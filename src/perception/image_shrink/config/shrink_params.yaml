@@ -1,0 +1,5 @@
+downscale_ratio: 0.4
+
+
+subscribe_topic: '/camera/color/image_raw'
+publish_topic: '/camera/color/small_image'

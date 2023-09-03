@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find response_generator)/launch/response_generator.launch"/>
+  <include file="$(find speech_recognition)/launch/speech_recognition.launch"/>
+  <!-- <include file="$(find task_generator)/launch/task_generator.launch"/> -->
+  <include file="$(find wakeword_detector)/launch/wakeword_detector.launch"/>
+
+</launch>

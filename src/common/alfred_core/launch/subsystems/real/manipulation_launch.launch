@@ -1,0 +1,6 @@
+<launch>
+
+    <!-- <node name="visual_servoing" pkg="manipulation" type="fsm.py" output="screen" /> -->
+    <!-- <node name="manip_fsm" pkg="manipulation" type="manip_fsm.py" output="screen" /> -->
+    <!-- <node name="manip_basic_control" pkg="manipulation" type="manip_basic_control.py" output="screen" /> -->
+</launch>

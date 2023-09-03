@@ -1,0 +1,37 @@
+
+##### camera topics:
+#### simulation
+# camera_info_topic: '/camera/depth/camera_info'
+# depth_image_topic: '/camera/depth/image_raw'
+# color_image_topic: "/camera/color/image_raw"
+
+#### real robot
+camera_info_topic: '/camera/aligned_depth_to_color/camera_info'
+depth_image_topic: '/camera/aligned_depth_to_color/image_raw'
+color_image_topic: "/camera/color/image_raw"
+
+
+
+# grasping strategy: one of ['graspnet', 'centroid']; TODO: GGCNN
+grasp_mode: 'centroid'
+
+# transform frame names
+tf_source_frame: 'camera_depth_optical_frame'
+tf_target_frame: 'base_link'
+tf_publish_frame_name: 'grasp'
+
+
+# graspnet args
+checkpoint_path: '/home/praveen/ws1/src/perception/grasp_detector/scripts/checkpoint-rs.tar'
+model_device_name: 'cuda:0'
+num_point: 20000
+num_view: 300
+num_angle : 12 # shouldnt this be 1?????
+collision_thresh: 0.01
+voxel_size: 0.01
+max_depth: 1200 
+num_depth: 4
+cylinder_radius: 0.05
+hmin: -0.02
+hmax_list: [0.01,0.02,0.03,0.04]
+input_feature_dim: 0

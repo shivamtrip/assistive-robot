@@ -1,0 +1,7 @@
+<launch>
+    <node name="shrink_image" pkg="image_shrink" type="shrink_image.py" output="screen" />  
+    <group ns="image_shrink">
+        <rosparam file="$(find image_shrink)/config/shrink_params.yaml" />
+    </group>
+    
+</launch>

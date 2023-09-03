@@ -1,0 +1,10 @@
+pvrecorder
+pvporcupine
+TTS
+google-cloud-texttospeech
+openai
+bs4
+google-cloud-speech
+SpeechRecognition
+spacy
+pyaudio

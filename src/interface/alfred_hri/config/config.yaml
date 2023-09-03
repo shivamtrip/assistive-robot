@@ -1,0 +1,8 @@
+uhuh_file: "resources/media/uh-huh.mp3"
+primitives_file_name: "resources/commands/primitives.json"
+wakeword: "Hey Alfred"
+audio_device_index: 1
+
+keywords_file: "resources/keywords/Hey-Alfred_en_linux_v2_1_0.ppn"
+model_file: "resources/models/porcupine_params.pv"
+

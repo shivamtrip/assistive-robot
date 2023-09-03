@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find image_shrink)/launch/image_shrinker.launch" />
+    <include file="$(find yolo)/launch/object_detector.launch" />
+    <!-- <include file="$(find grasp_detector)/launch/grasp_detector.launch" /> -->
+</launch>

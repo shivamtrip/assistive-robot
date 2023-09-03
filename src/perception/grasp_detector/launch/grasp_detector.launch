@@ -1,0 +1,6 @@
+<launch>
+    <node name="grasp_detector_node" pkg="grasp_detector" type="grasp_det.py" output="screen"></node>
+    <group ns="graspnet">
+        <rosparam file="$(find grasp_detector)/config/graspnet.yaml" />
+    </group>
+</launch>

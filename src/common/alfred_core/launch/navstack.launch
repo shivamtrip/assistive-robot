@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- <include file="$(find interface_meta)/launch/interface.launch" />
+  <include file="$(find planning_meta)/launch/planning.launch" /> -->
+  <include file="$(find alfred_navigation)/launch/navigation.launch" />
+
+</launch>

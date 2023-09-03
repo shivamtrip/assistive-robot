@@ -1,0 +1,39 @@
+{
+    "global_state" : "IDLE",
+    "local_state"  : "IDLE",
+    "last_update" : 0.0,
+    "operation_mode" : "AUTONOMOUS",
+    "current_task" : {
+        "origin" : "KITCHEN",
+        "goal" : "BEDROOM",
+        "task_type" : "DELIVERY",
+        "object_of_interest" : "BOTTLE"
+    },
+    "bot_joint_params": {
+    },
+    "hri_params": {
+        "listening" : false,
+        "emotion" : {
+            "name" : "DROWSY",
+            "intensity" : 0.0,
+            "sound" : "NONE"
+        },
+        "speech_in" : {
+            "text" : "Hello, I am your robot",
+            "recognized_emotion" : "NONE"
+        }
+    },
+    "teleop_commands" : {
+        "last_command_stamp" : 0.0,
+        "manipulator" : {
+            "vel_lift" : 0.0,
+            "vel_extend" : 0.0,
+            "yaw_position" : 0.0,
+            "gripper_open" : false
+        },
+        "mobile_base" : {
+            "velx" : 0.0,
+            "veltheta" : 0.0
+        }
+    }
+}

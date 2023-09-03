@@ -1,0 +1,12 @@
+#input  
+int64 objectId
+bool isPick
+float64 heightOfObject
+---
+#output
+float64 heightOfObject
+bool success
+---
+#feedback
+int64 curState
+string curStateInfo

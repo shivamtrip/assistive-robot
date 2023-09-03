@@ -1,0 +1,17 @@
+<launch>
+    <!-- simulator -->
+    <include file="$(find alfred_gazebo)/launch/simulation.launch" />
+    <!-- perception (object detection and grasp detector)-->
+    <include file="$(find alfred_core)/launch/subsystems/simulation/sim_perception.launch" />
+    <include file="$(find grasp_detector)/launch/grasp_detector.launch" />
+
+    <!-- manipulation -->
+    <include file="$(find manipulation)/launch/simulation.launch" />
+    <!-- speech  -->
+    <include file="$(find interface_meta)/launch/interface.launch" />
+    <!-- task allocator -->
+    <include file="$(find planning_meta)/launch/planning.launch" />
+
+    <!-- navigation -->
+    <include file="$(find alfred_navigation)/launch/navigation_sim_nogazebo.launch" />
+</launch>

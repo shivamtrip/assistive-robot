@@ -1,0 +1,3 @@
+<launch>
+    <node name="manipulation" pkg="manipulation" type="fsm_sim.py" output="screen" />  
+</launch>

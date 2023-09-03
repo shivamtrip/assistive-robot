@@ -1,0 +1,56 @@
+# Prerequisites
+latest/
+logs/
+*.d
+*.zip
+*.pyc
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.pt
+*.obj
+venvs/
+*realsense-ros/
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# ROS catkin build
+build/*
+.catkin_tools/*
+devel/*
+install/*
+logs/*
+
+# VS Code
+.vscode/*
+
+# Whisper files
+*.bin
+*.en.bin
+
+# Compilation files
+*.egg
+*/SOURCES.txt
+latest

@@ -1,0 +1,9 @@
+
+point_cloud_topic: '/camera/depth/color/points'
+base_frame: '/base_link'
+camera_frame: '/camera_color_optical_frame'
+
+# RANSAC parameters:
+confidence: 0.85
+inlier_threshold: 0.02
+min_sample_distance: 0.2

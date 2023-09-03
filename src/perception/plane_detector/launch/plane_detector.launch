@@ -1,0 +1,7 @@
+<launch>
+    <group ns="plane_detector">
+        <rosparam file="$(find plane_detector)/config/plane_detector_params.yaml" />
+    </group>
+
+    <node name="plane_detector_node" pkg="plane_detector" type="main.py" output="screen" />
+</launch>

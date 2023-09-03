@@ -1,0 +1,161 @@
+{
+  "configById": {
+    "ImageViewPanel!4950esa": {
+      "cameraTopic": "",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": false,
+      "transformMarkers": false,
+      "zoom": 1
+    },
+    "ImageViewPanel!k6tooa": {
+      "cameraTopic": "",
+      "enabledMarkerTopics": [],
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "rotation": 0,
+      "synchronize": false,
+      "transformMarkers": false,
+      "zoom": 1
+    },
+    "3D!14qa1ig": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 7.0637409706823355,
+        "phi": 77.9571563853764,
+        "thetaOffset": 43.16138911175447,
+        "targetOffset": [
+          2.556463361309705,
+          1.8402305851046499,
+          7.815611500402084e-16
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {
+        "syncCamera": false,
+        "labelScaleFactor": 0.09573593128807092,
+        "enableStats": true
+      },
+      "transforms": {},
+      "topics": {
+        "/scan": {
+          "visible": false,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/move_base/local_costmap/costmap": {
+          "visible": false
+        },
+        "/move_base_simple/goal": {
+          "visible": true
+        },
+        "/move_base/global_costmap/costmap": {
+          "visible": true
+        },
+        "param:/robot_description": {
+          "visible": true
+        },
+        "/amcl_pose": {
+          "visible": false
+        },
+        "/initialpose": {
+          "visible": false
+        },
+        "/scan_filtered": {
+          "visible": false,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/particlecloud": {
+          "visible": false
+        },
+        "/move_base/global_costmap/footprint": {
+          "visible": false
+        }
+      },
+      "layers": {
+        "380cb2e8-c871-468b-b309-d9fa5fe1442b": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "URDF",
+          "instanceId": "380cb2e8-c871-468b-b309-d9fa5fe1442b",
+          "layerId": "foxglove.Urdf",
+          "url": "C:\\Users\\prave\\Desktop\\alfred_description/stretch_urdf",
+          "order": 1
+        },
+        "9d853586-73c0-4014-9452-9a981ffcf6bc": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "9d853586-73c0-4014-9452-9a981ffcf6bc",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 2
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "foxglovePanelTitle": "Scene"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": {
+      "first": "ImageViewPanel!4950esa",
+      "second": "ImageViewPanel!k6tooa",
+      "direction": "column"
+    },
+    "second": "3D!14qa1ig",
+    "direction": "row",
+    "splitPercentage": 30.511113665576374
+  }
+}

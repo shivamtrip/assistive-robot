@@ -1,0 +1,4 @@
+primitives_file_name: "primitives.json"
+command_topic_name: "/interface/speech_recognition/command"
+speech_trigger_topic_name: "/interface/speech_recognition/trigger"
+wakeword_topic_name: "/interface/wakeword_detector/wakeword"

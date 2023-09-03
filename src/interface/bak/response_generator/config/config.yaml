@@ -1,0 +1,5 @@
+engagement_topic_name: /interface/speech_recognition/engagement
+
+verbal_response_service_name: /interface/response_generator/verbal_response_service
+
+uhuh_file: "media/uh-huh.mp3"

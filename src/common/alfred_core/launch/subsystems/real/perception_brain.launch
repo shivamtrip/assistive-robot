@@ -1,0 +1,5 @@
+<launch>
+    <include file="$(find yolo)/launch/object_detector.launch" />
+    <include file="$(find grasp_detector)/launch/grasp_detector.launch" />
+    <include file="$(find plane_detector)/launch/plane_detector.launch" />
+</launch>

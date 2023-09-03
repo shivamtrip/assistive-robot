@@ -1,0 +1,10 @@
+[submodule "src/simulation/stretch_ros"]
+	path = src/simulation/stretch_ros
+	url = https://github.com/hello-robot/stretch_ros.git
+[submodule "src/common/realsense-ros"]
+	path = src/common/realsense-ros
+	url = https://github.com/IntelRealSense/realsense-ros.git
+	branch = ros1-legacy
+[submodule "src/simulation/realsense_gazebo_plugin"]
+	path = src/simulation/realsense_gazebo_plugin
+	url = https://github.com/pal-robotics/realsense_gazebo_plugin.git

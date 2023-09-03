@@ -1,0 +1,1 @@
+- paths should be in configs as a yaml file.

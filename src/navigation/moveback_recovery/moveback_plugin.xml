@@ -1,0 +1,7 @@
+<library path="lib/libmoveback_recovery">
+  <class name="moveback_recovery/MovebackRecovery" type="moveback_recovery::MovebackRecovery" base_class_type="nav_core::RecoveryBehavior">
+    <description>
+      A recovery behavior that makes the robot move back by a certain distance.
+    </description>
+  </class>
+</library>

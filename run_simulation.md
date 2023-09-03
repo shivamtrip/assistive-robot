@@ -1,0 +1,10 @@
+
+
+roslaunch alfred_gazebo simulation.launch
+roslaunch manipulation simulation.launch
+roslaunch grasp_detector grasp_detector.launch
+roslaunch interface_meta interface.launch
+
+roslaunch planning_meta planning.launch
+
+roslaunch alfred_navigation navigation_sim_nogazebo.launch
