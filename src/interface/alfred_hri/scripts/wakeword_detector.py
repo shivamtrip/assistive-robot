@@ -59,12 +59,15 @@ class WakewordDetector():
             config = f.read()
             config = json.loads(config)
 
-        self.access_key = None
-
         if "PORCUPINE_ACCESS_KEY" not in config.keys():
             sys.exit("ERROR: PORCUPINE_ACCESS_KEY is not set. Please add it to ~/ws/api_keys/.secrets.json.")
 
-        self.access_key = config["PORCUPINE_ACCESS_KEY"]
+        self.access_key = None
+
+        if os.getenv("PORCUPINE_ACCESS_KEY") is None:
+            sys.exit("ERROR: PORCUPINE_ACCESS_KEY is not set. Please add it to ~/.secrets.sh.")
+
+        self.access_key = os.getenv("PORCUPINE_ACCESS_KEY")
 
         self.porcupine = pvporcupine.create(
                 access_key=self.access_key,
