@@ -53,9 +53,9 @@ class ResponseGenerator():
 
         # Access keys are stored in ~/.secrets.sh
         # check if file exists
-        if not os.path.isfile(os.path.expanduser("~/ws/api_keys/.secrets.json")):
+        if not os.path.isfile(os.path.expanduser("~/.secrets.json")):
             sys.exit("ERROR: secrets.json does not exist. Please create it and add your access key.")
-        secrets_file = os.path.expanduser("~/ws/api_keys/.secrets.json")
+        secrets_file = os.path.expanduser("~/.secrets.json")
         config = {}
         with open(secrets_file, "r") as f:
             config = f.read()
@@ -63,12 +63,12 @@ class ResponseGenerator():
 
         self.openai_access_key = None
         if "OPENAI_API_KEY" not in config.keys():
-            sys.exit("ERROR: OPENAI_API_KEY is not set. Please add it to ~/ws/api_keys/.secrets.json.")
+            sys.exit("ERROR: OPENAI_API_KEY is not set. Please add it to ~/.secrets.json.")
         self.openai_access_key = config["OPENAI_API_KEY"]
 
         self.google_cloud_api_key = None
         if "GOOGLE_CLOUD_API_KEY" not in config.keys():
-            sys.exit("ERROR: GOOGLE_CLOUD_API_KEY is not set. Please add it to ~/ws/api_keys/.secrets.json.")
+            sys.exit("ERROR: GOOGLE_CLOUD_API_KEY is not set. Please add it to ~/.secrets.json.")
         self.google_cloud_api_key = config["GOOGLE_CLOUD_API_KEY"]
 
         self.client = texttospeech.TextToSpeechClient()
