@@ -1,7 +1,0 @@
-speech_trigger_topic_name: /interface/wakeword_detector/trigger
-
-wakeword: "Hey Alfred"
-audio_device_index: 1
-
-keywords_file: "resources/keywords/Hey-Alfred_en_linux_v2_1_0.ppn"
-model_file: "resources/models/porcupine_params.pv"
