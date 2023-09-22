@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-    <rosparam command="load" file="$(find response_generator)/config/config.yaml" /> <!--Load parameters from config files-->
-    <node name="response_generator_node" pkg="response_generator" type="generate_response.py" output="screen">
-    </node>
-</launch>

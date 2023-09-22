@@ -50,10 +50,10 @@ class WakewordDetector():
         # Access key is stored in ~/.secrets.sh
         self.triggerCallback = triggerCallback
         # check if file exists
-        if not os.path.isfile(os.path.expanduser("~/ws/api_keys/.secrets.json")):
+        if not os.path.isfile(os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")):
             sys.exit("ERROR: secrets.json does not exist. Please create it and add your access key.")
         
-        secrets_file = os.path.expanduser("~/ws/api_keys/.secrets.json")
+        secrets_file = os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")
         config = {}
         with open(secrets_file, "r") as f:
             config = f.read()

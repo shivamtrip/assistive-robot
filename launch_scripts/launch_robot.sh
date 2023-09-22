@@ -40,7 +40,7 @@ else
     tmux send-keys -t 2 "sleep 20 && roslaunch alfred_navigation navigation_no_driver.launch" C-m
     tmux send-keys -t 3 "sleep 23 && rosrun task_planner task_planner.py" C-m
     tmux send-keys -t 4 "sleep 25 && roslaunch manipulation robot_manipulation.launch" C-m
-    tmux send-keys -t 5 "sleep 26 && roslaunch alfred_hri hri.launch" C-m
+    tmux send-keys -t 5 "sleep 26 && roslaunch alfred_hri hri.lau  y6nch" C-m
     tmux send-keys -t 6 "sleep 23 && ssh praveen@alfredbrain 'bash -s < /home/praveen/ws1/launch_scripts/launch_brain.sh'" C-m
     tmux send-keys -t 7 "htop" C-m
 

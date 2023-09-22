@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-    <rosparam command="load" file="$(find wakeword_detector)/config/config.yaml" /> <!--Load parameters from config files-->
-    <node name="wakeword_detector_node" pkg="wakeword_detector" type="wakeword_detector.py" output="screen">
-    </node>
-</launch>

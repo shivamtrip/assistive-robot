@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-    <!-- <node name="speech_recognition_node" pkg="speech_recognition" type="speech_recognition" output="screen">
-        <rosparam command="load" file="$(find speech_recognition)/config/params.yaml" />
-    </node> -->
-    <node name="speech_recognition_node" pkg="speech_recognition" type="recognize_speech.py" output="screen">
-        <rosparam command="load" file="$(find speech_recognition)/config/params.yaml" />
-    </node>
-</launch>
