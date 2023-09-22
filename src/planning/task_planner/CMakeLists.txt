@@ -17,9 +17,12 @@ find_package(catkin REQUIRED COMPONENTS
   move_base
   tf
 <<<<<<< HEAD
+<<<<<<< HEAD
   # response_generator
 =======
 >>>>>>> initial updates
+=======
+>>>>>>> fc19e240d6c9410d1a83240f9fd9c411f4e5929c
 )
 
 ## System dependencies are found with CMake's conventions
