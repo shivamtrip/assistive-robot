@@ -9,7 +9,7 @@ import json
 import os
 class FirebaseNode:
     def __init__(self, schema, operation_mode_callback, teleop_mode_callback):
-        firebase_secrets_path = os.path.expanduser("~/ws/api_keys/firebase_secrets.json")
+        firebase_secrets_path = os.path.expanduser("~/.alfred-auxilio-firebase-adminsdk.json")
         if not os.path.isfile(firebase_secrets_path):
             raise FileNotFoundError("Firebase secrets file not found")
         
