@@ -53,7 +53,7 @@ class WakewordDetector():
         if not os.path.isfile(os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")):
             sys.exit("ERROR: secrets.json does not exist. Please create it and add your access key.")
         
-        secrets_file = os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")
+        secrets_file = os.path.expanduser("~/.secrets.json")
         config = {}
         with open(secrets_file, "r") as f:
             config = f.read()
