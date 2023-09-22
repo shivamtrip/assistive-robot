@@ -23,7 +23,7 @@ class HRI():
 
         self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
-
+        rospy.loginfo("Waiting for services")
         self.startedListeningService.wait_for_service()
         self.commandService.wait_for_service()
         rospy.loginfo("HRI Node ready")
