@@ -25,7 +25,7 @@ import difflib
 from alfred_msgs.msg import Speech, SpeechTrigger
 from std_msgs.msg import String
 
-from response_generator.srv import VerbalResponse, VerbalResponseResponse
+# from response_generator.srv import VerbalResponse, VerbalResponseResponse
 
 from difflib import ndiff
 import json
@@ -42,9 +42,9 @@ import openai
 class ResponseGenerator():
     def __init__(self):
 
-        if not os.path.isfile(os.path.expanduser("~/.secrets.json")):
+        if not os.path.isfile(os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")):
             sys.exit("ERROR: secrets.json does not exist. Please create it and add your access key.")
-        secrets_file = os.path.expanduser("~/.secrets.json")
+        secrets_file = os.path.expanduser("~/alfred-autonomy/api_keys/.secrets.json")
         config = {}
 
         with open(secrets_file, "r") as f:

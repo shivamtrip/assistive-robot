@@ -16,7 +16,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   move_base
   tf
+<<<<<<< HEAD
   # response_generator
+=======
+>>>>>>> initial updates
 )
 
 ## System dependencies are found with CMake's conventions

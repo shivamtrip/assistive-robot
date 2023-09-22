@@ -2,7 +2,7 @@
 <launch>
   <arg 
     name="map_yaml" doc="filepath to previously captured map (required)" 
-    default="/home/hello-robot/ws/src/navigation/alfred_navigation/config/maps/ai_ms.yaml"
+    default="/home/hello-robot/alfred-autonomy/src/navigation/alfred_navigation/config/maps/ai_ms.yaml"
   /> 
 
   <arg name="rviz"     default="false" doc="whether to show Rviz" />
