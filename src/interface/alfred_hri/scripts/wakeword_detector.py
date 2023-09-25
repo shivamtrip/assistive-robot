@@ -39,7 +39,7 @@ class WakewordDetector():
         self.wakeword = rospy.get_param("wakeword", "Hey Alfred")
         self.keywords_path = rospy.get_param("keywords_path", "resources/keywords/Hey-Alfred_en_linux_v2_1_0.ppn")
         self.models_path = rospy.get_param("models_path", "resources/models/porcupine_params.pv")
-        self.audio_device_index = rospy.get_param("audio_device_index", 1)
+        self.audio_device_index = rospy.get_param("audio_device_index", 5)
         self.rospack = rospkg.RosPack()
         self.package_path = self.rospack.get_path("alfred_hri")
 
