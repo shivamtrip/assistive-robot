@@ -12,7 +12,7 @@
   <node name="map_server" pkg="map_server" type="map_server" args="$(find alfred_navigation)/maps/nursing_home_map.yaml" />
 
   <!-- LOCALIZATION -->
-  <include file="$(find alfred_navigation)/launch/navigation/amcl_sim.launch" />
+  <include file="$(find alfred_navigation)/launch/localization/amcl_sim.launch" />
 
   <!-- NAVIGATION -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
