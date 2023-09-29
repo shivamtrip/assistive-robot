@@ -25,7 +25,7 @@ import difflib
 from alfred_msgs.msg import Speech, SpeechTrigger
 from std_msgs.msg import String
 
-from response_generator.srv import VerbalResponse, VerbalResponseResponse
+# from response_generator.srv import VerbalResponse, VerbalResponseResponse
 
 from difflib import ndiff
 import json

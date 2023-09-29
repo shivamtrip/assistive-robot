@@ -30,11 +30,10 @@ else
     tmux split-window -h
     tmux select-pane -t 6
     tmux split-window -h
-    
-
-    
+        
     # Run commands in each pane (add sleeps to wait for roscore to start)
     # tmux send-keys -t 0 "roscore" C-m
+    
     tmux send-keys -t 0 "sleep 1 && roslaunch alfred_core driver.launch " C-m
     tmux send-keys -t 1 "sleep 10 && roslaunch alfred_core perception_robot_tuned.launch" C-m
     tmux send-keys -t 2 "sleep 20 && roslaunch alfred_navigation navigation_no_driver.launch" C-m

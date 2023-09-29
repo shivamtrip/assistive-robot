@@ -37,7 +37,7 @@ class BotStateManager():
         self.operationMode = OperationModes.AUTONOMOUS
         self.emotion = Emotions.NEUTRAL
 
-        with open(os.path.expanduser("~/ws/src/planning/task_planner/config/firebase_schema.json")) as f:
+        with open(os.path.expanduser("~/alfred-autonomy/src/planning/task_planner/config/firebase_schema.json")) as f:
             self.state_dict = json.load(f)
 
         self.firebaseNode = FirebaseNode(

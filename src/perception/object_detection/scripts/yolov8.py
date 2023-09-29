@@ -39,7 +39,7 @@ class ObjectDetectionNode:
         self.rgb_image_subscriber.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
-
+        self.last_image_time = time.time()
         self.started_publishing = False
         
     def runModel(self, img):
@@ -61,6 +61,7 @@ class ObjectDetectionNode:
         return box, box_cls, confs, img
 
     def callback(self,ros_rgb_image):
+        self.last_image_time = time.time()
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
         rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
         boxes, classes, confs, annotated_img = self.runModel(rgb_image)
@@ -97,6 +98,9 @@ if __name__ == "__main__":
     
     node = ObjectDetectionNode()
     try:
-        rospy.spin()
+        while True:
+            if time.time() - node.last_image_time > 60:
+                break
+            rospy.sleep(1)
     except rospy.ROSInterruptException:
         pass

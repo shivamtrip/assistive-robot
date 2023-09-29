@@ -14,7 +14,6 @@ class HRI():
         self.speech_recognition = SpeechRecognition()
         self.wakeword_detector = WakewordDetector(self.wakeword_triggered)
         self.responseGenerator = ResponseGenerator()
-        
         self.verbal_response_service = rospy.Service(
             '/interface/response_generator/verbal_response_service', 
             VerbalResponse, 
@@ -23,7 +22,8 @@ class HRI():
 
         self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
-
+        
+        rospy.loginfo("Waiting for services")
         self.startedListeningService.wait_for_service()
         self.commandService.wait_for_service()
         rospy.loginfo("HRI Node ready")
