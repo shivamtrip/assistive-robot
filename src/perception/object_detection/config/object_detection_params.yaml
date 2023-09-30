@@ -1,5 +1,6 @@
 
-model_type: 'yolov8x.pt'
+base_model: 'yolov8x.pt'
+custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/sodacan_tissue.pt'
 
 # subscribe_topic: '/camera/color/small_image'
 subscribe_topic: '/camera/color/small_image'

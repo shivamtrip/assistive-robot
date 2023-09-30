@@ -13,6 +13,7 @@ from rospy.numpy_msg import numpy_msg
 import json
 from yolo.msg import Detections
 import supervision as sv
+import threading
 
 # class NumpyEncoder(json.JSONEncoder):
 #     def default(self, obj):
@@ -26,8 +27,11 @@ class ObjectDetectionNode:
     def __init__(self) -> None:
         rospy.init_node('object_detection', anonymous=False)
 
-        self.model = YOLO(rospy.get_param('/object_detection/model_type'))
+        self.model = YOLO(rospy.get_param('/object_detection/base_model'))
         self.model.to(rospy.get_param('/object_detection/device'))
+        
+        self.model_custom = YOLO(rospy.get_param('/object_detection/custom_model'))
+        self.model_custom.to(rospy.get_param('/object_detection/device'))
         
         rospy.loginfo(f"[{rospy.get_name()}] " + "Loaded model")
         self.visualize = rospy.get_param('/object_detection/visualize')
@@ -41,12 +45,14 @@ class ObjectDetectionNode:
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
         self.last_image_time = time.time()
         self.started_publishing = False
+    
+    def runModel(self, img, model, outputs):
+        results = model(img, show = False, verbose= False)
         
-    def runModel(self, img):
-        results = self.model(img, show = False, verbose= False)
         if self.started_publishing == False:
             self.started_publishing = True
             rospy.loginfo(f"[{rospy.get_name()}] " + "Started publishing data")
+        
         boxes =  results[0].boxes
         detections = sv.Detections.from_yolov8(results[0])
         confs, box_cls, box = detections.confidence, detections.class_id, detections.xyxy
@@ -58,13 +64,41 @@ class ObjectDetectionNode:
                 
                 img = cv2.putText(img, str(self.model.names[cls.item()]) + " | " + str(cls.item()),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
                             0.5, (0,0,255), 1, cv2.LINE_AA)
-        return box, box_cls, confs, img
+        outputs[0] = box
+        outputs[1] = box_cls
+        outputs[2] = confs
+        outputs[3] = img
+
+    def mergeResults(self, results1, results2):
+        boxes1, classes1, confs1, annotated_img1 = results1
+        boxes2, classes2, confs2, annotated_img2 = results2
+        boxes = np.concatenate((boxes1, boxes2))
+        classes = np.concatenate((classes1, classes2))
+        confs = np.concatenate((confs1, confs2))
+        annotated_img = np.concatenate((annotated_img1, annotated_img2))
+        return boxes, classes, confs, annotated_img
+    
 
     def callback(self,ros_rgb_image):
         self.last_image_time = time.time()
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
         rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
-        boxes, classes, confs, annotated_img = self.runModel(rgb_image)
+        
+        r1 = [None, None, None, None]
+        r2 = [None, None, None, None]
+        
+        t1 = threading.Thread(self.runModel, args = (rgb_image, self.model, r1))
+        t2 = threading.Thread(self.runModel, args = (rgb_image, self.model_custom, r2))
+        t1.start()
+        t2.start()
+        
+        t1.join()
+        t2.join()   
+
+        boxes, classes , confs, annotated_img = self.mergeResults(r1, r2)
+        
+                
+        
         boxes = boxes # shape = (nPredictions, 4)
         classes = classes.flatten()
         boxes = boxes.flatten()
