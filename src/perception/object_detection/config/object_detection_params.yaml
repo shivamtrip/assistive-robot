@@ -9,4 +9,5 @@ publish_topic: 'object_bounding_boxes'
 visualize: true
 visualize_topic: 'annotated_image_body'
 
-device: 'cuda:0'
+device_1: 'cuda:0'
+device_2: 'cuda:1'

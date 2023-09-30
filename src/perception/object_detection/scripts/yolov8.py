@@ -28,10 +28,10 @@ class ObjectDetectionNode:
         rospy.init_node('object_detection', anonymous=False)
 
         self.model = YOLO(rospy.get_param('/object_detection/base_model'))
-        self.model.to(rospy.get_param('/object_detection/device'))
+        self.model.to(rospy.get_param('/object_detection/device_1'))
         
         self.model_custom = YOLO(rospy.get_param('/object_detection/custom_model'))
-        self.model_custom.to(rospy.get_param('/object_detection/device'))
+        self.model_custom.to(rospy.get_param('/object_detection/device_2'))
         
         rospy.loginfo(f"[{rospy.get_name()}] " + "Loaded model")
         self.visualize = rospy.get_param('/object_detection/visualize')
@@ -62,7 +62,7 @@ class ObjectDetectionNode:
             for (b,cls) in zip(box,box_cls):
                 img = cv2.rectangle(img, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
                 
-                img = cv2.putText(img, str(self.model.names[cls.item()]) + " | " + str(cls.item()),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
+                img = cv2.putText(img, str(model.names[cls.item()]) + " | " + str(cls.item()),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
                             0.5, (0,0,255), 1, cv2.LINE_AA)
         outputs[0] = box
         outputs[1] = box_cls
@@ -87,8 +87,8 @@ class ObjectDetectionNode:
         r1 = [None, None, None, None]
         r2 = [None, None, None, None]
         
-        t1 = threading.Thread(self.runModel, args = (rgb_image, self.model, r1))
-        t2 = threading.Thread(self.runModel, args = (rgb_image, self.model_custom, r2))
+        t1 = threading.Thread(target = self.runModel, args = (rgb_image, self.model, r1))
+        t2 = threading.Thread(target = self.runModel, args = (rgb_image, self.model_custom, r2))
         t1.start()
         t2.start()
         
