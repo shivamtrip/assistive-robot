@@ -84,10 +84,7 @@ class ObjectDetectionNode:
                 
         for i in range(len(final_results)-1):
             outputs[i] = final_results[i]
-        
-        # outputs[0] = box
-        # outputs[1] = box_cls
-        # outputs[2] = confs
+
         outputs[3] = img
     def mergeResults(self, results1, results2):
         boxes1, classes1, confs1, annotated_img1 = results1
@@ -116,9 +113,6 @@ class ObjectDetectionNode:
 
         boxes, classes , confs, annotated_img = self.mergeResults(r1, r2)
         
-                
-        
-        boxes = boxes # shape = (nPredictions, 4)
         classes = classes.flatten()
         boxes = boxes.flatten()
         confs = confs.flatten()
@@ -131,12 +125,6 @@ class ObjectDetectionNode:
         msg.box_classes = classes
         msg.confidences = confs
 
-        
-        # msg = {
-        #     'boxes' : np.array(boxes),
-        #     'box_classes' : classes.cpu().numpy(),
-        # } 
-        # self.data_pub.publish(json.dumps(msg, cls = NumpyEncoder))
         self.data_pub.publish(msg)
         
         if self.visualize:
