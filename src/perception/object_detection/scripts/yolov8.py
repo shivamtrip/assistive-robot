@@ -86,9 +86,13 @@ class ObjectDetectionNode:
             outputs[i] = final_results[i]
 
         outputs[3] = img
-    def mergeResults(self, results1, results2):
-        boxes1, classes1, confs1, annotated_img1 = results1
-        boxes2, classes2, confs2, annotated_img2 = results2
+    def mergeResults(self, results_coco, resultscustom):
+        boxes1, classes1, confs1, annotated_img1 = results_coco
+        boxes2, classes2, confs2, annotated_img2 = resultscustom
+        if len(boxes2) == 0:
+            return np.array(boxes1), np.array(classes1), np.array(confs1), np.array(annotated_img1)
+        elif len(boxes1) == 0:
+            return np.array(boxes2), np.array(classes2), np.array(confs2), np.array(annotated_img2)
         boxes = np.concatenate((boxes1, boxes2))
         classes = np.concatenate((classes1, classes2))
         confs = np.concatenate((confs1, confs2))
@@ -111,7 +115,7 @@ class ObjectDetectionNode:
         t1.join()
         t2.join()   
 
-        boxes, classes , confs, annotated_img = self.mergeResults(r1, r2)
+        boxes, classes, confs, annotated_img = self.mergeResults(r1, r2)
         
         classes = classes.flatten()
         boxes = boxes.flatten()

@@ -1,4 +1,4 @@
-downscale_ratio: 0.4
+downscale_ratio: 0.3
 
 
 subscribe_topic: '/camera/color/image_raw'
