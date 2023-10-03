@@ -2,8 +2,8 @@
 base_model: 'yolov8x.pt'
 custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/sodacan_tissue.pt'
 
-# subscribe_topic: '/camera/color/small_image'
 subscribe_topic: '/camera/color/small_image'
+# subscribe_topic: '/camera/color/image_raw'
 
 publish_topic: 'object_bounding_boxes'
 visualize: true
@@ -11,3 +11,16 @@ visualize_topic: 'annotated_image_body'
 
 device_1: 'cuda:0'
 device_2: 'cuda:1'
+
+class_list:
+  - 'soda_can'
+  - 'tissue_paper'
+  - 'toothbrush'
+  - 'tie'
+  - 'cell phone'
+  - 'banana'
+  - 'apple'
+  - 'orange'
+  - 'bottle'
+  - 'cup'
+  - 'teddy_bear'

@@ -27,6 +27,9 @@ class ObjectDetectionNode:
     def __init__(self) -> None:
         rospy.init_node('object_detection', anonymous=False)
 
+        self.class_list = rospy.get_param('/object_detection/class_list')
+        self.class_id_map = {self.class_list[i]: i for i in range(len(self.class_list))}
+        rospy.loginfo(f"[{rospy.get_name()}] Loaded class list: {self.class_list}")
         self.model = YOLO(rospy.get_param('/object_detection/base_model'))
         self.model.to(rospy.get_param('/object_detection/device_1'))
         
@@ -56,27 +59,43 @@ class ObjectDetectionNode:
         boxes =  results[0].boxes
         detections = sv.Detections.from_yolov8(results[0])
         confs, box_cls, box = detections.confidence, detections.class_id, detections.xyxy
-        # box = boxes.xyxy
-        # box_cls =boxes.cls
-        if self.visualize:
-            for (b,cls) in zip(box,box_cls):
-                img = cv2.rectangle(img, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
-                
-                img = cv2.putText(img, str(model.names[cls.item()]) + " | " + str(cls.item()),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
-                            0.5, (0,0,255), 1, cv2.LINE_AA)
-        outputs[0] = box
-        outputs[1] = box_cls
-        outputs[2] = confs
-        outputs[3] = img
 
+        final_results = [
+            [],
+            [],
+            [],
+            []
+        ]
+
+        
+        for (b,cls, conf) in zip(box,box_cls, confs):
+            
+            if model.names[cls.item()] in self.class_list:
+                
+                new_class_id = self.class_id_map[model.names[cls.item()]]
+                final_results[0].append(b)
+                final_results[1].append(new_class_id) #remapped class index
+                final_results[2].append(conf)
+                if self.visualize:
+                    img = cv2.rectangle(img, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
+                    
+                    img = cv2.putText(img, str(self.class_list[new_class_id]) + " | " + str(new_class_id),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
+                                0.5, (0,0,255), 1, cv2.LINE_AA)
+                
+        for i in range(len(final_results)-1):
+            outputs[i] = final_results[i]
+        
+        # outputs[0] = box
+        # outputs[1] = box_cls
+        # outputs[2] = confs
+        outputs[3] = img
     def mergeResults(self, results1, results2):
         boxes1, classes1, confs1, annotated_img1 = results1
         boxes2, classes2, confs2, annotated_img2 = results2
         boxes = np.concatenate((boxes1, boxes2))
         classes = np.concatenate((classes1, classes2))
         confs = np.concatenate((confs1, confs2))
-        annotated_img = np.concatenate((annotated_img1, annotated_img2))
-        return boxes, classes, confs, annotated_img
+        return boxes, classes, confs, annotated_img1
     
 
     def callback(self,ros_rgb_image):
