@@ -1,77 +1,71 @@
 <launch>
+    <arg name="localization"/>
+    <arg name="args"/>
+    <arg name="database_path"/>
+    <arg name="wait_for_transform"/>
+    <arg name="pointcloud_topic"/>
+    <arg name="cmd_vel_topic"/>
+    <arg name="odom_topic"/>
+    <arg name="scan"/>
+    <arg name="rgb_topic"/>
+    <arg name="rgb_camera_info"/>
 
-  <!-- Arguments -->
-  <arg name="move_forward_only" default="false"/>
+    <!-- Choose visualization -->
+    <arg name="rtabmap_viz"             default="true" />
+    <arg name="rviz"                    default="false" />
 
-  <arg name="with_camera" default="true"/>
-  <arg name="localization" default="false"/>
-  <arg name="database_path" default="~/.ros/rtabmap.db"/>
-  <arg     if="$(arg localization)" name="rtabmap_args" default=""/>
-  <arg unless="$(arg localization)" name="rtabmap_args" default="-d"/>
+    <!-- Mapping -->
+    <group ns="rtabmap">
 
-  <!-- Creating RGBD image for first camera -->
-  <group ns="camera1">
-    <node pkg="rtabmap_sync" type="rgbd_sync" name="rgbd_sync1" output="screen">
-      <remap from="rgb/image"         to="/camera_head/color/image_raw"/>
-      <remap from="depth/image"       to="/camera_head/aligned_depth_to_color/image_raw"/>
-      <remap from="rgb/camera_info"   to="/camera_head/color/camera_info"/>
-      <!-- <remap from="depth/camera_info" to="/camera_head/depth/camera_info"/> -->
+    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg args)">
+        <param name="database_path"       type="string" value="$(arg database_path)"/>
+        <param name="frame_id"            type="string" value="camera_link"/>
+        <param name="odom_frame_id"       type="string" value="odom"/>
+        <param name="odom_tf_angular_variance" type="double" value="0.005"/>
+        <param name="odom_tf_linear_variance"  type="double" value="0.005"/>
+        <param name="wait_for_transform_duration"  type="double"   value="$(arg wait_for_transform)"/>
+        <param name="subscribe_depth"     type="bool"   value="true"/>
+        <param name="subscribe_scan"      type="bool"   value="true"/>
 
-      <remap from="rgbd_image"       to="rgbd_image1"/>
-    </node>
-  </group>
+        <!-- inputs -->
+        <remap from="scan"            to="$(arg scan)"/>
+        <remap from="rgb/image"       to="$(arg rgb_topic)"/>
+        <remap from="depth/image"     to="$(arg pointcloud_topic)"/>
+        <remap from="rgb/camera_info" to="$(arg rgb_camera_info)"/>
 
-  <!-- Launching RTAB-Map -->
-  <group ns="rtabmap">
+        <!-- output -->
+        <remap from="grid_map" to="/map"/>
 
-    <!-- Odometry -->
-    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
-      <param name="subscribe_rgb"       type="bool" value="false"/>
-      <param name="subscribe_depth"     type="bool" value="false"/>
-      <param name="subscribe_rgbd" type="bool"   value="true"/>
-      <param name="rgbd_cameras"   type="int"    value="1"/>
-      <param name="frame_id"       type="string" value="camera_head_link"/>
-      <param name="publish_tf"     type="bool"   value="true"/>
-      <param name="wait_imu_to_init"  type="bool"   value="true"/>
-      <remap from="rgbd_image"     to="/camera1/rgbd_image1"/>
-      <remap from="imu"            to="/imu/data"/>
-    </node>
+        <!-- RTAB-Map's parameters: do "rosrun rtabmap rtabmap (double-dash)params" to see the list of available parameters. -->
+        <param name="RGBD/ProximityBySpace"        type="string" value="true"/>
+        <param name="RGBD/OptimizeFromGraphEnd"    type="string" value="false"/>
+        <param name="RGBD/AngularUpdate"           type="string" value="0.1"/>
+        <param name="RGBD/LinearUpdate"            type="string" value="0.1"/>
+        <param name="RGBD/ProximityPathMaxNeighbors" type="string" value="10"/>
+        <param name="Reg/Strategy"                 type="string" value="1"/>
+        <param name="Reg/Force3DoF"                type="string" value="true"/>
+        <param name="Vis/MinInliers"               type="string" value="6"/>
+        <param name="Vis/InlierDistance"           type="string" value="0.1"/>
+        <param name="Grid/FromDepth"               type="string" value="true"/>
+        <param name="Grid/MaxObstacleHeight"             type="string" value="0.3"/>
+        <!-- <param name="Grid/MinGroundHeight"               type="string" value="0.001"/> -->
+        <!-- <param name="Grid/RangeMax"                type="string" value="3.5"/> -->
+        <param name="Kp/MaxDepth"                  type="string" value="4.0"/>
+        <param name="Icp/CoprrespondenceRatio"     type="string" value="0.3"/>
+        <param name="Rtabmap/TimeThr"              type="string" value="700"/>
+        <param name="Mem/RehearsalSimilarity"      type="string" value="0.30"/>
+        <param name="Grid/VoxelSize"               type="string" value="1"/>
 
-    <node name="rtabmap" pkg="rtabmap_slam" type="rtabmap" output="screen" args="$(arg rtabmap_args)">
-      <param name="database_path"       type="string" value="$(arg database_path)"/>
-      <param name="frame_id"            type="string" value="camera_head_link"/>
-      <param name="subscribe_rgb"       type="bool" value="false"/>
-      <param name="subscribe_depth"     type="bool" value="false"/>
-      <param name="subscribe_rgbd"      type="bool" value="true"/>
-      <param name="rgbd_cameras"        type="int" value="1"/>
-      <param name="subscribe_scan"      type="bool"   value="false"/>
-      <param name="approx_sync"         type="bool"   value="true"/>
-      <param name="publish_tf"          type="bool"   value="true"/>
-      <param name="rtabmapviz"          type="bool"   value="true"/>
-
-      <!-- inputs -->
-      <remap from="rgbd_image"     to="/camera1/rgbd_image1"/>
-      <!-- <remap from="rgbd_images"     to="/rtabmap/rgbd_images"/> -->
-      <param name="queue_size" type="int" value="10"/>
-
-      <!-- output -->
-      <remap from="grid_map" to="/map"/>
-
-      <!-- RTAB-Map's parameters -->
-      <param name="Reg/Strategy"                 type="string" value="1"/>
-      <param name="Reg/Force3DoF"                type="string" value="true"/>
-      <param name="GridGlobal/MinSize"           type="string" value="20"/>
-      <param name="Grid/Sensor"                  type="string" value="1"/>
-      <param name="Vis/EstimationType"           type="string" value="0"/>  
-      <param name="Grid/FromDepth"               type="string" value="true"/>
-      <param name="Grid/RangeMax"                type="string" value="3.5"/>
-      <param name="Grid/VoxelSize"               type="string" value="1"/>
-
-      <!-- localization mode -->
-      <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
-      <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
     </node>
 
-  </group>
+    <param     if="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="false"/>
+    <param unless="$(arg localization)" name="Mem/IncrementalMemory" type="string" value="true"/>
+    <param name="Mem/InitWMWithAllNodes" type="string" value="$(arg localization)"/>
+    </group>
+
+        <!-- Visualisation RTAB-Map -->
+    <!-- <node if="$(arg rtabmap_viz)" pkg="rtabmap_viz" type="rtabmap_viz" name="rtabmap_viz">
+
+    </node> -->
 
 </launch>
