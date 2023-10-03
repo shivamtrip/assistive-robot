@@ -24,19 +24,16 @@ from fsm import ManipulationFSM
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+    startManipService.wait_for_service()
     startManipService()
     node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 47
+    goal.objectId = 4
     goal.isPick = True
     node.main(goal)
     rospy.sleep(5)
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print("Shutting down")
 
  
