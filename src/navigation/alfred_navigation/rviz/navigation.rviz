@@ -385,22 +385,22 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: true
-      Enabled: false
+      Enabled: true
       Name: Global Costmap
       Topic: /move_base/global_costmap/costmap
       Unreliable: false
       Use Timestamp: false
-      Value: false
+      Value: true
     - Alpha: 0.699999988079071
       Class: rviz/Map
       Color Scheme: costmap
       Draw Behind: true
-      Enabled: true
+      Enabled: false
       Name: Local Costmap
       Topic: /move_base/local_costmap/costmap
       Unreliable: false
       Use Timestamp: false
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/Polygon
       Color: 0; 0; 0
@@ -501,7 +501,7 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 1.9500000476837158
+        Max Value: 1.4500000476837158
         Min Value: 0.30000001192092896
         Value: true
       Axis: Z
@@ -562,17 +562,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -4.170183181762695
-        Y: -2.9825258255004883
-        Z: 1.012654423713684
+        X: -4.040233135223389
+        Y: -5.125236988067627
+        Z: -0.9591138362884521
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.759796679019928
+      Pitch: 0.6747967600822449
       Target Frame: <Fixed Frame>
-      Yaw: 5.283122539520264
+      Yaw: 5.548122406005859
     Saved: ~
 Window Geometry:
   Displays:
