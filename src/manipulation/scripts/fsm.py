@@ -66,7 +66,6 @@ class ManipulationFSM:
             'toothbrush': (-0.0, 0.0, 0.0),
             'tie': (-0.0, 0.0, 0.0),
             'cell phone': (-0.0, 0.0, 0.0),
-            'banana': (-0.0, 0.0, 0.0),
             'orange': (-0.0, 0.0, 0.0),
             'cup': (-0.0, 0.0, 0.0),
             'teddy_bear': (-0.0, 0.0, 0.0)
@@ -82,7 +81,6 @@ class ManipulationFSM:
             'toothbrush': False,
             'tie': True,
             'cell phone': True,
-            'banana': False,
             'apple': False,
             'orange': False,
             'bottle': False,
