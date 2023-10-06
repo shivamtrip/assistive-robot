@@ -28,8 +28,7 @@ else
     tmux split-window -h
     tmux select-pane -t 4
     tmux split-window -h
-    tmux select-pane -t 6
-    tmux split-window -h
+
     
 
 
@@ -38,9 +37,9 @@ else
     
     tmux send-keys -t 0 "sleep 1 && roslaunch alfred_core driver.launch " C-m
     tmux send-keys -t 1 "sleep 5 && roslaunch alfred_core perception_robot_tuned.launch" C-m
-    tmux send-keys -t 4 "sleep 10 && /home/hello-robot/ws/src/manipulation/scripts/fsm_test_pick.py" C-m
-    tmux send-keys -t 6 "sleep 10 && ssh praveen@alfredbrain 'bash -s < /home/praveen/ws1/launch_scripts/launch_brain.sh'" C-m
-    tmux send-keys -t 7 "htop" C-m
+    tmux send-keys -t 2 "sleep 10 && /home/hello-robot/alfred-autonomy/src/manipulation/scripts/tests/fsm/test_pick.py" C-m
+    # tmux send-keys -t 3 "sleep 10 && ssh praveen@alfredbrain 'bash -s < /home/praveen/ws1/launch_scripts/launch_brain.sh'" C-m
+    tmux send-keys -t 4 "htop" C-m
 
     # Attach to tmux session
     tmux attach-session -t autonomy

@@ -143,7 +143,7 @@ class ManipulationMethods:
             "lift;to": z - 0.3,
         })
         move_to_pose(trajectoryClient, {
-            "head;to": 0,
+            "head_pan;to": 0,
         }
         )
         rospy.sleep(3)

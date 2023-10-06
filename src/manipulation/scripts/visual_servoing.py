@@ -461,6 +461,43 @@ class AlignToObject:
         self.state = State.SEARCH
         self.requestClearObject = False
 
+    def alignObjectHorizontalTest(self, offset = 0.0):
+        self.requestClearObject = True
+        if not self.clearAndWaitForNewObject():
+            return False
+
+        xerr = np.inf
+        rospy.loginfo("Aligning object horizontally")
+        prevxerr = np.inf
+        curvel = 0.0
+        prevsettime = time.time()
+        while True:
+            x, y, z, confidence = self.objectLocArr[-1]
+            rospy.loginfo(f"{x}, {y}, {z}")
+            if self.isDetected:
+                xerr = (x) + offset
+            else:
+                rospy.logwarn("Object not detected. Using open loop motions")
+                xerr = (x - curvel * (time.time() - prevsettime)) + offset
+            rospy.loginfo("Alignment Error = " + str(xerr))
+            dxerr = (xerr - prevxerr)
+            vx = (self.kp['velx'] * xerr + self.kd['velx'] * dxerr)
+            prevxerr = xerr
+            move_to_pose(self.trajectoryClient, {
+                    'base_translate;vel' : vx,
+            }) 
+            curvel = vx
+            prevsettime = time.time()
+            
+            rospy.sleep(0.1)
+        exit()
+        move_to_pose(self.trajectoryClient, {
+            'base_translate;vel' : 0.0,
+        }) 
+        # risk
+        # if self.isDetected is False:
+        #     return False
+        return True
     
     def alignObjectHorizontal(self, offset = 0.0):
         self.requestClearObject = True
@@ -474,6 +511,7 @@ class AlignToObject:
         prevsettime = time.time()
         while abs(xerr) > 0.008:
             x, y, z, confidence = self.objectLocArr[-1]
+            print(xerr)
             if self.isDetected:
                 xerr = (x) + offset
             else:
@@ -504,6 +542,7 @@ class AlignToObject:
     def main(self, objectId):
         self.objectId = objectId
         print("Triggered Visual Servoing for object of interest:" , objectId)
+        # self.alignObjectHorizontalTest()
         self.state = State.SEARCH
         while True:
             if self.state == State.SEARCH:

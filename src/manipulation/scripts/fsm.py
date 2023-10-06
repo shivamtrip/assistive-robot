@@ -34,26 +34,58 @@ class ManipulationFSM:
         self.grasp = None
         self.planeOfGrasp = None
         # REFACTOR this to be a ros parameter loaded upon launch.
+        # self.label2name = {
+        #     0: "soda_can"
+        #     39: "bottle",
+        #     47: "apple",
+        #     65: "remote", 
+        #     46: "banana",
+        # }
         self.label2name = {
-            39: "bottle",
-            47: "apple",
-            65: "remote", 
-            46: "banana"
+            0: 'soda_can',
+            1: 'tissue_paper',
+            2: 'toothbrush',
+            3: 'tie',
+            4: 'cell phone',
+            5: 'banana',
+            6: 'apple',
+            7: 'orange',
+            8: 'bottle',
+            9: 'cup',
+            10: 'teddy_bear'
         }
 
         #Initiliaze object specific params. 
         self.offset_dict = {
-            'bottle': -0.015,
-            'apple': -0.04,
-            'remote':-0.015, 
-            "banana" : -0.015
+            'bottle': (0, 0.0, 0.0),
+            'apple': (0, 0.0, 0.0),
+            'remote': (0, 0.0, 0.0), 
+            "banana" : (0, 0.0, 0.0),
+            "soda_can" : (0, 0.0, 0.0),
+            'tissue_paper': (-0.0, 0.02, 0.05),
+            'toothbrush': (-0.0, 0.0, 0.0),
+            'tie': (-0.0, 0.0, 0.0),
+            'cell phone': (-0.0, 0.0, 0.0),
+            'orange': (-0.0, 0.0, 0.0),
+            'cup': (-0.0, 0.0, 0.0),
+            'teddy_bear': (-0.0, 0.0, 0.0)
         } 
 
         self.isContactDict = {
             'bottle': False,
-             'apple':  True,
+            'apple':  True,
             'remote': True,
-            'banana': True
+            'banana': True,
+            "soda_can": False,
+            'tissue_paper': False,
+            'toothbrush': False,
+            'tie': True,
+            'cell phone': True,
+            'apple': False,
+            'orange': False,
+            'bottle': False,
+            'cup': False,
+            'teddy_bear': False
         }
 
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
@@ -69,8 +101,8 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
         self.graspActionClient.wait_for_server()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
-        self.planeFitClient.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
+        # self.planeFitClient.wait_for_server()
 
 
         self.visualServoing = AlignToObject(-1)
@@ -179,7 +211,7 @@ class ManipulationFSM:
                     else:
                         self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
                 elif self.state == States.VISUAL_SERVOING:
-                    success = self.visualServoing.main(goal.objectId)
+                    success = self.visualServoing.main(goal.objectId,)
                     if success:
                         self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
                         self.state = objectManipulationState
@@ -197,15 +229,20 @@ class ManipulationFSM:
                     self.state = States.WAITING_FOR_GRASP_AND_PLANE
                     self.send_feedback({'msg' : "moving to pregrasp pose"})
                     self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-                    # self.visualServoing.alignObjectHorizontal(offset = self.manipulationMethods.getEndEffectorPose()[1])
+                    self.visualServoing.alignObjectHorizontal(offset = self.manipulationMethods.getEndEffectorPose()[1])
                     # self.requestGraspAndPlaneFit(getGrasp = True, getPlane = True)   
                     self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = True, getPlane = False)   
-                    distToExtend = abs(abs(self.grasp.y) - self.manipulationMethods.getEndEffectorPose()[0]) + self.offset_dict[self.label2name[goal.objectId]]
+                    offsets = self.offset_dict[self.label2name[goal.objectId]]
+                    
+                    x_grasp = self.grasp.x + offsets[0]
+                    z_grasp = self.grasp.z + offsets[2]
+                    y_grasp = abs(abs(self.grasp.y) - self.manipulationMethods.getEndEffectorPose()[0]) + offsets[1]
+                    
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
-                        self.grasp.x, 
-                        distToExtend, 
-                        self.grasp.z, 
+                        x_grasp, 
+                        y_grasp, 
+                        z_grasp, 
                         self.grasp.yaw,
                         moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                     ) 
