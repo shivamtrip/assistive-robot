@@ -47,6 +47,7 @@ def move_to_pose(trajectoryClient, pose, asynchronous=False, custom_contact_thre
     if not custom_contact_thresholds: 
         joint_positions = [pose[key] for key in joint_names]
         point.positions = joint_positions
+        point.effort = []
         trajectory_goal.trajectory.points = [point]
     else:
         pose_correct = all([len(pose[key])==2 for key in joint_names])

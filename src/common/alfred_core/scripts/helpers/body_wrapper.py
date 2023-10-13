@@ -33,6 +33,11 @@ class JointTrajectoryAction:
         for name in goal.trajectory.joint_names:
             joint, motionType = name.split(';')
             pos = goal.trajectory.points[0].positions[0]
+            # threshold = goal.trajectory.points[0].effort[0]
+            if len(goal.trajectory.points[0].effort) > 0:
+                threshold = goal.trajectory.points[0].effort[0]
+            else:
+                threshold = 100
             if 'head' in joint:
                 if motionType == 'to':
                     self.robot.head.move_to(joint, pos)
@@ -55,18 +60,18 @@ class JointTrajectoryAction:
 
             elif 'lift' in joint:
                 if motionType == 'to':
-                    self.robot.lift.move_to(pos)
+                    self.robot.lift.move_to(pos, contact_thresh_pos=threshold, contact_thresh_neg=-threshold)
                 elif motionType == 'vel':
                     self.robot.lift.set_velocity(pos)
                 elif motionType == 'by':
-                    self.robot.lift.move_by(pos)
+                    self.robot.lift.move_by(pos, contact_thresh_pos=threshold, contact_thresh_neg=-threshold)
             elif 'arm' in joint:
                 if motionType == 'to':
-                    self.robot.arm.move_to(pos)
+                    self.robot.arm.move_to(pos, contact_thresh_pos=threshold, contact_thresh_neg=-threshold)
                 elif motionType == 'vel':
                     self.robot.arm.set_velocity(pos)
                 elif motionType == 'by':
-                    self.robot.arm.move_by(pos)
+                    self.robot.arm.move_by(pos, contact_thresh_pos=threshold, contact_thresh_neg=-threshold)
                     
             elif 'stretch_gripper' in joint:
                 if motionType == 'to':

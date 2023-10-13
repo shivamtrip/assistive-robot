@@ -11,6 +11,9 @@ if not robot.startup():
 # print("Sending command")
 # robot.lift.move_to(0.6)
 
+
+
+
 robot.arm.move_to(0.2)
 robot.push_command()
 robot.head.move_to("head_pan", -np.pi/2)
