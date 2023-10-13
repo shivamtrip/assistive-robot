@@ -8,25 +8,10 @@ from firebase_node import FirebaseNode
 import os
 from sensor_msgs.msg import JointState
 
-# class State:
-#     def __init__(self, name, transitions : dict):
-#         self.name = name
-#         self.transitions = transitions
-#         self.outcomes = self.transitions.keys()
-
-#     # override this function
-#     def execute(self, **kwargs):
-#         raise NotImplementedError
-
-#     def onComplete(self, **kwargs):
-#         raise NotImplementedError
-    
-#     def run(self, manager, **kwargs):
-#         self.execute(**kwargs)
-#         self.onComplete(**kwargs)
 
 class BotStateManager():
     def __init__(self, updateCallback):
+
         self.position = None
         self.orientation = None
         self.currentSemanticLocation = LocationOfInterest.HOME # GEOFENCE THIS USING DEFINED BOXES TODO(@shivamtrip)
@@ -37,8 +22,10 @@ class BotStateManager():
         self.operationMode = OperationModes.AUTONOMOUS
         self.emotion = Emotions.NEUTRAL
 
-        with open(os.path.expanduser("~/ws/src/planning/task_planner/config/firebase_schema.json")) as f:
+        with open(os.path.expanduser("~/alfred-autonomy/src/planning/task_planner/config/firebase_schema.json")) as f:
             self.state_dict = json.load(f)
+        
+    
 
         self.firebaseNode = FirebaseNode(
             self.state_dict, 
@@ -48,6 +35,7 @@ class BotStateManager():
         self.jointStateSubscriber = rospy.Subscriber("/alfred/joint_states", JointState, self.joint_state_callback) 
         self.last_update_time = time.time()
         self.updateCallback = updateCallback
+
 
     def isAutonomous(self):
         self.pollOperationState()
@@ -114,6 +102,8 @@ class BotStateManager():
                 "effort": msg.effort[msg.name.index(name)]
             }
         self.firebaseNode.update_node(self.state_dict)
+
+    
     
     def isExtendedCommunicationLossTeleop(self):
         return time.time() - (self.state_dict['teleop_commands']['last_command_stamp']) > 10
@@ -130,10 +120,10 @@ class BotStateManager():
         self.position = msg.base_position.pose.position
         self.orientation = msg.base_position.pose.orientation
         
-        if time.time() - self.last_update_time > 1:
-            self.last_update_time = time.time()
-            rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
-            rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+        # if time.time() - self.last_update_time > 1:
+        #     self.last_update_time = time.time()
+        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
+        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
 
     def manipulation_feedback(self, feedback):
         pass
