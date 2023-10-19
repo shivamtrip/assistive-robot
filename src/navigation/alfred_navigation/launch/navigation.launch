@@ -61,6 +61,10 @@
   </node>
 	
 
+  <!-- Navigation Manager -->
+  <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
+
+
   <!-- VISUALIZE -->
   <node name="rviz" pkg="rviz" type="rviz" output="log" args="-d $(find alfred_navigation)/rviz/navigation.rviz" if="$(arg rviz)" />
 

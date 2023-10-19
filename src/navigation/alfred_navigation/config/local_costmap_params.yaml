@@ -15,4 +15,9 @@ local_costmap:
   - {name: rgbd_obstacle_layer,     type: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"}
   - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
   - {name: inflated_layer, type: "costmap_2d::InflationLayer"}
+
+
+  rgbd_obstacle_layer:
+    track_unknown_space: true
+    voxel_decay: 5
   

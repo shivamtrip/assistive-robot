@@ -2,6 +2,7 @@
 from enum import Enum
 import json
 from move_base_msgs.msg import MoveBaseActionFeedback, MoveBaseFeedback
+from alfred_navigation.msg import NavManActionFeedback, NavManFeedback
 import time
 import rospy
 from firebase_node import FirebaseNode
@@ -116,14 +117,28 @@ class BotStateManager():
 
         # emotion params
 
-    def navigation_feedback(self, msg : MoveBaseFeedback):
-        self.position = msg.base_position.pose.position
-        self.orientation = msg.base_position.pose.orientation
+    # def navigation_feedback(self, msg : MoveBaseFeedback):
+    #     self.position = msg.base_position.pose.position
+    #     self.orientation = msg.base_position.pose.orientation
         
+    #     # if time.time() - self.last_update_time > 1:
+    #     #     self.last_update_time = time.time()
+    #     rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
+    #     rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+
+    def navigation_feedback(self, msg : NavManFeedback):
+        # self.position = msg.base_position.pose.position
+        # self.orientation = msg.base_position.pose.orientation
+
+        self.status = msg.status
+        
+        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current Status: {}".format(self.status))
+
         # if time.time() - self.last_update_time > 1:
         #     self.last_update_time = time.time()
-        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
-        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+        # rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
+        # rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+
 
     def manipulation_feedback(self, feedback):
         pass
