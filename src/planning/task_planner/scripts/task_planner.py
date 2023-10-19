@@ -299,9 +299,14 @@ class TaskPlanner:
         # goal.y = -2.505342483520508 #elevator
         # goal.theta = 240
 
-        goal.x = -4.1436285972595215 
-        goal.y = -4.530055522918701 
-        goal.theta = 240
+        # goal.x = -4.1436285972595215 
+        # goal.y = -4.530055522918701 
+        # goal.theta = 240
+
+        # near AIMS fridge
+        goal.x = -2.615337371826172
+        goal.y = -7.306527137756348
+        goal.theta = 0
         
         self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
 
