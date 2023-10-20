@@ -15,7 +15,7 @@ base_local_planner: "dwa_local_planner/DWAPlannerROS"
 #                     {name: rotate_recovery, type: rotate_recovery/RotateRecovery},
 #                     {name: aggressive_reset, type: clear_costmap_recovery/ClearCostmapRecovery}]
 # recovery_behaviors: [{name: my_reset, type: moveback_recovery/MovebackRecovery}]
-recovery_behaviors: []
+recovery_behaviors: [{name: moveback_recovery, type: moveback_recovery/MovebackRecovery}]
                     # [{name: conservative_reset, type: clear_costmap_recovery/ClearCostmapRecovery}, 
                     # {name: rotate_recovery, type: rotate_recovery/RotateRecovery},
                     # {name: moveback_recovery1, type: moveback_recovery/MovebackRecovery}]
