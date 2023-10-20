@@ -188,7 +188,7 @@ void MovebackRecovery::runBehavior()
   bool done_rotating = false;
   double current_angle = tf2::getYaw(global_pose.pose.orientation);
   double start_angle = current_angle;
-  double rotation_angle = 45;
+  double rotation_angle = 22.5;
   double goal_angle = start_angle + rotation_angle * (M_PI/180);
   double dist_left = rotation_angle;
 

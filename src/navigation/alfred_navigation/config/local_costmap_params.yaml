@@ -21,5 +21,5 @@ local_costmap:
 
   rgbd_obstacle_layer:
     track_unknown_space: false
-    voxel_decay: 5
+    voxel_decay: 10
   
