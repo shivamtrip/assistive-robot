@@ -11,6 +11,7 @@ import concurrent.futures
 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback, MoveBaseFeedback, MoveBaseActionResult, MoveBaseResult
 from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
+from moveback_recovery.msg import MovebackRecoveryAction, MovebackRecoveryGoal
 from utils import get_quaternion
 
 
@@ -32,8 +33,12 @@ class NavigationManager():
 
         self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
+        self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
+
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
         self.navigation_client.wait_for_server()
+
+        self.moveback_client.wait_for_server()
 
         self.navman_server.start()
 
@@ -92,11 +97,17 @@ class NavigationManager():
         
     
     def debug_nav_failure(self):
-            
 
-            print("Sending goal again!")
+            print("Sending moveback goal!")
+            moveback_goal = MovebackRecoveryGoal()
+            moveback_goal.execute = True
+            self.moveback_client.send_goal(moveback_goal)
+
+            print("Successfully sent Moveback goal!")
+
+            # print("Sending goal again!")
     
-            self.navigate_to_goal()
+            # self.navigate_to_goal()
 
         
         
