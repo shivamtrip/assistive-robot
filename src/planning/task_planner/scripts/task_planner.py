@@ -46,6 +46,8 @@ class TaskPlanner:
     def __init__(self):
         self.trigger=0
         # self.q=[]
+        self.eta=0
+        self.eta2=0
         self.q = []
         self.last_task_success=0
         rospy.init_node('task_planner')
@@ -148,11 +150,17 @@ class TaskPlanner:
             try:
                 if len(self.q) != 0:
                     # remote_id, task_to_execute = self.q.pop(0)
+                    temp=self.q[0]
                     tasks_to_execute = self.q.pop(0)
                     # execute tasks here.
                     rospy.loginfo(f"Executing task {tasks_to_execute} for room {1}")
                     self.navigate_to_location(self.navigationGoal, tasks_to_execute)
+                    if(temp in [1,2,3,4]):
+                        eta2=eta2-10
+                    elif(temp in [5,6,7,8]):
+                        eta=eta-10
                     rospy.sleep(5)
+
                     rospy.loginfo("Task complete...")
             except KeyboardInterrupt:
                 break
@@ -330,37 +338,58 @@ class TaskPlanner:
                 button_callback_value6 = self.db.child("button_callback6").get().val()
                 button_callback_value7 = self.db.child("button_callback7").get().val()
                 button_callback_value8 = self.db.child("button_callback8").get().val()
+                button_callback_value9 = self.db.child("button_callback9").get().val()
+                button_callback_value10 = self.db.child("button_callback10").get().val()
+                button_callback_value11 = self.db.child("button_callback11").get().val()
+                button_callback_value12 = self.db.child("button_callback12").get().val()
+                
                 if(button_callback_value==1):
                     if 1 not in self.q:
+                        # self.eta=0
+                        self.eta2=self.eta2+10
                         self.q.append(1)
                         self.db.child("button_callback").set(0)
 
                 elif(button_callback_value2==1):
                     if 2 not in self.q:
+                        # self.eta=0
+                        self.eta2=self.eta2+10
                         self.q.append(2)
                         self.db.child("button_callback2").set(0)
                 elif(button_callback_value3==1):
                     if 3 not in self.q:
+                        # self.eta=0
+                        self.eta2=self.eta2+10
                         self.q.append(3)
                         self.db.child("button_callback3").set(0)
                 elif(button_callback_value4==1):
                     if 4 not in self.q:
+                        # self.eta=0
+                        self.eta2=self.eta2+10
                         self.q.append(4)   
                         self.db.child("button_callback4").set(0)
                 elif(button_callback_value5==1):
                     if 5 not in self.q:
+                        # self.eta2=0
+                        self.eta=self.eta+10
                         self.q.append(5)   
                         self.db.child("button_callback5").set(0)
                 elif(button_callback_value6==1):
                     if 6 not in self.q:
+                        # self.eta2=0
+                        self.eta=self.eta+10
                         self.q.append(6)   
                         self.db.child("button_callback6").set(0)
                 elif(button_callback_value7==1):
                     if 7 not in self.q:
+                        # self.eta2=0
+                        self.eta=self.eta+10
                         self.q.append(7)   
                         self.db.child("button_callback7").set(0)
                 elif(button_callback_value8==1):
                     if 8 not in self.q:
+                        # self.eta2=0
+                        self.eta=self.eta+10
                         self.q.append(8)   
                         self.db.child("button_callback8").set(0)
             except KeyboardInterrupt:
