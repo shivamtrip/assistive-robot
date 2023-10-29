@@ -156,9 +156,13 @@ class TaskPlanner:
                     rospy.loginfo(f"Executing task {tasks_to_execute} for room {1}")
                     self.navigate_to_location(self.navigationGoal, tasks_to_execute)
                     if(temp in [1,2,3,4]):
-                        eta2=eta2-10
+                        self.eta2=self.eta2-10
+                        self.db.child("eta2").set(eta2)
+
                     elif(temp in [5,6,7,8]):
-                        eta=eta-10
+                        self.eta=self.eta-10
+                        self.db.child("eta").set(eta)
+
                     rospy.sleep(5)
 
                     rospy.loginfo("Task complete...")
