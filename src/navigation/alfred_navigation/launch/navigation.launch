@@ -44,7 +44,7 @@
   <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
 
   <!-- Moveback Recovery -->
-  <node name="moveback_recovery_node" pkg="moveback_recovery" type="moveback_recovery_node" output="screen" />
+  <!-- <node name="moveback_recovery_node" pkg="moveback_recovery" type="moveback_recovery_node" output="screen" /> -->
 
   <!-- VISUALIZE -->
   <node name="rviz" pkg="rviz" type="rviz" output="log" args="-d $(find alfred_navigation)/rviz/navigation.rviz" if="$(arg rviz)" />

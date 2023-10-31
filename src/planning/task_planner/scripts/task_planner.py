@@ -94,7 +94,7 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        # self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         #self.commandReceived = rospy.Service('/robot_task_command', GlobalTask, self.command_callback)
         
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
@@ -150,10 +150,10 @@ class TaskPlanner:
     def main(self):
         task_thread = threading.Thread(target=task_planner.execute_task_temp)
         task_thread2 = threading.Thread(target=task_planner.updateButton)
-        task_thread.start()
+        # task_thread.start()
         # task_thread2.start()
 
-        task_thread.join()
+        # task_thread.join()
         # task_thread2.join()
 
     def execute_task_temp(self):
@@ -307,6 +307,12 @@ class TaskPlanner:
         goal.x = -2.615337371826172
         goal.y = -7.306527137756348
         goal.theta = 0
+
+
+        # # near AIMS Baxter
+        # goal.x = -1.9814379215240479
+        # goal.y = -0.4820127487182617
+        # goal.theta = 0
         
         self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
 

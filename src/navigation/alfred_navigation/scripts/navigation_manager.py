@@ -31,15 +31,16 @@ class NavigationManager():
 
         self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, self.update_goal, False)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.movebase_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
-        self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
+        # self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
-        self.navigation_client.wait_for_server()
+        self.movebase_client.wait_for_server()
 
-        self.moveback_client.wait_for_server()
+        # self.moveback_client.wait_for_server()
 
+        print("Starting NavMan Server..")
         self.navman_server.start()
 
 
@@ -67,23 +68,23 @@ class NavigationManager():
         quaternion = get_quaternion(self.nav_goal_theta)
         movebase_goal.target_pose.pose.orientation = quaternion
 
-        self.navigation_client.send_goal(movebase_goal, feedback_cb = self.navigation_feedback)
+        self.movebase_client.send_goal(movebase_goal, feedback_cb = self.navigation_feedback)
         print("Sending goal to move_base")
         # print("Sending goal to move_base", self.goal_locations[locationName]['x'], self.goal_locations[locationName]['y'], self.goal_locations[locationName]['theta'])
              
-        wait = self.navigation_client.wait_for_result()
+        wait = self.movebase_client.wait_for_result()
 
         self.check_result()
 
 
     def check_result(self):
 
-        if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
+        if self.movebase_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
 
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal")
             
             # cancel navigation
-            self.navigation_client.cancel_goal()
+            self.movebase_client.cancel_goal()
 
             self.nav_result = False
 
@@ -98,16 +99,16 @@ class NavigationManager():
     
     def debug_nav_failure(self):
 
-            print("Sending moveback goal!")
-            moveback_goal = MovebackRecoveryGoal()
-            moveback_goal.execute = True
-            self.moveback_client.send_goal(moveback_goal)
+            # print("Sending moveback goal!")
+            # moveback_goal = MovebackRecoveryGoal()
+            # moveback_goal.execute = True
+            # self.moveback_client.send_goal(moveback_goal)
 
-            print("Successfully sent Moveback goal!")
+            # print("Successfully sent Moveback goal!")
 
-            # print("Sending goal again!")
+            print("Sending goal again!")
     
-            # self.navigate_to_goal()
+            self.navigate_to_goal()
 
         
         
