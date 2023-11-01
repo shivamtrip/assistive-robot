@@ -338,7 +338,6 @@ class AlignToObject:
         if self.requestClearObject:
             self.requestClearObject = False
             self.objectLocArr = []
-        rospy.loginfo(msg)
         num_detections = (msg.nPredictions)
         msg = {
             "boxes" : np.array(msg.box_bounding_boxes).reshape(num_detections, 4),

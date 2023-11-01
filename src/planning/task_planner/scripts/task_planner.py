@@ -61,7 +61,8 @@ class TaskPlanner:
         self.goal_locations = json.load(open(locations_path))
         self.visualServoing = AlignToObject(-1)
         self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
-
+        self.nServoTriesAttempted=0
+        self.nServoTriesAllowed=3
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         firebase_secrets_path = os.path.expanduser("~/firebasesecrets.json")
@@ -163,17 +164,6 @@ class TaskPlanner:
                     rospy.loginfo(f"Executing task {tasks_to_execute} for room {1}")
                     self.navigate_to_location(self.navigationGoal, tasks_to_execute)
 
-                    if(temp in [1,2,3,4]):
-                        self.eta2=self.eta2-10
-                        self.db.child("eta2").set(eta2)
-                        self.db.child("battery_person").set("Jake") #updates firebase to 1 if battery below recommended threshold
-
-
-                    elif(temp in [5,6,7,8]):
-                        self.eta=self.eta-10
-                        self.db.child("eta").set(eta)
-                        self.db.child("battery_state").set("Amy") #updates firebase to 1 if battery below recommended threshold
-
 
                     rospy.sleep(5)
 
@@ -270,6 +260,7 @@ class TaskPlanner:
         else:
             self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
 
+
         
 
     def navigate_to_location(self, location : Enum, k):
@@ -277,58 +268,57 @@ class TaskPlanner:
         goal = MoveBaseGoal()
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Executing task. Going to {}".format(locationName))
         # send goal
+        if(k in [1,2,3,4]):
+            self.db.child("task_person").set("Jake") #updates firebase to 1 if battery below recommended threshold
+        elif(k in [5,6,7,8]):
+            self.db.child("task_person").set("Amy") #updates firebase to 1 if battery below recommended threshold
+
         if(k==1):
             # goal.target_pose.pose.position.x = -23.77337646484375 #elevator
+            # goal.target_pose.pose.position.y = 16.433826446533203
+
             self.db.child("current_task").set("Delivery") 
 
-            goal.target_pose.pose.position.x = -3.32
-            #-3.32
-            # goal.target_pose.pose.position.y = 16.433826446533203
+            goal.target_pose.pose.position.x = -3.32 # table
             goal.target_pose.pose.position.y = -9.54
-
             # success = self.visualServoing.main(goal.objectId)
-            success = self.visualServoing.main(39)
-            if(success!=0):
-                self.visualServoing.recoverFromFailure()
-            nServoTriesAttempted += 1
-            if nServoTriesAttempted >= nServoTriesAllowed:
-                success = True
-            #-9.54
         elif(k==2):
-            goal.target_pose.pose.position.x = -14.054288864135742 #beverly
-            #-2.38
-            goal.target_pose.pose.position.y = 10.595928192138672
-            #-7.66
+            # goal.target_pose.pose.position.x = -14.054288864135742 #beverly
+            # goal.target_pose.pose.position.y = 10.595928192138672
+
+            goal.target_pose.pose.position.x = -2.38 # refrigerator
+            goal.target_pose.pose.position.y = -7.66
+
         elif(k==3):
-            goal.target_pose.pose.position.x = -19.99483299255371 #aims door
-            #-3.69
-            goal.target_pose.pose.position.y = 12.28384780883789
-            #-3.83
+            # goal.target_pose.pose.position.x = -19.99483299255371 #aims door
+            # goal.target_pose.pose.position.y = 12.28384780883789
+            goal.target_pose.pose.position.x = -3.69 # center area
+            goal.target_pose.pose.position.y = -3.83
         elif(k==4):
-            goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
-            #-4.30
-            goal.target_pose.pose.position.y = 0.53509521484375
-            #-1.70
+            # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
+            # goal.target_pose.pose.position.y = 0.53509521484375
+            goal.target_pose.pose.position.y = -4.30 # center area
+            goal.target_pose.pose.position.y = -1.70
         elif(k==5):
-            goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
-            #-4.30
-            goal.target_pose.pose.position.y = 0.53509521484375
-            #-1.70
+            # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
+            # goal.target_pose.pose.position.y = 0.53509521484375
+            goal.target_pose.pose.position.y = -4.30
+            goal.target_pose.pose.position.y = -1.70
         elif(k==6):
-            goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
-            #-4.30
-            goal.target_pose.pose.position.y = 0.53509521484375
-            #-1.70
+            # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
+            # goal.target_pose.pose.position.y = 0.53509521484375
+            goal.target_pose.pose.position.y = -4.30
+            goal.target_pose.pose.position.y = -1.70
         elif(k==7):
-            goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
-            #-4.30
-            goal.target_pose.pose.position.y = 0.53509521484375
-            #-1.70
+            # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
+            # goal.target_pose.pose.position.y = 0.53509521484375
+            goal.target_pose.pose.position.y = -4.30
+            goal.target_pose.pose.position.y = -1.70
         elif(k==8):
-            goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
-            #-4.30
-            goal.target_pose.pose.position.y = 0.53509521484375
-            #-1.70
+            # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
+            # goal.target_pose.pose.position.y = 0.53509521484375
+            goal.target_pose.pose.position.y = -4.30
+            goal.target_pose.pose.position.y = -1.70
         goal.target_pose.header.frame_id = "map"
         quaternion = get_quaternion(240)
         goal.target_pose.pose.orientation = quaternion
@@ -338,12 +328,29 @@ class TaskPlanner:
              
         wait = self.navigation_client.wait_for_result()
 
+        if(k in [1,2,3,4]):
+            self.eta2=self.eta2-10
+            self.db.child("eta2").set(self.eta2)
+
+
+        elif(k in [5,6,7,8]):
+            self.eta=self.eta-10
+            self.db.child("eta").set(self.eta)
+
         if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach Table")
             # cancel navigation
             self.navigation_client.cancel_goal()
             return False
         
+        success = self.visualServoing.main(0)
+        if(success!=0):
+            self.visualServoing.recoverFromFailure()
+        self.nServoTriesAttempted += 1
+        if self.nServoTriesAttempted >= self.nServoTriesAllowed:
+            success = True
+            self.nServoTriesAttempted=0
+
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached Table")
         self.bot_state.update_emotion(Emotions.HAPPY)
         self.bot_state.update_state()
@@ -387,51 +394,71 @@ class TaskPlanner:
                 if(button_callback_value==1):
                     if 1 not in self.q:
                         # self.eta=0
-                        self.eta2=self.eta2+10
                         self.q.append(1)
+                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
+                            self.eta2 += 10
+                            self.eta=0
+
                         self.db.child("button_callback").set(0)
 
                 elif(button_callback_value2==1):
                     if 2 not in self.q:
                         # self.eta=0
-                        self.eta2=self.eta2+10
                         self.q.append(2)
+
+                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
+                            self.eta2 += 10
+                            self.eta
                         self.db.child("button_callback2").set(0)
                 elif(button_callback_value3==1):
                     if 3 not in self.q:
                         # self.eta=0
-                        self.eta2=self.eta2+10
                         self.q.append(3)
+
+                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
+                            self.eta2 += 10
                         self.db.child("button_callback3").set(0)
                 elif(button_callback_value4==1):
                     if 4 not in self.q:
                         # self.eta=0
-                        self.eta2=self.eta2+10
                         self.q.append(4)   
+
+                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
+                            self.eta2 += 10
+                        
                         self.db.child("button_callback4").set(0)
                 elif(button_callback_value5==1):
                     if 5 not in self.q:
                         # self.eta2=0
-                        self.eta=self.eta+10
                         self.q.append(5)   
+
+                        if all(value != self.q[0] for value in [1, 2, 3, 4]):
+                            self.eta += 10
+
                         self.db.child("button_callback5").set(0)
                 elif(button_callback_value6==1):
                     if 6 not in self.q:
                         # self.eta2=0
-                        self.eta=self.eta+10
                         self.q.append(6)   
+
+                        if all(value != self.q[0] for value in [1, 2, 3, 4]):
+                            self.eta += 10
                         self.db.child("button_callback6").set(0)
                 elif(button_callback_value7==1):
                     if 7 not in self.q:
                         # self.eta2=0
-                        self.eta=self.eta+10
                         self.q.append(7)   
+
+                        if all(value != self.q[0] for value in [1, 2, 3, 4]):
+                            self.eta += 10
                         self.db.child("button_callback7").set(0)
                 elif(button_callback_value8==1):
                     if 8 not in self.q:
                         # self.eta2=0
-                        self.eta=self.eta+10
                         self.q.append(8)   
+
+                        if all(value != self.q[0] for value in [1, 2, 3, 4]):
+                            self.eta += 10
                         self.db.child("button_callback8").set(0)
             except KeyboardInterrupt:
                 break
