@@ -27,6 +27,9 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from firebase_node import FirebaseNode
 import threading
 import concurrent.futures
+from visual_servoing import AlignToObject
+# import stretch_body.pimu as pimu
+from sensor_msgs.msg import BatteryState
 
 # from alfred_msgs.msg import Speech, SpeechTrigger
 # from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest
@@ -56,7 +59,9 @@ class TaskPlanner:
         locations_file = rospy.get_param("locations_file", "config/locations.json")
         locations_path = os.path.join(base_dir, locations_file)
         self.goal_locations = json.load(open(locations_path))
-        
+        self.visualServoing = AlignToObject(-1)
+        self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
+
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
         firebase_secrets_path = os.path.expanduser("~/firebasesecrets.json")
@@ -88,6 +93,8 @@ class TaskPlanner:
         rospack = rospkg.RosPack()
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+
 
         self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         #self.commandReceived = rospy.Service('/robot_task_command', GlobalTask, self.command_callback)
@@ -155,13 +162,18 @@ class TaskPlanner:
                     # execute tasks here.
                     rospy.loginfo(f"Executing task {tasks_to_execute} for room {1}")
                     self.navigate_to_location(self.navigationGoal, tasks_to_execute)
+
                     if(temp in [1,2,3,4]):
                         self.eta2=self.eta2-10
                         self.db.child("eta2").set(eta2)
+                        self.db.child("battery_person").set("Jake") #updates firebase to 1 if battery below recommended threshold
+
 
                     elif(temp in [5,6,7,8]):
                         self.eta=self.eta-10
                         self.db.child("eta").set(eta)
+                        self.db.child("battery_state").set("Amy") #updates firebase to 1 if battery below recommended threshold
+
 
                     rospy.sleep(5)
 
@@ -252,15 +264,35 @@ class TaskPlanner:
     #     self.startNavService()
     #     navSuccess = self.navigate_to_location(self.navigationGoal)
     
+    def battery_check(self, data):
+        if(int(data.voltage)==0):
+            self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
+        else:
+            self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
+
+        
+
     def navigate_to_location(self, location : Enum, k):
         locationName = location.name
         goal = MoveBaseGoal()
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Executing task. Going to {}".format(locationName))
         # send goal
         if(k==1):
-            goal.target_pose.pose.position.x = -23.77337646484375 #elevator
+            # goal.target_pose.pose.position.x = -23.77337646484375 #elevator
+            self.db.child("current_task").set("Delivery") 
+
+            goal.target_pose.pose.position.x = -3.32
             #-3.32
-            goal.target_pose.pose.position.y = 16.433826446533203
+            # goal.target_pose.pose.position.y = 16.433826446533203
+            goal.target_pose.pose.position.y = -9.54
+
+            # success = self.visualServoing.main(goal.objectId)
+            success = self.visualServoing.main(39)
+            if(success!=0):
+                self.visualServoing.recoverFromFailure()
+            nServoTriesAttempted += 1
+            if nServoTriesAttempted >= nServoTriesAllowed:
+                success = True
             #-9.54
         elif(k==2):
             goal.target_pose.pose.position.x = -14.054288864135742 #beverly
@@ -347,6 +379,11 @@ class TaskPlanner:
                 button_callback_value11 = self.db.child("button_callback11").get().val()
                 button_callback_value12 = self.db.child("button_callback12").get().val()
                 
+                # p=pimu.Pimu()
+                # p.pull_status()
+                # if(p.status['voltage']<p.config['low_voltage_alert']):
+                #     self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
+ 
                 if(button_callback_value==1):
                     if 1 not in self.q:
                         # self.eta=0
@@ -401,7 +438,7 @@ class TaskPlanner:
 
 if __name__ == "__main__":
     task_planner = TaskPlanner()
-
+    
     # rospy.sleep(2)
     try:    
         task_planner.main()

@@ -184,6 +184,7 @@ class ManipulationFSM:
                         self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
                         self.state = objectManipulationState
                     else:
+                        #success = self.visualServoing.main(goal.objectId)
                         if nServoTriesAttempted >= nServoTriesAllowed:
                             self.send_feedback({'msg' : "Servoing failed. Aborting."})
                             self.reset()

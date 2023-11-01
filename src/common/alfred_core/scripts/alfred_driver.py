@@ -10,6 +10,7 @@ import numpy as np
 import threading
 from helpers.rwlock import RWLock
 import stretch_body.robot as rb
+import stretch_body.pimu as pimu
 from stretch_body.hello_utils import ThreadServiceExit
 import time
 import tf2_ros
@@ -28,7 +29,7 @@ from std_srvs.srv import Trigger, TriggerResponse
 from std_srvs.srv import SetBool, SetBoolResponse
 
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import JointState, Imu, MagneticField
+from sensor_msgs.msg import BatteryState, JointState, Imu, MagneticField
 from std_msgs.msg import Header
 from helpers.command_groups import HeadPanCommandGroup, HeadTiltCommandGroup, WristYawCommandGroup, GripperCommandGroup, ArmCommandGroup, LiftCommandGroup, MobileBaseCommandGroup
 
@@ -201,7 +202,17 @@ class AlfredBodyNode:
         self.imu_wrist_pub.publish(i)
         ##################################################
 
+        battery_state = BatteryState()
+        battery_state.header.stamp = current_time
+        v = float(robot_status['pimu']['voltage'])
+        if(v<robot_status['pimu']['low_voltage_alert']):
+            battery_state.voltage = 1
+        elif(v>robot_status['pimu']['low_voltage_alert']):
+            battery_state.voltage = 0
+        # battery_state.current = i
+        self.power_pub.publish(battery_state)
         self.robot_mode_rwlock.release_read()
+
 
     ######## CHANGE MODES #########
 
@@ -324,6 +335,8 @@ class AlfredBodyNode:
         # if CURRENT < IMIN or CURRENT > IMAX:
         #     return False
 
+
+
         return True
     
     def stow(self, msg):
@@ -348,6 +361,17 @@ class AlfredBodyNode:
 
         return TriggerResponse()
     
+    # def battery(self):
+        # self.imu_mobile_base_pub = rospy.Publisher('imu_mobile_base', Imu, queue_size=1)
+        # self.magnetometer_mobile_base_pub = rospy.Publisher('magnetometer_mobile_base', MagneticField, queue_size=1)
+        # self.imu_wrist_pub = rospy.Publisher('imu_wrist', Imu, queue_size=1)
+        # m = MagneticField()
+        # m.header.stamp = current_time
+        # m.header.frame_id = 'imu_mobile_base'
+        # self.magnetometer_mobile_base_pub.publish(m)
+        # for battery status
+
+
 
     def main(self):
 
@@ -429,6 +453,17 @@ class AlfredBodyNode:
         self.magnetometer_mobile_base_pub = rospy.Publisher('magnetometer_mobile_base', MagneticField, queue_size=1)
         self.imu_wrist_pub = rospy.Publisher('imu_wrist', Imu, queue_size=1)
 
+        # for battery status
+        # p=pimu.Pimu()
+        # p.pull_status()
+        # if(p.status['voltage']<p.config['low_voltage_alert']):
+        #     self.battery_pub=rospy.Publisher('battery_status',1,queue_size=1)
+        # elif(p.status['voltage']>p.config['low_voltage_alert']):
+        #     self.battery_pub=rospy.Publisher('battery_status',0,queue_size=1)
+        # self.battery_pub=rospy.Publisher('battery_status',pimu.Pimu)
+
+        self.power_pub = rospy.Publisher('battery', BatteryState, queue_size=1)
+
         rospy.Subscriber("cmd_vel", Twist, self.set_mobile_base_velocity_callback)
 
         # ~ symbol gets parameter from private namespace
@@ -493,6 +528,7 @@ class AlfredBodyNode:
         try:
             while not rospy.is_shutdown():
                 self.command_mobile_base_velocity_and_publish_state()
+                # self.battery()
                 command_base_velocity_and_publish_joint_state_rate.sleep()
         except (rospy.ROSInterruptException, ThreadServiceExit):
             self.robot.stop()
