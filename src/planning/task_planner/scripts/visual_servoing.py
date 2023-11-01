@@ -148,6 +148,7 @@ class AlignToObject:
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : angleToGo,
                 })
+                rospy.sleep(5)
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : 0,
                 })
@@ -157,6 +158,12 @@ class AlignToObject:
                 rospy.loginfo("Object not found, rotating base.")
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : -np.pi/2,
+                    # 'head_pan;to' : -self.vs_range[0][0],
+                })
+                rospy.sleep(5)
+                
+                move_to_pose(self.trajectoryClient, {
+                    # 'base_rotate;by' : -np.pi/2,
                     'head_pan;to' : -self.vs_range[0][0],
                 })
                 rospy.sleep(5)
@@ -212,9 +219,9 @@ class AlignToObject:
                 return False
 
             self.isDepthMatters = False
-        else:
-            if not self.clearAndWaitForNewObject():
-                return False
+        # else:
+            # if not self.clearAndWaitForNewObject():
+            #     return False
 
         maxGraspableDistance = 0.77
         if self.objectId == 41:
@@ -236,7 +243,7 @@ class AlignToObject:
             })
             # rospy.loginfo("Distance to move = {}, Distance moved = {}".format(distanceToMove, distanceMoved))
             # rospy.loginfo()
-            rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
+            # rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
             if self.objectId != 60:
                 if self.isDetected:
                     lastDetectedTime = time.time()

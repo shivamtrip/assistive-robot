@@ -277,7 +277,7 @@ class TaskPlanner:
             # goal.target_pose.pose.position.x = -23.77337646484375 #elevator
             # goal.target_pose.pose.position.y = 16.433826446533203
 
-            self.db.child("current_task").set("Delivery") 
+            self.db.child("current_action").set("Delivery") 
 
             goal.target_pose.pose.position.x = -3.32 # table
             goal.target_pose.pose.position.y = -9.54
@@ -343,7 +343,7 @@ class TaskPlanner:
             self.navigation_client.cancel_goal()
             return False
         
-        success = self.visualServoing.main(0)
+        success = self.visualServoing.main(9)
         if(success!=0):
             self.visualServoing.recoverFromFailure()
         self.nServoTriesAttempted += 1
