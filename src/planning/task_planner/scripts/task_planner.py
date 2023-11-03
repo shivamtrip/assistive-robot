@@ -27,7 +27,7 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from firebase_node import FirebaseNode
 import threading
 import concurrent.futures
-from visual_servoing import AlignToObject
+# from visual_servoing import AlignToObject
 # import stretch_body.pimu as pimu
 from sensor_msgs.msg import BatteryState
 
@@ -59,7 +59,7 @@ class TaskPlanner:
         locations_file = rospy.get_param("locations_file", "config/locations.json")
         locations_path = os.path.join(base_dir, locations_file)
         self.goal_locations = json.load(open(locations_path))
-        self.visualServoing = AlignToObject(-1)
+        # self.visualServoing = AlignToObject(-1)
         self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
         self.nServoTriesAttempted=0
         self.nServoTriesAllowed=3
@@ -220,7 +220,7 @@ class TaskPlanner:
        
                 # self.startNavService()
                 # success = self.navigate_to_location(LocationOfInterest.TABLE)
-                # self.bot_state.update_operation_mode(OperationModes.TELEOPERATION)
+                self.bot_state.update_operation_mode(OperationModes.TELEOPERATION)
                 # success = self.navigate_to_location(LocationOfInterest.HOME)
 
     def executeTask(self,i,j):
@@ -255,7 +255,7 @@ class TaskPlanner:
     #     navSuccess = self.navigate_to_location(self.navigationGoal)
     
     def battery_check(self, data):
-        if(int(data.voltage)==0):
+        if((data.voltage)>11.8):
             self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
         else:
             self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
@@ -278,13 +278,15 @@ class TaskPlanner:
             # goal.target_pose.pose.position.y = 16.433826446533203
 
             self.db.child("current_action").set("Delivery") 
-
+            self.db.child("eta").set(0) 
             goal.target_pose.pose.position.x = -3.32 # table
             goal.target_pose.pose.position.y = -9.54
             # success = self.visualServoing.main(goal.objectId)
         elif(k==2):
             # goal.target_pose.pose.position.x = -14.054288864135742 #beverly
             # goal.target_pose.pose.position.y = 10.595928192138672
+            self.db.child("eta").set(0)
+            self.db.child("current_action").set("Delivery") 
 
             goal.target_pose.pose.position.x = -2.38 # refrigerator
             goal.target_pose.pose.position.y = -7.66
@@ -293,32 +295,50 @@ class TaskPlanner:
             # goal.target_pose.pose.position.x = -19.99483299255371 #aims door
             # goal.target_pose.pose.position.y = 12.28384780883789
             goal.target_pose.pose.position.x = -3.69 # center area
+            self.db.child("current_action").set("Video Call") 
+
             goal.target_pose.pose.position.y = -3.83
+            self.db.child("eta").set(0)
         elif(k==4):
             # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
             # goal.target_pose.pose.position.y = 0.53509521484375
             goal.target_pose.pose.position.y = -4.30 # center area
+            self.db.child("current_action").set("Video Call") 
+
             goal.target_pose.pose.position.y = -1.70
+            self.db.child("eta").set(0)
         elif(k==5):
             # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
             # goal.target_pose.pose.position.y = 0.53509521484375
             goal.target_pose.pose.position.y = -4.30
             goal.target_pose.pose.position.y = -1.70
+            self.db.child("eta2").set(0)
+            self.db.child("current_action").set("Delivery") 
+
         elif(k==6):
             # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
             # goal.target_pose.pose.position.y = 0.53509521484375
             goal.target_pose.pose.position.y = -4.30
             goal.target_pose.pose.position.y = -1.70
+            self.db.child("current_action").set("Delivery") 
+
+            self.db.child("eta2").set(0)
         elif(k==7):
             # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
             # goal.target_pose.pose.position.y = 0.53509521484375
             goal.target_pose.pose.position.y = -4.30
             goal.target_pose.pose.position.y = -1.70
+            self.db.child("current_action").set("Video Call") 
+
+            self.db.child("eta2").set(0)
         elif(k==8):
             # goal.target_pose.pose.position.x = 0.8146820068359375 #lobby end
             # goal.target_pose.pose.position.y = 0.53509521484375
             goal.target_pose.pose.position.y = -4.30
             goal.target_pose.pose.position.y = -1.70
+            self.db.child("current_action").set("Video Call") 
+
+            self.db.child("eta2").set(0)
         goal.target_pose.header.frame_id = "map"
         quaternion = get_quaternion(240)
         goal.target_pose.pose.orientation = quaternion
@@ -343,13 +363,15 @@ class TaskPlanner:
             self.navigation_client.cancel_goal()
             return False
         
-        success = self.visualServoing.main(9)
-        if(success!=0):
-            self.visualServoing.recoverFromFailure()
-        self.nServoTriesAttempted += 1
-        if self.nServoTriesAttempted >= self.nServoTriesAllowed:
-            success = True
-            self.nServoTriesAttempted=0
+        # success = self.visualServoing.main(12)
+        # if(success!=0):
+        #     self.visualServoing.recoverFromFailure()
+        # self.nServoTriesAttempted += 1
+        # if self.nServoTriesAttempted >= self.nServoTriesAllowed:
+        #     success = True
+        #     self.nServoTriesAttempted=0
+
+        self.bot_state.update_operation_mode(OperationModes.TELEOPERATION)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached Table")
         self.bot_state.update_emotion(Emotions.HAPPY)
@@ -395,9 +417,12 @@ class TaskPlanner:
                     if 1 not in self.q:
                         # self.eta=0
                         self.q.append(1)
-                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
-                            self.eta2 += 10
-                            self.eta=0
+                        if all(value != self.q[0] for value in [5,6,7,8]):
+                            self.db.child("eta").set(0)
+                        self.eta2 += 10
+                        self.db.child("eta2").set(self.eta2)
+                        
+                        # self.eta=0
 
                         self.db.child("button_callback").set(0)
 
@@ -406,25 +431,35 @@ class TaskPlanner:
                         # self.eta=0
                         self.q.append(2)
 
-                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
-                            self.eta2 += 10
-                            self.eta
+                        if all(value != self.q[0] for value in [5,6,7,8]):
+                            self.db.child("eta").set(0)
+                        self.eta2 += 10
+                        self.db.child("eta2").set(self.eta2)
+
+                        # self.eta=0
                         self.db.child("button_callback2").set(0)
                 elif(button_callback_value3==1):
                     if 3 not in self.q:
                         # self.eta=0
                         self.q.append(3)
 
-                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
-                            self.eta2 += 10
+                        if all(value != self.q[0] for value in [5,6,7,8]):
+                            self.db.child("eta").set(0)
+                        self.eta2 += 10
+                        self.db.child("eta2").set(self.eta2)
+
+                        # self.eta=0
                         self.db.child("button_callback3").set(0)
                 elif(button_callback_value4==1):
                     if 4 not in self.q:
                         # self.eta=0
                         self.q.append(4)   
 
-                        if all(value != self.q[0] for value in [5, 6, 7, 8]):
-                            self.eta2 += 10
+                        if all(value != self.q[0] for value in [5,6,7,8]):
+                            self.db.child("eta").set(0)
+                        self.eta2 += 10
+                        # self.eta=0
+                        self.db.child("eta2").set(self.eta2)
                         
                         self.db.child("button_callback4").set(0)
                 elif(button_callback_value5==1):
@@ -433,8 +468,11 @@ class TaskPlanner:
                         self.q.append(5)   
 
                         if all(value != self.q[0] for value in [1, 2, 3, 4]):
-                            self.eta += 10
+                            self.db.child("eta2").set(0)
+                        self.eta += 10
 
+
+                        self.db.child("eta").set(self.eta)
                         self.db.child("button_callback5").set(0)
                 elif(button_callback_value6==1):
                     if 6 not in self.q:
@@ -442,7 +480,10 @@ class TaskPlanner:
                         self.q.append(6)   
 
                         if all(value != self.q[0] for value in [1, 2, 3, 4]):
-                            self.eta += 10
+                            self.db.child("eta2").set(0)
+                        self.eta += 10
+                        self.db.child("eta").set(self.eta)
+                        
                         self.db.child("button_callback6").set(0)
                 elif(button_callback_value7==1):
                     if 7 not in self.q:
@@ -450,7 +491,10 @@ class TaskPlanner:
                         self.q.append(7)   
 
                         if all(value != self.q[0] for value in [1, 2, 3, 4]):
-                            self.eta += 10
+                            self.db.child("eta2").set(0)
+                        self.eta += 10
+                        self.db.child("eta").set(self.eta)
+
                         self.db.child("button_callback7").set(0)
                 elif(button_callback_value8==1):
                     if 8 not in self.q:
@@ -458,7 +502,12 @@ class TaskPlanner:
                         self.q.append(8)   
 
                         if all(value != self.q[0] for value in [1, 2, 3, 4]):
-                            self.eta += 10
+                            self.db.child("eta2").set(0)
+
+                        self.eta += 10
+                        self.db.child("eta").set(self.eta)
+
+
                         self.db.child("button_callback8").set(0)
             except KeyboardInterrupt:
                 break

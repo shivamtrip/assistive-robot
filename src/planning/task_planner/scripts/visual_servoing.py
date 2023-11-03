@@ -271,18 +271,18 @@ class AlignToObject:
 
 
 
-    def alignObjectForManipulation(self):
-        print("Aligning object for manipulation")
-        move_to_pose(self.trajectoryClient, {
-                'head_pan;to' : -np.pi/2,
-            }
-        )
-        move_to_pose(self.trajectoryClient, {
-                'base_rotate;by' : np.pi/2,
-            }
-        )
-        rospy.sleep(4)
-        return True
+    # def alignObjectForManipulation(self):
+    #     print("Aligning object for manipulation")
+    #     move_to_pose(self.trajectoryClient, {
+    #             'head_pan;to' : -np.pi/2,
+    #         }
+    #     )
+    #     move_to_pose(self.trajectoryClient, {
+    #             'base_rotate;by' : np.pi/2,
+    #         }
+    #     )
+    #     rospy.sleep(4)
+    #     return True
     
 
     def convertPointToBaseFrame(self, x_f, y_f, z):
@@ -528,13 +528,13 @@ class AlignToObject:
                     return False
                 self.state = State.ROTATE_90
 
-            elif self.state == State.ROTATE_90:
-                success = self.alignObjectForManipulation()
-                if not success:
-                    rospy.loginfo("Object not found. Exiting visual servoing")
-                    self.reset()
-                    return False
-                self.state = State.ALIGN_HORIZONTAL
+            # elif self.state == State.ROTATE_90:
+            #     success = self.alignObjectForManipulation()
+            #     if not success:
+            #         rospy.loginfo("Object not found. Exiting visual servoing")
+            #         self.reset()
+            #         return False
+            #     self.state = State.ALIGN_HORIZONTAL
 
             elif self.state == State.ALIGN_HORIZONTAL:
                 success = self.alignObjectHorizontal()
@@ -554,9 +554,9 @@ class AlignToObject:
 
 if __name__ == "__main__":
     # unit test
-    switch_to_manipulation = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
-    switch_to_manipulation.wait_for_service()
-    switch_to_manipulation()
+    # switch_to_manipulation = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+    # switch_to_manipulation.wait_for_service()
+    # switch_to_manipulation()
     rospy.init_node("align_to_object", anonymous=True)
     node = AlignToObject(39)
     # node.main(39)
