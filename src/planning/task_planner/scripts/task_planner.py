@@ -35,6 +35,13 @@ from sensor_msgs.msg import BatteryState
 # from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
 # from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
+from alfred_navigation.msg import NavManAction, NavManGoal
+
+
+# import sys
+# sys.path.append("/home/hello-robot/ws/src/navigation/alfred_navigation/scripts")
+# from navigation_manager import NavigationManager
+
 
 from state_manager import BotStateManager, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
 import os
@@ -89,7 +96,7 @@ class TaskPlanner:
 
         self.bot_state = BotStateManager(self.stateUpdateCallback)
 
-
+        self.nav_test = True
 
         rospack = rospkg.RosPack()
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
@@ -97,15 +104,15 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
 
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        # self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         #self.commandReceived = rospy.Service('/robot_task_command', GlobalTask, self.command_callback)
         
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
         # self.stow_robot_service.wait_for_service()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
-        self.navigation_client.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
+        # self.navigation_client.wait_for_server()
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for driver..")
@@ -129,6 +136,13 @@ class TaskPlanner:
         self.navigationGoal = LocationOfInterest.HOME
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
 
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        self.navigation_client.wait_for_server()
+
+        self.navigate_to_location_manual()
+
         # create a timed callback to check if we have, Obj been idle for too long
 
     def stateUpdateCallback(self):
@@ -146,17 +160,17 @@ class TaskPlanner:
     def main(self):
         task_thread = threading.Thread(target=task_planner.execute_task_temp)
         task_thread2 = threading.Thread(target=task_planner.updateButton)
-        task_thread.start()
-        task_thread2.start()
+        # task_thread.start()
+        # task_thread2.start()
 
-        task_thread.join()
-        task_thread2.join()
+        # task_thread.join()
+        # task_thread2.join()
 
     def execute_task_temp(self):
         
         while True:
             try:
-                if len(self.q) != 0:
+                if len(self.q) != 0 or self.nav_test == True:
                     # remote_id, task_to_execute = self.q.pop(0)
                     temp=self.q[0]
                     tasks_to_execute = self.q.pop(0)
@@ -168,6 +182,7 @@ class TaskPlanner:
                     rospy.sleep(5)
 
                     rospy.loginfo("Task complete...")
+                    self.nav_test = False
             except KeyboardInterrupt:
                 break
 
@@ -265,7 +280,7 @@ class TaskPlanner:
 
     def navigate_to_location(self, location : Enum, k):
         locationName = location.name
-        goal = MoveBaseGoal()
+        goal = NavManGoal()
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Executing task. Going to {}".format(locationName))
         # send goal
         if(k in [1,2,3,4]):
@@ -323,10 +338,10 @@ class TaskPlanner:
         quaternion = get_quaternion(240)
         goal.target_pose.pose.orientation = quaternion
         self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
-        print("Sending goal to move_base", self.goal_locations[locationName]['x'], self.goal_locations[locationName]['y'], self.goal_locations[locationName]['theta'])
+        # print("Sending goal to move_base", self.goal_locations[locationName]['x'], self.goal_locations[locationName]['y'], self.goal_locations[locationName]['theta'])
         
              
-        wait = self.navigation_client.wait_for_result()
+        # wait = self.navigation_client.wait_for_result()
 
         if(k in [1,2,3,4]):
             self.eta2=self.eta2-10
@@ -357,6 +372,8 @@ class TaskPlanner:
         self.bot_state.currentGlobalState = GlobalStates.REACHED_GOAL
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached Table")
         return True
+
+
 
     def updateButton(self):
         while True:
@@ -464,6 +481,7 @@ class TaskPlanner:
                 break
 
 if __name__ == "__main__":
+
     task_planner = TaskPlanner()
     
     # rospy.sleep(2)

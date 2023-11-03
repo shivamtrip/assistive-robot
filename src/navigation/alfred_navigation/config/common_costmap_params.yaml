@@ -4,12 +4,13 @@ raytrace_range: 3.0
 footprint: [[0.05, 0.17], [0.05, -0.17], [-0.17, -0.17], [-0.27, -0.06], [-0.27, 0.06], [-0.17, 0.17]]
 footprint_padding: 0.05 #0.025
 
+static_layer:
+  unknown_cost_value: 10000
 
 obstacle_layer: 
   observation_sources: laser_scan_sensor 
-  unknown_cost_value: 1000
   laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: scan_filtered, marking: true, clearing: true, inf_is_valid: true}
-
+  track_unknown_space: false
 
 rgbd_obstacle_layer:
   enabled:               true

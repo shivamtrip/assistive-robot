@@ -24,7 +24,7 @@
   <include file="$(find alfred_navigation)/launch/localization/amcl.launch" />
 
   <!-- NAVIGATION -->
-  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen" launch-prefix="xterm -e">
     <param name="footprint_padding" value="0.01" />
     <param name="controller_frequency" value="10.0" />
     <param name="controller_patience" value="100.0" />
@@ -36,30 +36,15 @@
     <rosparam file="$(find alfred_navigation)/config/dwa_local_planner_params.yaml" command="load" />
     <rosparam file="$(find alfred_navigation)/config/base_global_planner_params.yaml" command="load" />
     <rosparam file="$(find alfred_navigation)/config/move_base_params.yaml" command="load" />
-    <!-- <rosparam param="recovery_behaviors"> [ { name: "my_reset", type: "moveback_recovery/MovebackRecovery " } ] </rosparam> -->
+
     <remap from="/cmd_vel" to="/alfred/cmd_vel" />
-    <!-- <rosparam file="$(find alfred_navigation)/config/base_local_planner_params.yaml" command="load" /> -->
   </node>
 
-  <!-- Depth Image to Laser Scan Node -->
-  <node name="depthimage_to_laserscan" pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" args="">
+  <!-- Navigation Manager -->
+  <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
 
-    <remap from="image"       to="/camera/aligned_depth_to_color/image_raw"/> <!-- change here for your camera depth topic name. Default: "/camera/depth/image_raw" -->
-
-    <remap from="camera_info" to="/camera/color/camera_info"/> 
-    <remap from="scan" to="depth_image_scan"/>
-    <!-- the remap for camera_info by default uses the same path as the one given to the image topic. Default: "<path_to_image_topic>/camera_info>" -->
-
-    <!-- PARAMETERS: -->
-    <!-- These are the default values. --> 
-    <param name="scan_height"     type="int"    value="1"/> <!-- default: 1 pixel. Number of pixel rows used to generate laser scan. -->
-    <param name="scan_time"       type="double" value="0.033"/> <!-- default:0.033, 30 FPS . Time between scans. -->
-    <param name="range_min"       type="double" value="0.45"/> <!--default:0.45m. Ranges less than this are considered -Inf. -->
-    <param name="range_max"       type="double" value="10.0"/> <!--default: 10m. Ranges less than this are considered +Inf. -->
-    <param name="output_frame_id" type="str"    value="base_link"/> <!--default: camera_depth_frame. Frame id of the laser scan. -->
-	
-  </node>
-	
+  <!-- Moveback Recovery -->
+  <!-- <node name="moveback_recovery_node" pkg="moveback_recovery" type="moveback_recovery_node" output="screen" /> -->
 
   <!-- VISUALIZE -->
   <node name="rviz" pkg="rviz" type="rviz" output="log" args="-d $(find alfred_navigation)/rviz/navigation.rviz" if="$(arg rviz)" />
