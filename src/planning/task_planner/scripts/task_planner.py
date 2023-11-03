@@ -269,6 +269,36 @@ class TaskPlanner:
     #     self.startNavService()
     #     navSuccess = self.navigate_to_location(self.navigationGoal)
     
+    def navigate_to_location_manual(self):
+        # locationName = location.name
+        goal = NavManGoal()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" +"Executing task. Going to {}".format(locationName))
+        # send goal
+        # goal.x = -3.8682618141174316 #elevator
+        # goal.y = -2.505342483520508 #elevator
+        # goal.theta = 240
+
+        # goal.x = -4.1436285972595215 
+        # goal.y = -4.530055522918701 
+        # goal.theta = 240
+
+        # near AIMS fridge
+        goal.x = -2.615337371826172
+        goal.y = -7.306527137756348
+        goal.theta = 0
+
+
+        # # near AIMS Baxter
+        # goal.x = -1.9814379215240479
+        # goal.y = -0.4820127487182617
+        # goal.theta = 0
+        
+        self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
+
+        print("Task Planner has sent goal to Navigation Manager")
+
+        return True
+    
     def battery_check(self, data):
         if(int(data.voltage)==0):
             self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
