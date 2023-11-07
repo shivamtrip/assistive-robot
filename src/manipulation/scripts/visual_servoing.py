@@ -62,45 +62,52 @@ class AlignToObject:
         }         
 
         self.prevxerr = 0    
-        self.gotTransforms = False
         self.isDetected = False 
-        self.actionServer = None
-        self.cameraParams = {}
-        self.debug_out = True
         
         self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), np.deg2rad(5)] # [(left angle, right angle), stepsize]
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         self.listener = tf.TransformListener()
         self.tf_ros = TransformerROS()
-        self.cameraInfoSub = rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, self.getCamInfo)
+
+
+        rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
+        msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
+        self.cameraParams = {
+            'width' : msg.width,
+            'height' : msg.height,
+            'intrinsics' : np.array(msg.K).reshape(3,3),
+            'focal_length' : self.intrinsics[0][0],
+        }
+        self.intrinsics = np.array(msg.K).reshape(3,3)
+        rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
+
+        
         self.bridge = CvBridge()
         
         self.obtainedInitialImages = False
-        self.obtainedIntrinsics = False
 
         self.maxDistanceToMove = 0.0
 
         self.objectLocationInCamera = [np.inf, np.inf, np.inf]
-        self.objectLocationArrInCamera = []
 
         self.requestClearObject = False
         self.objectLocArr = []
         self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio')
-        self.isDepthMatters = False
-        # TODO(@praveenvnktsh) fix in rosparam
+        
+        
         self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image,self.depthCallback)
         self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.parseScene)
-        while not self.obtainedIntrinsics and not self.obtainedInitialImages:
-            rospy.loginfo("Waiting for imagse")
-            rospy.sleep(1)
+        
+        while not self.obtainedInitialImages:
+            rospy.sleep(0.1)
+        rospy.loginfo(f"[{self.node_name}]: Initial images obtained.")
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
 
     def computeObjectLocation(self, objectLocs):
         objectLocs = np.array(objectLocs)
         if len(objectLocs) == 0:
             return np.inf, np.inf, np.inf, np.inf, np.inf
-        print(colored("hello", 'blue'))
 
         weights = objectLocs[:, 3]
         x = np.average(objectLocs[:, 0], weights = weights)
@@ -111,21 +118,14 @@ class AlignToObject:
         return angleToGo, x, y, z, radius
 
     def findAndOrientToObject(self):
-        print("Scanning area")
-        # self.objectLocArr = []
-        # if self.objectId == 60:
-        #     self.isDepthMatters = True
-        #     self.clearAndWaitForNewObject(2)
-        #     self.isDepthMatters = False
-        # else:
-        # self.clearAndWaitForNewObject()
-
+        
+        rospy.loginfo(f"[{self.node_name}]: Finding and orienting to object")
+        
         move_to_pose(self.trajectoryClient, {
             'head_tilt;to' : -10 * np.pi/180,
             'head_pan;to' : self.vs_range[0][0],
         })
         rospy.sleep(2)
-        print("STARTING SEARCH")
         nRotates = 0
         while True:
             for i, angle in enumerate(np.arange(self.vs_range[0][0], self.vs_range[0][1], self.vs_range[1])):
@@ -316,8 +316,8 @@ class AlignToObject:
     
     def getTransform(self, target_frame, source_frame):
 
-        # if self.tf_listener.frameExists(target_frame) and self.tf_listener.frameExists(source_frame):
-        if True: #TODO(@praveenvnktsh) DOWNGRADE THE PACKAGE. THIS IS A HAC
+        if self.listener.frameExists(target_frame) and self.listener.frameExists(source_frame):
+        # if True: #TODO(@praveenvnktsh) DOWNGRADE THE PACKAGE. THIS IS A HAC
             t = self.listener.getLatestCommonTime(target_frame, source_frame)
             position, quaternion = self.listener.lookupTransform(target_frame, source_frame, t)
 
@@ -353,101 +353,34 @@ class AlignToObject:
             box = np.squeeze(msg['boxes'][loc])
             confidence = np.squeeze(msg['confidences'][loc])
             x1, y1, x2, y2 =  box
-            # print(x1, y1, x2, y2)
             crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
             
+            z_f = np.median(crop[crop != 0])/1000.0
+            h, w = self.depth_image.shape[:2]
+            y_new1 = w - x2 * upscale_fac
+            x_new1= y1 * upscale_fac
+            y_new2 = w - x1 * upscale_fac
+            x_new2 = y2 * upscale_fac
+
+            x_f = (x_new1 + x_new2)/2
+            y_f = (y_new1 + y_new2)/2
+            # print("cam frame", x_f, y_f, z_f)
+            point = self.convertPointToBaseFrame(x_f, y_f, z_f)
+
+            x, y, z = point.x, point.y, point.z
+            rospy.logdebug("Object detected at" + str((x, y, z)))
+
+            radius = np.sqrt(x**2 + y**2)
             
+            confidence /= radius
             
-
-            # draw rectangel
-
-            # im = self.depth_image.copy().astype(np.uint8)
-            # cv2.rectangle(im, (int(x1 * upscale_fac), int(y1 * upscale_fac)), (int(x2 * upscale_fac), int(y2 * upscale_fac)), (0, 0, 0), 2)
-            # im = cv2.resize(im, (w//2, h//2), interpolation=cv2.INTER_AREA)
-            # cv2.imshow("a", im)
-            # cv2.waitKey(1)
-            if self.objectId == 60 and self.isDepthMatters:
-                # h, w = crop.shape[:2]
-                # xmap = (np.arange(0, w) + x1) * upscale_fac
-                # ymap = (np.arange(0, h) + y1) * upscale_fac
-                # xmap, ymap = np.meshgrid(xmap, ymap)
-                # points_z = crop / 1000.0
-                # cx, cy, fx, fy = self.intrinsics[0][2], self.intrinsics[1][2], self.intrinsics[0][0], self.intrinsics[1][1]
-                # points_x = (xmap - cx) * points_z / fx
-                # points_y = (ymap - cy) * points_z / fy
-                # cloud = np.stack([points_x, points_y, points_z], axis=-1)
-                # pcd_points = cloud.reshape([-1, 3])
-                # pcd_points = np.hstack((pcd_points,np.ones((pcd_points.shape[0],1)))) 
-                # transform_mat = self.get_transform('/base_link', '/camera_depth_optical_frame')            
-                # pcd_points = np.matmul(transform_mat,pcd_points.T).T  
-                # print(np.median(pcd_points[:,0]))
-                upscale_fac = self.upscale_fac
-                h, w = crop.shape[:2]
-                xmap = np.arange(0, w) + x1 * upscale_fac
-                ymap = np.arange(0, h) + y1 * upscale_fac
-                xmap, ymap = np.meshgrid(xmap, ymap)
-                points_z = crop / 1000.0
-                cx, cy, fx, fy = self.intrinsics[0][2], self.intrinsics[1][2], self.intrinsics[0][0], self.intrinsics[1][1]
-                points_x = (xmap - cx) * points_z / fx
-                points_y = (ymap - cy) * points_z / fy
-                cloud = np.stack([points_x, points_y, points_z], axis=-1)
-                pcd_points = cloud.reshape([-1, 3])
-                pcd_points = np.hstack((pcd_points,np.ones((pcd_points.shape[0],1)))) 
-                transform_mat = self.getTransform('/base_link', '/camera_depth_optical_frame')            
-                pcd_points = np.matmul(transform_mat,pcd_points.T).T  
-
-                #filter ground plane
-                pcd_points = pcd_points[pcd_points[:,2]>0.2]
-
-                #visualize point clouds using o3d
-                # pcd = o3d.geometry.PointCloud()
-                # pcd.points = o3d.utility.Vector3dVector(pcd_points[:, :3])
-                # o3d.visualization.draw_geometries([pcd])
-
-                print(np.median(pcd_points[:,0]), pcd_points.shape)
+            if (z > 0.7  and radius < 2.5): # to remove objects that are not in field of view
                 self.isDetected = True
-                self.objectLocArr.append((np.median(pcd_points[:,0]), np.median(pcd_points[:,1]), np.median(pcd_points[:,2]), confidence))
+                self.objectLocArr.append((x, y, z, confidence))
             else:
-                z_f = np.median(crop[crop != 0])/1000.0
-                h, w = self.depth_image.shape[:2]
-                y_new1 = w - x2 * upscale_fac
-                x_new1= y1 * upscale_fac
-                y_new2 = w - x1 * upscale_fac
-                x_new2 = y2 * upscale_fac
-
-                x_f = (x_new1 + x_new2)/2
-                y_f = (y_new1 + y_new2)/2
-                # print("cam frame", x_f, y_f, z_f)
-                point = self.convertPointToBaseFrame(x_f, y_f, z_f)
-
-                x, y, z = point.x, point.y, point.z
-                rospy.logdebug("Object detected at" + str((x, y, z)))
-
-                radius = np.sqrt(x**2 + y**2)
-                
-                confidence /= radius
-                # confidence *= ()
-                self.objectLocationArrInCamera.append((x_f, y_f, z_f, 1))
-                if self.objectId == 60 or (z > 0.7  and radius < 2.5): # to remove objects that are not in field of view
-                    # print(x, y, z)
-                    self.isDetected = True
-                    self.objectLocArr.append((x, y, z, confidence))
-                else:
-                    self.isDetected = False
-                
+                self.isDetected = False
         else:
             self.isDetected = False
-        
-    def getCamInfo(self,msg):
-        self.intrinsics = np.array(msg.K).reshape(3,3)
-        self.cameraParams = {
-            'width' : msg.width,
-            'height' : msg.height,
-            'focal_length' : self.intrinsics[0][0],
-        }
-        self.obtainedIntrinsics = True
-        rospy.logdebug(f"[{rospy.get_name()}]" + "Obtained camera intrinsics")
-        self.cameraInfoSub.unregister()
 
     def depthCallback(self, depth_img):
         depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
@@ -457,7 +390,6 @@ class AlignToObject:
     def reset(self):
         self.isDetected = False
         self.objectLocArr = []
-        self.objectLocationArrInCamera = []
         self.state = State.SEARCH
         self.requestClearObject = False
 
@@ -594,11 +526,6 @@ if __name__ == "__main__":
     node = AlignToObject(39)
     # node.main(39)
     node.moveTowardsObject()
-    # node.trackObjectHeadCam()
-    # for i in range(20):
-    #     node.trackObjectHeadCam()
-    #     node.objectLocationArrInCamera = []
-    #     rospy.sleep(1)
     
     try:
         rospy.spin()

@@ -19,6 +19,7 @@ import rospy
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TransformStamped
+from sensor_msgs.msg import JointState, CameraInfo, Image
 
 # from helpers.joint_trajectory_server import JointTrajectoryAction
 from helpers.body_wrapper import JointTrajectoryAction
@@ -48,6 +49,18 @@ class AlfredBodyNode:
 
         self.robot_mode_rwlock = RWLock()
         self.robot_mode = None
+        
+        
+        self.cameraParams = {
+            'intrinsics' : None,
+        }
+        
+        
+        # camera services
+        
+        
+        
+        
         
     ###### MOBILE BASE VELOCITY METHODS #######
 
@@ -236,7 +249,6 @@ class AlfredBodyNode:
             self.mobile_base_manipulation_origin = {'x':x, 'y':y, 'theta':theta} 
         self.change_mode('manipulation', code_to_run)
 
-
     def calibrate(self):
         def code_to_run():
             self.robot.lift.home()
@@ -304,6 +316,10 @@ class AlfredBodyNode:
             success=True,
             message='is_runstopped: {0}'.format(request.data)
             )
+        
+
+
+
     
     def isRobotReady(self):
         # TODO(@praveenvnktsh): finish this function
@@ -473,6 +489,7 @@ class AlfredBodyNode:
         self.runstop_service = rospy.Service('/runstop',
                                               SetBool,
                                               self.runstop_service_callback)
+        
         
         self.head_pan_cg = HeadPanCommandGroup(node=self) \
             if 'head_pan' in self.robot.head.joints else None
