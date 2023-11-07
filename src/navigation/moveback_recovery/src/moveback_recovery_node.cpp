@@ -64,7 +64,7 @@ int main(int argc, char** argv){
   controller_costmap_ros_->start();
 
   moveback_recovery::MovebackRecovery moveback_object();
-  moveback_object.initialize("moveback_recovery", &buffer, planner_costmap_ros_, controller_costmap_ros_);
+  // moveback_object.initialize("moveback_recovery", &buffer, planner_costmap_ros_, controller_costmap_ros_);
 
   ros::spin();
 

@@ -1,0 +1,67 @@
+{
+    "system_1": {
+        "id": "",
+        "remote": {
+            "remote_1": {
+                "button": {
+                    "button_1": {
+                        "goal_x": "33",
+                        "goal_y": "",
+                        "object_type": "cheetah",
+                        "relative_name": "",
+                        "state": "0",
+                        "task_type": ""
+                    },
+                    "button_2": {
+                        "goal_x": "",
+                        "goal_y": "",
+                        "object_type": "",
+                        "relative_name": "Frank",
+                        "state": "1",
+                        "task_type": ""
+                    }
+                },
+                "current_eta": "",
+                "current_task": "",
+                "resident_name": "",
+                "room_number": ""
+            },
+            "remote_2": {
+                "button": {
+                    "button_1": {
+                        "goal_x": "",
+                        "goal_y": "",
+                        "object_type": "",
+                        "relative_name": "",
+                        "state": "0",
+                        "task_type": ""
+                    },
+                    "button_2": {
+                        "goal_x": "",
+                        "goal_y": "",
+                        "object_type": "",
+                        "relative_name": "",
+                        "state": "0",
+                        "task_type": ""
+                    }
+                },
+                "current_eta": "",
+                "current_task": "",
+                "resident_name": "",
+                "room_number": ""
+            }
+        },
+        "status": {
+            "battery_percent": "",
+            "current_task": {
+                "object_type": "",
+                "relative_name": "",
+                "resident_name": "",
+                "room_number": "",
+                "task_type": ""
+            },
+            "operation_mode": "",
+            "state": ""
+        }
+    }
+}
