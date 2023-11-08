@@ -8,4 +8,5 @@ publish_topic: 'object_bounding_boxes'
 visualize: true
 visualize_topic: 'annotated_image_body'
 
-device: 'cuda:0'
+# device: 'cuda:0'
+device: 'cpu'

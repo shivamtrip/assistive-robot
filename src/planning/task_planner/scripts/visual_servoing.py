@@ -28,6 +28,7 @@ from control_msgs.msg import FollowJointTrajectoryResult
 import actionlib
 from yolo.msg import Detections
 from termcolor import colored
+import math
 
 class State(Enum):
     SEARCH = 1
@@ -146,13 +147,13 @@ class AlignToObject:
                 rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
 
                 move_to_pose(self.trajectoryClient, {
-                    'base_rotate;by' : angleToGo,
+                    'base_rotate;by' : math.degrees(angleToGo),
                 })
                 rospy.sleep(5)
                 move_to_pose(self.trajectoryClient, {
-                    'head_pan;to' : 0,
+                    'head_pan;by' : math.degrees(angleToGo),
                 })
-                
+                rospy.sleep(5)
                 break
             else:
                 rospy.loginfo("Object not found, rotating base.")
@@ -206,7 +207,7 @@ class AlignToObject:
         rospy.loginfo("Moving towards the object")
         lastDetectedTime = time.time()
         startTime = time.time()
-        vel = 0.1
+        vel = 0.5
         intervalBeforeRestart = 10
 
         move_to_pose(self.trajectoryClient, {
@@ -227,7 +228,8 @@ class AlignToObject:
         if self.objectId == 41:
             maxGraspableDistance = 1
 
-        distanceToMove = self.computeObjectLocation(self.objectLocArr)[3] - maxGraspableDistance
+        # distanceToMove = self.computeObjectLocation(self.objectLocArr)[3] - maxGraspableDistance
+        distanceToMove = self.computeObjectLocation(self.objectLocArr)[4] 
         rospy.loginfo("Object distance = {}".format(self.computeObjectLocation(self.objectLocArr)[4]))
         # rospy.loginfo("Distance to move = {}. Threshold = {}".format(distanceToMove, distanceThreshold))
         if distanceToMove < 0:
@@ -239,7 +241,7 @@ class AlignToObject:
             distanceMoved = motionTime * vel
             
             move_to_pose(self.trajectoryClient, {
-                'base_translate;vel' : vel,
+                'base_translate;vel' : distanceToMove
             })
             # rospy.loginfo("Distance to move = {}, Distance moved = {}".format(distanceToMove, distanceMoved))
             # rospy.loginfo()
@@ -255,14 +257,14 @@ class AlignToObject:
                     if time.time() - lastDetectedTime > intervalBeforeRestart:
                         rospy.loginfo("Lost track of the object. Going back to search again.")
                         move_to_pose(self.trajectoryClient, {
-                            'base_translate;vel' : 0.0,
+                            'base_translate;vel' : 0.5,
                         })  
                         return False
             else: # open loop movement for the table
                 if distanceMoved >= distanceToMove:
                     break
 
-            rospy.sleep(0.1)
+            # rospy.sleep(0.1)
 
         move_to_pose(self.trajectoryClient, {
             'base_translate;vel' : 0.0,

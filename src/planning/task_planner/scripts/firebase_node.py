@@ -25,8 +25,8 @@ class FirebaseNode:
         self.operation_stream = self.db.child("operation_mode").stream(operation_mode_callback)
         self.teleoperation_stream = self.db.child("teleop_commands").stream(teleop_mode_callback)
     
-    # def update_operation_mode(self, mode):
-    #     self.db.update(mode)
+    def update_operation_mode(self, mode):
+        self.db.update(mode)
 
 
     def update_node(self, dict):

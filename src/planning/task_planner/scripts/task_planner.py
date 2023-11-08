@@ -27,7 +27,7 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from firebase_node import FirebaseNode
 import threading
 import concurrent.futures
-# from visual_servoing import AlignToObject
+from visual_servoing import AlignToObject
 # import stretch_body.pimu as pimu
 from sensor_msgs.msg import BatteryState
 
@@ -59,7 +59,7 @@ class TaskPlanner:
         locations_file = rospy.get_param("locations_file", "config/locations.json")
         locations_path = os.path.join(base_dir, locations_file)
         self.goal_locations = json.load(open(locations_path))
-        # self.visualServoing = AlignToObject(-1)
+        self.visualServoing = AlignToObject(-1)
         self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
         self.nServoTriesAttempted=0
         self.nServoTriesAllowed=3
@@ -132,14 +132,14 @@ class TaskPlanner:
         # create a timed callback to check if we have, Obj been idle for too long
 
     def stateUpdateCallback(self):
-        
-        if not self.bot_state.isAutonomous():
-            if not self.isManipMode :
-                self.isManipMode = True
-                self.startManipService()
+        pass        
+        # if not self.bot_state.isAutonomous():
+        #     if not self.isManipMode :
+        #         self.isManipMode = True
+        #         self.startManipService()
             
-            if not self.runningTeleop:
-                self.maintainvelocities()
+            # if not self.runningTeleop:
+                # self.maintainvelocities()
     def delay(self):
         time.sleep(5)
 
@@ -161,7 +161,11 @@ class TaskPlanner:
                     temp=self.q[0]
                     tasks_to_execute = self.q.pop(0)
                     # execute tasks here.
-                    rospy.loginfo(f"Executing task {tasks_to_execute} for room {1}")
+                    if(temp in [1,2,3,4]):
+                        pp=1
+                    elif(temp in [5,6,7,8]):
+                        pp=2
+                    rospy.loginfo(f"Executing task {tasks_to_execute} for room {pp}")
                     self.navigate_to_location(self.navigationGoal, tasks_to_execute)
 
 
@@ -363,13 +367,13 @@ class TaskPlanner:
             self.navigation_client.cancel_goal()
             return False
         
-        # success = self.visualServoing.main(12)
-        # if(success!=0):
-        #     self.visualServoing.recoverFromFailure()
-        # self.nServoTriesAttempted += 1
-        # if self.nServoTriesAttempted >= self.nServoTriesAllowed:
-        #     success = True
-        #     self.nServoTriesAttempted=0
+        success = self.visualServoing.main(12)
+        if(success!=0):
+            self.visualServoing.recoverFromFailure()
+        self.nServoTriesAttempted += 1
+        if self.nServoTriesAttempted >= self.nServoTriesAllowed:
+            success = True
+            self.nServoTriesAttempted=0
 
         self.bot_state.update_operation_mode(OperationModes.TELEOPERATION)
 
