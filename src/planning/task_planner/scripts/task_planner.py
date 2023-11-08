@@ -367,7 +367,7 @@ class TaskPlanner:
             self.navigation_client.cancel_goal()
             return False
         
-        success = self.visualServoing.main(12)
+        success = self.visualServoing.main(0)
         if(success!=0):
             self.visualServoing.recoverFromFailure()
         self.nServoTriesAttempted += 1

@@ -28,6 +28,7 @@ from control_msgs.msg import FollowJointTrajectoryResult
 import actionlib
 from yolo.msg import Detections
 from termcolor import colored
+import math
 
 class State(Enum):
     SEARCH = 1
@@ -91,9 +92,9 @@ class AlignToObject:
         # TODO(@praveenvnktsh) fix in rosparam
         self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image,self.depthCallback)
         self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.parseScene)
-        while not self.obtainedIntrinsics and not self.obtainedInitialImages:
-            rospy.loginfo("Waiting for imagse")
-            rospy.sleep(1)
+        # while not self.obtainedIntrinsics and not self.obtainedInitialImages:
+            # rospy.loginfo("Waiting for imagse")
+            # rospy.sleep(1)
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
 
     def computeObjectLocation(self, objectLocs):
@@ -146,17 +147,24 @@ class AlignToObject:
                 rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
 
                 move_to_pose(self.trajectoryClient, {
-                    'base_rotate;by' : angleToGo,
+                    'base_rotate;by' : math.degrees(angleToGo),
                 })
+                rospy.sleep(5)
                 move_to_pose(self.trajectoryClient, {
-                    'head_pan;to' : 0,
+                    'head_pan;by' : math.degrees(angleToGo),
                 })
-                
+                rospy.sleep(5)
                 break
             else:
                 rospy.loginfo("Object not found, rotating base.")
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : -np.pi/2,
+                    # 'head_pan;to' : -self.vs_range[0][0],
+                })
+                rospy.sleep(5)
+                
+                move_to_pose(self.trajectoryClient, {
+                    # 'base_rotate;by' : -np.pi/2,
                     'head_pan;to' : -self.vs_range[0][0],
                 })
                 rospy.sleep(5)
@@ -199,7 +207,7 @@ class AlignToObject:
         rospy.loginfo("Moving towards the object")
         lastDetectedTime = time.time()
         startTime = time.time()
-        vel = 0.1
+        vel = 0.5
         intervalBeforeRestart = 10
 
         move_to_pose(self.trajectoryClient, {
@@ -212,15 +220,16 @@ class AlignToObject:
                 return False
 
             self.isDepthMatters = False
-        else:
-            if not self.clearAndWaitForNewObject():
-                return False
+        # else:
+            # if not self.clearAndWaitForNewObject():
+            #     return False
 
         maxGraspableDistance = 0.77
         if self.objectId == 41:
             maxGraspableDistance = 1
 
-        distanceToMove = self.computeObjectLocation(self.objectLocArr)[3] - maxGraspableDistance
+        # distanceToMove = self.computeObjectLocation(self.objectLocArr)[3] - maxGraspableDistance
+        distanceToMove = self.computeObjectLocation(self.objectLocArr)[4] 
         rospy.loginfo("Object distance = {}".format(self.computeObjectLocation(self.objectLocArr)[4]))
         # rospy.loginfo("Distance to move = {}. Threshold = {}".format(distanceToMove, distanceThreshold))
         if distanceToMove < 0:
@@ -231,12 +240,12 @@ class AlignToObject:
             motionTime = time.time() - startTime
             distanceMoved = motionTime * vel
             
-            move_to_pose(self.trajectoryClient, {
-                'base_translate;vel' : vel,
-            })
+            # move_to_pose(self.trajectoryClient, {
+            #     'base_translate;vel' : distanceToMove
+            # })
             # rospy.loginfo("Distance to move = {}, Distance moved = {}".format(distanceToMove, distanceMoved))
             # rospy.loginfo()
-            rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
+            # rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
             if self.objectId != 60:
                 if self.isDetected:
                     lastDetectedTime = time.time()
@@ -248,14 +257,14 @@ class AlignToObject:
                     if time.time() - lastDetectedTime > intervalBeforeRestart:
                         rospy.loginfo("Lost track of the object. Going back to search again.")
                         move_to_pose(self.trajectoryClient, {
-                            'base_translate;vel' : 0.0,
+                            'base_translate;vel' : 0.5,
                         })  
                         return False
             else: # open loop movement for the table
                 if distanceMoved >= distanceToMove:
                     break
 
-            rospy.sleep(0.1)
+            # rospy.sleep(0.1)
 
         move_to_pose(self.trajectoryClient, {
             'base_translate;vel' : 0.0,
@@ -338,7 +347,6 @@ class AlignToObject:
         if self.requestClearObject:
             self.requestClearObject = False
             self.objectLocArr = []
-
         num_detections = (msg.nPredictions)
         msg = {
             "boxes" : np.array(msg.box_bounding_boxes).reshape(num_detections, 4),
