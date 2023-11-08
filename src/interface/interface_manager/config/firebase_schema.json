@@ -7,7 +7,7 @@
                     "button_1": {
                         "goal_x": "33",
                         "goal_y": "",
-                        "object_type": "cheetah",
+                        "object_type": "lion",
                         "relative_name": "",
                         "state": "0",
                         "task_type": ""
@@ -17,7 +17,7 @@
                         "goal_y": "",
                         "object_type": "",
                         "relative_name": "Frank",
-                        "state": "1",
+                        "state": "0",
                         "task_type": ""
                     }
                 },

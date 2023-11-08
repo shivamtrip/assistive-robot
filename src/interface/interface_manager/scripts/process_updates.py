@@ -8,6 +8,7 @@ import pyrebase
 import time
 from collections import defaultdict
 from alfred_msgs.msg import DeploymentTask
+from update_server import ServerUpdater
 
 
 class UpdateProcessor:
@@ -31,7 +32,9 @@ class UpdateProcessor:
             
         self.update_delay = 2       # seconds
           
-          
+        self.server_updater = ServerUpdater()      
+    
+
           
     def initialize_lists(self):
         
@@ -70,14 +73,18 @@ class UpdateProcessor:
         
         task_message = DeploymentTask()
         
-        task_message.task_type = "Delivery"
+        task_message.task_type = "delivery"
         task_message.object_type = "Bottle"
         task_message.room_number = 201
 
         
         self.task_publisher.publish(task_message)
 
+        self.server_updater.reset_button_state(button, remote, system)
+
         
+
+
 
 
 if __name__ == "__main__":

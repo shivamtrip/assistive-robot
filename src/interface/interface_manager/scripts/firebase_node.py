@@ -8,7 +8,7 @@ import rospy
 import json
 import os
 class FirebaseNode:
-    def __init__(self, schema, operation_mode_callback, teleop_mode_callback):
+    def __init__(self):         # schema, operation_mode_callback, teleop_mode_callback):
         firebase_secrets_path = os.path.expanduser("~/firebasesecrets.json")
         if not os.path.isfile(firebase_secrets_path):
             raise FileNotFoundError("Firebase secrets file not found")
@@ -22,26 +22,35 @@ class FirebaseNode:
         # self.db.set(schema)
 
         self.last_update = time.time()
-        self.operation_stream = self.db.child("operation_mode").stream(operation_mode_callback)
-        self.teleoperation_stream = self.db.child("teleop_commands").stream(teleop_mode_callback)
+        # self.operation_stream = self.db.child("operation_mode").stream(operation_mode_callback)
+        # self.teleoperation_stream = self.db.child("teleop_commands").stream(teleop_mode_callback)
     
     # def update_operation_mode(self, mode):
     #     self.db.update(mode)
 
+    
+    def update_node(self, server_update):
 
-    def update_node(self, dict):
-        dict['last_update'] = (time.time())
+        print(" ------------- UPDATE INCOMING ---------------")
+        print(server_update)
+
+        # self.db.child("alfred_deployment").update(server_update)
         
-        if time.time() - self.last_update > 2:
-            keys_to_del = [
-                'operation_mode',
-                'teleop_commands'
-            ]
-            for key in keys_to_del:
-                if key in dict.keys():
-                    del dict[key]
-            self.db.update(dict)
-            self.last_update = time.time()
+
+
+    # def update_node(self, dict):
+    #     dict['last_update'] = (time.time())
+        
+    #     if time.time() - self.last_update > 2:
+    #         keys_to_del = [
+    #             'operation_mode',
+    #             'teleop_commands'
+    #         ]
+    #         for key in keys_to_del:
+    #             if key in dict.keys():
+    #                 del dict[key]
+    #         self.db.update(dict)
+    #         self.last_update = time.time()
 
 
     
