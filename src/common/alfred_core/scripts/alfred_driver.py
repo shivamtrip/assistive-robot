@@ -393,7 +393,7 @@ class AlfredBodyNode:
             self.robot.home()
 
 
-        self.stow(None)
+        # self.stow(None)
 
         mode = rospy.get_param('~mode', "navigation")
         if mode == "navigation":

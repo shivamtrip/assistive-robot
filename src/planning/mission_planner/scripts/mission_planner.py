@@ -104,22 +104,26 @@ class Mission_Planner():
     
             # Navigate to Pick-up Location            
             navSuccess = self.TaskExecutor.navigate_to_location()
-            self.update_mission_status(navSuccess)
+            if not self.update_mission_status(navSuccess):
+                return
 
 
             # # Search for and pick-up object
             # manipulationSuccess = manipulate_object()
-            # self.update_mission_status(navSuccess)
+            # if not self.update_mission_status(manipulationSuccess):
+            #     return 
 
 
             # # Navigate to delivery location
             # navSuccess = navigate_to_location()
-            # self.update_mission_status(navSuccess)
+            # if not self.update_mission_status(navSuccess):
+            #     return 
 
 
             # # Place object at delivery location
             # manipulationSuccess = manipulate_object()
-            # self.update_mission_status(navSuccess)
+            # if not self.update_mission_status(manipulationSuccess):
+            #     return 
 
 
         elif self.current_task_type == "videocall":

@@ -66,7 +66,7 @@ class TaskPlanner:
         locations_file = rospy.get_param("locations_file", "config/locations.json")
         locations_path = os.path.join(base_dir, locations_file)
         self.goal_locations = json.load(open(locations_path))
-        self.visualServoing = AlignToObject(-1)
+        # self.visualServoing = AlignToObject(-1)
         self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
         self.nServoTriesAttempted=0
         self.nServoTriesAllowed=3
@@ -154,6 +154,8 @@ class TaskPlanner:
             
             if not self.runningTeleop:
                 self.maintainvelocities()
+
+
     def delay(self):
         time.sleep(5)
 
@@ -299,11 +301,11 @@ class TaskPlanner:
 
         return True
     
-    def battery_check(self, data):
-        if(int(data.voltage)==0):
-            self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
-        else:
-            self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
+    # def battery_check(self, data):
+    #     if(int(data.voltage)==0):
+    #         self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
+    #     else:
+    #         self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
 
 
         
