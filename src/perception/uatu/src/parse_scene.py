@@ -15,6 +15,9 @@ from geometry_msgs.msg import Vector3, Vector3Stamped, PoseStamped, Point, Pose,
 # ROS action finite state machine
 from yolo.msg import Detections
 from graph import Graph, Node
+import message_filters
+import open3d as o3d
+
 
 class SceneParser:
     def __init__(self,):
@@ -42,8 +45,12 @@ class SceneParser:
         self.objectLocArr = []
         self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio')
         
-        self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image,self.depthCallback)
-        self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.parseScene)
+        self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+        self.rgb_image_subscriber = rospy.Subscriber('/camera/color/image_raw', Image)
+        synced = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber], 10, 0.1, allow_headerless=True)
+        synced.registerCallback(self.image_callback)
+        
+        self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.parse_detections)
         
         self.class_list = rospy.get_param('class_list')
         self.graph : Graph = Graph(len(self.class_list))
@@ -59,12 +66,33 @@ class SceneParser:
         rospy.Service('/start_tracking_object', Trigger, self.start_tracking_object)
         rospy.Service('/stop_tracking_object', Trigger, self.stop_tracking_object)
         
+        rospy.Service('/start_accumulate_tsdf', Trigger, self.start_accumulate_tsdf)
+        rospy.Service('/stop_accumulate_tsdf', Trigger, self.stop_accumulate_tsdf)
         
         rospy.loginfo(f"[{self.node_name}]: Initial images obtained.")
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
         
         
+        self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length=4.0 / 512.0,
+            sdf_trunc=0.04,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+        )
     
+    def start_accumulate_tsdf(self, req):
+        self.accumulating_tsdf = True
+        return True, "Accumulated TSDF"
+    
+    def stop_accumulate_tsdf(self, req):
+        self.accumulating_tsdf = False
+        pcd = self.tsdf_volume.extract_point_cloud()
+        o3d.io.write_point_cloud("/home/hello-robot/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply", pcd)
+        self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length=4.0 / 512.0,
+            sdf_trunc=0.04,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+        )
+        return True, "Accumulated TSDF"
     
     def start_tracking_object(self, req):
         self.tracking = req.objectId
@@ -77,7 +105,38 @@ class SceneParser:
         self.graph.clear()
         rospy.loginfo(f"[{self.node_name}]: Graph cleared.")
 
-    def convertPointToBaseFrame(self, x_f, y_f, z):
+    def tsdf_snapshot(self, req):
+        if not self.accumulating_tsdf:
+            return False
+        color = o3d.geometry.Image(self.color_image.astype(np.uint8))
+        depth = self.depth_image.astype(np.uint16)
+        depth[depth < 150] = 0
+        depth = o3d.geometry.Image(depth)
+        
+        extrinsics = self.get_transform('/camera_color_optical_frame', '/base_link')
+        extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+        intrinsics = self.intrinsics
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            color, depth, depth_scale=1000, convert_rgb_to_intensity=False
+        )
+        cam = o3d.camera.PinholeCameraIntrinsic()
+        cam.intrinsic_matrix = intrinsics
+        cam.width = self.color.shape[1]
+        cam.height = self.color.shape[0]
+        self.tsdf_volume.integrate(
+            rgbd,
+            cam,
+            extrinsics)
+        return True
+
+    def image_callback(self, depth_img, color_img):
+        depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
+        self.depth_image = np.array(depth_img, dtype=np.uint16)
+        self.color_image = self.bridge.imgmsg_to_cv2(color_img, desired_encoding="passthrough")
+            
+
+
+    def convert_point_to_base_frame(self, x_f, y_f, z):
         intrinsic = self.intrinsics
         fx = intrinsic[0][0]
         fy = intrinsic[1][1] 
@@ -111,10 +170,8 @@ class SceneParser:
                 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 continue
-    
 
-
-    def parseScene(self, msg : Detections):
+    def parse_detections(self, msg : Detections):
         self.obtainedInitialImages = True
         num_detections = (msg.nPredictions)
         msg = {
@@ -160,12 +217,6 @@ class SceneParser:
                     msg.header.stamp)
                 if self.tracking == class_type:
                     self.trackedNode.add_sample(x, y, z, None, msg.header.stamp, confidence)
-
-    def depthCallback(self, depth_img):
-        depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
-        depth_img = np.array(depth_img, dtype=np.float32)
-        self.depth_image = cv2.rotate(depth_img, cv2.ROTATE_90_CLOCKWISE)
-    
 
 if __name__ == "__main__":
     node = SceneParser()

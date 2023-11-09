@@ -4,6 +4,8 @@ from std_srvs.srv import Trigger
 from helpers import *
 from control_msgs.msg import FollowJointTrajectoryAction
 from planner import Planner
+import open3d as o3d
+
 class Manipulation:
     def __init__(self):
         self.node_name = "manipulation"
@@ -18,62 +20,80 @@ class Manipulation:
         self.search_range = rospy.get_param('/manipulation/search_range')
 
         self.planner = Planner()
+        
+        self.capture_tsdf_snapshot = None
+        self.start_tsdf_accumulation = None
+        self.stop_tsdf_accumulation = None
+        
+        self.start_object_tracking = None
+        self.stop_object_tracking = None
+        self.capture_object_snapshot = None
     
         
-    def search_for_object(self, accumulate_tsdf = False):
+    def pan_camera_region(self, 
+                          range = [0, 2 * np.pi, 10],
+                          pitch = -10 * np.pi/180,
+                          object_of_interest = 0,
+            ):
         
-        rospy.loginfo(f"[{self.node_name}]: Searching for object")
-        
-        if not accumulate_tsdf:
-            self.enable_tracking()
-        else:
-            self.enable_tsdf_accumulation()
+        rospy.loginfo(f"[{self.node_name}]: Panning area. pitch: {pitch}, range: {range}")
+
+
+        self.start_tsdf_accumulation()
+        self.start_object_tracking(object_of_interest)
         
         move_to_pose(self.trajectoryClient, {
-            'head_tilt;to' : -10 * np.pi/180,
-            'head_pan;to' : self.search_range[0][0],
-        }, asynchronous= False)
+            'head_tilt;to' : pitch,
+            'head_pan;to' : range[0],
+        })
         
-        nRotates = 0
-        for i, angle in enumerate(np.arange(self.search_range[0][0], self.search_range[0][1], self.search_range[1])):
+        for i, angle in enumerate(np.arange(range[0], range[1], range[2])):
             move_to_pose(self.trajectoryClient, {
                 'head_pan;to' : angle,
-            }, asynchronous= False)
-            if not accumulate_tsdf:
-                self.capture_snapshot_request()
+            })
+            self.capture_tsdf_snapshot()
+            self.capture_object_snapshot()
             
-        if not accumulate_tsdf:
-            self.object_of_interest = self.disable_tracking() # returns the initial action server call 
-        
         move_to_pose(self.trajectoryClient, {
             'head_tilt;to' : -10 * np.pi/180,
             'head_pan;to' : 0,
-        }, asynchronous= False)
+        })
         
-    def move_to_object(self, obj):
-        x_me, y_me = self.get_robot_position()
-        x_obj, y_obj, z_obj = obj
-        
-        theta = np.arctan2((y_obj - y_me), (x_obj - x_me))
-        
-        reachable = 0.85
-        location_to_go = [
-            x_obj - reachable * np.cos(theta),
-            y_obj - reachable * np.sin(theta),
-        ]
-        
-        # send request to movebase
+        object_properties = self.stop_object_tracking()
+        self.stop_tsdf_accumulation()
+        path_to_tsdf = "/home/hello-robot/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply"
+        return object_properties, path_to_tsdf
         
     def execute_plan(self, plan):
         pass
     
+    def execute_base_plan(self, plan):
+        pass
+    
+    def execute_manipulator_plan(self, plan):
+        pass
+    
     def main(self):
-        self.search_for_object()
-        self.move_to_object(self.object_of_interest)
-        self.search_for_object(True)
-        plan = self.planner.plan()
         
-        if plan != None:
-            self.execute_plan()
-        else:
-            rospy.loginfo(f"[{self.node_name}]: No feasible plan found. Reroute and reattempt.")
+        object_properties, path_to_tsdf = self.pan_camera_region(
+            range = self.search_range,
+            pitch = -10 * np.pi/180,
+        )
+        point_cloud = o3d.io.read_point_cloud(path_to_tsdf)
+        
+        base_plan = self.planner.plan_base(point_cloud, object_properties)
+        self.execute_base_plan(base_plan)
+        
+        
+        object_properties, path_to_tsdf = self.pan_camera_region(
+            range = self.search_range,
+            pitch = -10 * np.pi/180,
+        )
+        
+        point_cloud = o3d.io.read_point_cloud(path_to_tsdf)
+
+        grasp_target = self.planner.plan_grasp_target(point_cloud, object_properties)
+        manipulator_plan = self.planner.plan_manipulator(point_cloud, grasp_target)
+
+        self.execute_manipulator_plan(manipulator_plan)
+        
