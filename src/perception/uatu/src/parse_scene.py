@@ -55,7 +55,7 @@ class SceneParser:
         self.class_list = rospy.get_param('class_list')
         self.graph : Graph = Graph(len(self.class_list))
         
-        self.trackedNode = Node(-1)
+        
         
         while not self.obtainedInitialImages:
             rospy.sleep(0.1)
@@ -72,34 +72,28 @@ class SceneParser:
         rospy.loginfo(f"[{self.node_name}]: Initial images obtained.")
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
         
-        
+        self.trackedNode = None
+        self.tsdf_volume = None
+        self.point_cloud = None
+    
+    def start_accumulate_tsdf(self, req):
+        self.accumulating_tsdf = True
         self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
             voxel_length=4.0 / 512.0,
             sdf_trunc=0.04,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )
-    
-    def start_accumulate_tsdf(self, req):
-        self.accumulating_tsdf = True
         return True, "Accumulated TSDF"
     
     def stop_accumulate_tsdf(self, req):
         self.accumulating_tsdf = False
         pcd = self.tsdf_volume.extract_point_cloud()
+        self.point_cloud = pcd
         o3d.io.write_point_cloud("/home/hello-robot/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply", pcd)
-        self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=4.0 / 512.0,
-            sdf_trunc=0.04,
-            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
-        )
         return True, "Accumulated TSDF"
     
     def start_tracking_object(self, req):
-        self.tracking = req.objectId
-        
-    def stop_tracking_object(self, req):
-        self.tracking = -1
-        self.trackedNode.clear_samples()
+        self.trackedNode = Node(req.objectId)
         
     def clear_graph(self, req):
         self.graph.clear()
@@ -108,10 +102,13 @@ class SceneParser:
     def tsdf_snapshot(self, req):
         if not self.accumulating_tsdf:
             return False
-        color = o3d.geometry.Image(self.color_image.astype(np.uint8))
+        
         depth = self.depth_image.astype(np.uint16)
         depth[depth < 150] = 0
+        depth[depth > 3000] = 0
+        
         depth = o3d.geometry.Image(depth)
+        color = o3d.geometry.Image(self.color_image.astype(np.uint8))
         
         extrinsics = self.get_transform('/camera_color_optical_frame', '/base_link')
         extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
@@ -129,12 +126,42 @@ class SceneParser:
             extrinsics)
         return True
 
+    def image_snapshot(self):
+        extrinsics_to_base = self.get_transform('/camera_color_optical_frame', '/base_link')
+        extrinsics_to_base = np.concatenate((extrinsics_to_base, np.array([[0, 0, 0, 1]])), axis=0)
+        
+        extrinsics_to_map = self.get_transform('/camera_color_optical_frame', '/map')
+        extrinsics_to_map = np.concatenate((extrinsics_to_map, np.array([[0, 0, 0, 1]])), axis=0)
+        
+        detections = self.latest_detections
+        classes = detections['box_classes']
+        indices = classes == self.trackedNode.cls_type
+        boxes = detections['boxes'][indices]
+        
+        if len(boxes) != 0:
+            self.trackedNode.add_sample(
+                self.color_image, self.depth_image,
+                extrinsics_to_base, extrinsics_to_map,
+                boxes
+            )
+
     def image_callback(self, depth_img, color_img):
         depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
         self.depth_image = np.array(depth_img, dtype=np.uint16)
         self.color_image = self.bridge.imgmsg_to_cv2(color_img, desired_encoding="passthrough")
             
-
+    def get_three_d_bbox_from_tracker(self):
+        if self.trackedNode == None or self.point_cloud == None:
+            return False
+        
+        cloud = self.trackedNode.reconstruct_object()
+        
+        bbox = cloud.get_oriented_bounding_box()
+        box_points = np.array(bbox.get_box_points())
+        
+        return box_points
+        
+        
 
     def convert_point_to_base_frame(self, x_f, y_f, z):
         intrinsic = self.intrinsics
@@ -179,6 +206,7 @@ class SceneParser:
             "box_classes" : np.array(msg.box_classes).reshape(num_detections),
             'confidences' : np.array(msg.confidences).reshape(num_detections),
         }
+        self.latest_detections = msg
         n = len(msg['box_classes'])
         
         upscale_fac = self.upscale_fac
@@ -187,36 +215,15 @@ class SceneParser:
             confidence = np.squeeze(msg['confidences'][n])
             class_type = np.squeeze(msg['box_classes'][n])
             x1, y1, x2, y2 =  box
-            crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
+            mask = np.zeros_like(self.depth_image)
+            mask[int(y1):int(y2), int(x1):int(x2)] = 1
+            depth = self.depth_image * mask
+            color = self.color_image * mask
             
-            z_f = np.median(crop[crop != 0])/1000.0
-            h, w = self.depth_image.shape[:2]
-            y_new1 = w - x2 * upscale_fac
-            x_new1 = y1 * upscale_fac
-            y_new2 = w - x1 * upscale_fac
-            x_new2 = y2 * upscale_fac
-
-            x_f = (x_new1 + x_new2)/2
-            y_f = (y_new1 + y_new2)/2
-            
-            # instead of center, randomly sample points within the bounding box and obtain the mean
-            n_points = 30
-            x_s = np.random.randint(x_new1, x_new2, n_points)
-            y_s = np.random.randint(y_new1, y_new2, n_points)
-            z_s = np.array([self.depth_image[y, x] for x, y in zip(x_s, y_s)])/1000.0
-            
-            points = np.array([self.convertPointToBaseFrame(x, y, z) for x, y, z in zip(x_s, y_s, z_s)])
-            x, y, z = np.median(points, axis=0)
-
-            radius = np.sqrt(x**2 + y**2)
-            confidence /= radius
-            if (radius < 2.5): # to remove objects that are not in field of view
-                self.graph.add_observation(
-                    x, y, z,
-                    class_type, confidence, 
-                    msg.header.stamp)
-                if self.tracking == class_type:
-                    self.trackedNode.add_sample(x, y, z, None, msg.header.stamp, confidence)
+            self.graph.add_observation(
+                color, depth,
+                class_type, confidence, 
+                msg.header.stamp)
 
 if __name__ == "__main__":
     node = SceneParser()

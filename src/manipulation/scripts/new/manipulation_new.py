@@ -77,7 +77,7 @@ class Manipulation:
         
         object_properties, path_to_tsdf = self.pan_camera_region(
             range = self.search_range,
-            pitch = -10 * np.pi/180,
+            pitch = -30 * np.pi/180,
         )
         point_cloud = o3d.io.read_point_cloud(path_to_tsdf)
         
@@ -87,7 +87,7 @@ class Manipulation:
         
         object_properties, path_to_tsdf = self.pan_camera_region(
             range = self.search_range,
-            pitch = -10 * np.pi/180,
+            pitch = -30 * np.pi/180,
         )
         
         point_cloud = o3d.io.read_point_cloud(path_to_tsdf)

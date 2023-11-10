@@ -2,7 +2,7 @@ import numpy as np
 import open3d as o3d 
 import cv2
 import heapq
-og_pcd = o3d.io.read_point_cloud("/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/sim/mesh.ply")
+og_pcd = o3d.io.read_point_cloud("/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/sim/pcd.ply")
 
 pcd_min = np.min(np.array(og_pcd.points), axis=0)
 resolution = 0.05
@@ -310,7 +310,7 @@ def visualize(state):
 if __name__ == "__main__":
     # x, y, theta, z, phi, ext
     start =  np.array([  0,   0,       0, 0.3, 3.1,   0])
-    target = np.array([0.0, 0.1,  1.57, 1.3,     0, 0.1])
+    target = np.array([0.0, 0.0,  1.57, 1.3,     0, 0.5])
     # path = astar(start, target)
     resolutions = np.array(
         [

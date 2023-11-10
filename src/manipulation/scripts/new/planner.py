@@ -1,16 +1,23 @@
 import numpy as np
 import cv2
+import open3d as o3d
 
 class Planner:
     
     
     def __init__(self):
-        self.get_segmentation_from_bounds = None
+        self.get_segmentation_from_bounds = None # replace this with a service call to obtain segmentation
+        self.get_three_d_bbox_from_tracker = None # replace this with a service call to obtain 3d bbox
+        self.get_plane = None # service to get a plane from uatu
+        
         self.resolution = 0.05 #resolution for planning base and voxelizing/rasterizing point cloud
         self.radius_reachable = int(0.85 / self.resolution)
         self.max_dist_traverse = int(1.3 / self.resolution)
         self.characteristic_dist = 0.15 / self.resolution
-    
+        
+        self.lengths = [
+            0.11587, 0.25, 0.25
+        ]
     
     def plan_base(self, point_cloud, object_location, viz = False):
         points = point_cloud
@@ -84,19 +91,168 @@ class Planner:
         )
         
         return navigation_target
-
     
-    def plan_manipulator(self, target):
-        pass
+    def get_collision_boxes(self, state, get_centers = False):
+        boxes = []
+        x, y, theta, z, phi, ext = state
+        l, l1, l3 = self.lengths
+        centr = np.array([
+            x - l * np.cos(theta), 
+            y - l * np.sin(theta), 0.093621], dtype = np.float64).reshape(3, 1)
+        base_box_o3d = o3d.geometry.OrientedBoundingBox(
+            center = centr,
+            R = Planner.get_rotation_mat(theta).reshape(3, 3),
+            extent = np.array([0.35, 0.35, 0.3], dtype = np.float64).reshape(3, 1)
+        )
+        
+        boxes.append(base_box_o3d)
+        
+        arm_center = centr + np.array(
+                [
+                    (- l1 * np.sin(theta) + ( 0.3 + ext)* np.sin(theta))/2,
+                    (l1 * np.cos(theta)  - ( 0.3 + ext) * np.cos(theta))/2,
+                    z
+                ]
+            ).reshape(3, 1)
+        arm_box_o3d = o3d.geometry.OrientedBoundingBox(
+            center = arm_center,
+            R = Planner.get_rotation_mat(theta).reshape(3, 3),
+            extent = np.array([0.1, ext + 0.3, 0.1], dtype = np.float64).reshape(3, 1)
+        )
+        
+        boxes.append(arm_box_o3d)
+        gripper_center = centr + np.array([
+            (0.3 + ext - l1/2) * np.sin(theta) + l3/2 * np.sin(theta + phi),
+            -(0.3 + ext - l1/2) * np.cos(theta) - l3/2 * np.cos(theta + phi),
+            z - 0.15
+        ]).reshape(3, 1)
+        
+        gripper_box_o3d = o3d.geometry.OrientedBoundingBox(
+            center = gripper_center,
+            R = Planner.get_rotation_mat(theta + phi).reshape(3, 3),
+            extent = np.array([0.15, 0.25, 0.15], dtype = np.float64).reshape(3, 1)
+        )
+        boxes.append(gripper_box_o3d)
+        centers = []
+        if get_centers:
+            center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
+            center.translate(centr)
+            center.paint_uniform_color([0, 0, 1])
+            centers.append(center)
+            center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
+            center.translate(np.array([x, y, 0.09]))
+            center.paint_uniform_color([0, 0, 1])
+            centers.append(center)
+            center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
+            center.translate(gripper_center)
+            center.paint_uniform_color([0, 0, 1])
+            centers.append(center)
+            center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
+            center.translate(arm_center)
+            center.paint_uniform_color([0, 0, 1])
+            centers.append(center)
+        
+        return boxes, centers
+    
+    def check_collision(self, state, pcd):
+        boxes, _ = self.get_collision_boxes(state, get_centers = False)
+        points_in_pcd = o3d.utility.Vector3dVector(np.array(pcd.points))
+        for box in boxes:
+            if len(box.get_point_indices_within_bounding_box(points_in_pcd)) > 0:
+                return True
+        return False
+        
+    def check_valid_config(self, state, pcd):
+        tx, ty, ttheta, tz, tphi, text = state
+        
+        if tz > 1.5 or tz < 0.1:
+            return False    
+        if text > 0.8 or text < 0:
+            return False
+        if ttheta > 2 * np.pi or ttheta < 0:
+            return False
+        if tphi > np.pi or tphi < -np.pi:
+            return False
+        if abs(tx) > 0.3 or abs(ty) > 0.3:
+            return False
+        
+        if self.check_collision(state, pcd):
+            return False
+        
+        return True
+    
+    def plan_naive_manipulator(self, point_cloud, curstate, target):
+        tx, ty, ttheta, tz, tphi, text = target
+        path = []
+        next_state = curstate.copy()
+        next_state[:2] = np.array([tx, ty])
+        if not self.check_valid_config(next_state, point_cloud):
+            path.append(next_state.copy())
+        else:
+            return path, False
+        
+        next_state[2] = ttheta
+        if not self.check_valid_config(next_state, point_cloud):
+            path.append(next_state.copy())
+        else:
+            return path, False
+        
+        next_state[3] = tz
+        if not self.check_valid_config(next_state, point_cloud):
+            path.append(next_state.copy())
+        else:
+            return path, False
+        
+        next_state[4] = tphi 
+        if not self.check_valid_config(next_state, point_cloud):
+            path.append(next_state.copy())
+        else:
+            return path, False
+        
+        next_state[5] = text
+        if not self.check_valid_config(next_state, point_cloud):
+            path.append(next_state.copy())
+        else:
+            return path, False
+
+        return path, True
+    
+    
+    def get_astar_path(self, point_cloud, curstate, target):
+        return [], False
+    
+    def plan_manipulator(self, point_cloud, curstate, target):
+        path, success = self.plan_naive_manipulator(point_cloud, curstate, target)
+        
+        if success:
+            return path, True
+        
+        path, success = self.get_astar_path(point_cloud, curstate, target)
+        
+        if success:
+            return path, True
+        else:
+            return [], False
+            
     
     def plan_grasp_target(self, point_cloud, object_location):
-        segmentation = self.get_segmentation_from_bounds(point_cloud, object_location)
+        bbox_points = self.get_three_d_bbox_from_tracker(object_location)
+        o3d_box = o3d.geometry.OrientationBoundingBox.create_from_points(o3d.utility.Vector3dVector(bbox_points))
+        cropped_cloud = point_cloud.crop(o3d_box)
         
-        # choose centroid
+        points = np.array(cropped_cloud.points)
         
-        points_of_interest = point_cloud[segmentation]
+        median_grasp = np.median(points, axis = 0)
         
-        # choose grasp target 
+        return median_grasp
+        
+        
+                
+    @staticmethod
+    def get_rotation_mat(theta):
+        return np.array([[np.cos(theta), -np.sin(theta), 0],
+                            [np.sin(theta), np.cos(theta), 0],
+                            [0, 0, 1]], dtype = np.float64)
         
         
     
