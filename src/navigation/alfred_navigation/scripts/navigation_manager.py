@@ -40,9 +40,9 @@ class NavigationManager():
 
         # self.moveback_client.wait_for_server()
 
-        print("Starting NavMan Server..")
         self.navman_server.start()
-
+        print("NavMan Server has started..")
+        
 
     def update_goal(self, goal : NavManGoal):
         

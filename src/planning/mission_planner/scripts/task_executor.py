@@ -8,6 +8,7 @@ from alfred_navigation.msg import NavManAction, NavManGoal
 import rospkg
 import os
 import json
+from update_server import ServerUpdater
 
 
 class TaskExecutor:
@@ -25,6 +26,7 @@ class TaskExecutor:
 
 
 
+
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
 
@@ -35,7 +37,7 @@ class TaskExecutor:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
 
-
+        print("Task Executor Initialized")
 
 
 
@@ -59,18 +61,23 @@ class TaskExecutor:
         wait = self.navigation_client.wait_for_result()
 
         if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
-            rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach {}".format(locationName))
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach {}".format(location_name))
             # cancel navigation
             # self.navigation_client.cancel_goal()
             return False
         
-        # rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))
-        # self.bot_state.update_emotion(Emotions.HAPPY)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(location_name))
+
+        self.server_updater.update_emotion(Emotions.HAPPY)
         # self.bot_state.update_state()
         # self.bot_state.currentGlobalState = GlobalStates.REACHED_GOAL
         # rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))
         return True
 
+
+    def (self):
+    
 
 
     def dummy_cb(self, msg):

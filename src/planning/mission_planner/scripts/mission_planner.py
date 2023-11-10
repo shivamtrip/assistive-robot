@@ -29,15 +29,8 @@ class Mission_Planner():
         self.count = 0
         
         self.TaskExecutor = TaskExecutor()
-
-
-        # self.current_task_type = 
-        # self.current_task_object = 
-        # self.current_task_room = 
-        # self.current_goal_x = 
-        # self.current_goal_y =         
-        self.system_state = States.IDLE
-        
+        self.server_updater = ServerUpdater()
+              
         self.task_listener = rospy.Subscriber('deployment_task_info', DeploymentTask, self.allocate_task)        # callback: task_allocator
         # self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
         
@@ -69,15 +62,20 @@ class Mission_Planner():
         pass
 
 
-    def update_mission_status(self, result):
+    def update_mission_status(self, result, state):
 
         print(" ----- MISSION STATUS ----- ", result)
-        # if not result:
-        #     # Abort mission, update state
-        #     pass
-        # else:
-        #     # Update state
-        #     pass
+
+        if not result:
+            # Abort mission, update state
+            pass
+        else:
+            self.server_updater.update_emotion(Emotions.HAPPY)
+            self.server_updater.currentGlobalState = GlobalStates.REACHED_GOAL
+            self.server_updater.update_state()
+            
+    
+        return True
 
 
     
@@ -116,17 +114,17 @@ class Mission_Planner():
             if not self.update_mission_status(navSuccess):
                 return
 
-
+            print("Reached pick-up location")
             # # Search for and pick-up object
             # manipulationSuccess = manipulate_object()
             # if not self.update_mission_status(manipulationSuccess):
             #     return 
 
 
-            # # Navigate to delivery location
-            # navSuccess = navigate_to_location()
-            # if not self.update_mission_status(navSuccess):
-            #     return 
+            # Navigate to delivery location
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
+            if not self.update_mission_status(navSuccess):
+                return 
 
 
             # # Place object at delivery location
@@ -145,7 +143,9 @@ class Mission_Planner():
         # elif self.current_task_type == "return_to_home_base":
         #     pass
 
-            
+
+        print("Mission Completed")
+
     def main(self):
 
         # if not self.battery_health_ok or not self.task_queue or system_state != STATES.IDLE:
@@ -160,7 +160,7 @@ class Mission_Planner():
                 rospy.sleep(0.1)
 
                 self.execute_task()
-                self.system_state = States.TASK_MODE
+                # self.system_state = States.TASK_MODE
 
             rate.sleep()
 

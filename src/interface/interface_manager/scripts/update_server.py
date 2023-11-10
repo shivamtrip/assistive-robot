@@ -44,6 +44,17 @@ class ServerUpdater:
 
 
 
+    def update_emotion(self, emotion: Enum):
+
+        with open(self.firebase_schema_path) as f:
+            self.current_cloud_status = json.load(f)
+
+        self.current_cloud_status[system]['hri_params']['emotion']['name'] = emotion.name
+        self.emotion = emotion
+        self.update_server(self.current_cloud_status)
+
+
+
     def update_server(self, server_update):
 
         self.db.child("alfred_deployment").update(server_update)

@@ -5,16 +5,12 @@
             "remote_1": {
                 "button": {
                     "button_1": {
-                        "goal_x": "33",
-                        "goal_y": "",
                         "object_type": "BOTTLE",
                         "relative_name": "Tony",
                         "state": "0",
                         "task_type": "DELIVERY"
                     },
                     "button_2": {
-                        "goal_x": "",
-                        "goal_y": "",
                         "object_type": "",
                         "relative_name": "Frank",
                         "state": "0",
@@ -23,22 +19,18 @@
                 },
                 "current_eta": "",
                 "current_task": "",
-                "resident_name": "",
-                "room_number": ""
+                "resident_name": "Adam",
+                "room_number": "201"
             },
             "remote_2": {
                 "button": {
                     "button_1": {
-                        "goal_x": "",
-                        "goal_y": "",
                         "object_type": "",
                         "relative_name": "",
                         "state": "0",
                         "task_type": ""
                     },
                     "button_2": {
-                        "goal_x": "",
-                        "goal_y": "",
                         "object_type": "",
                         "relative_name": "",
                         "state": "0",

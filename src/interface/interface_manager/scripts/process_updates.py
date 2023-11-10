@@ -83,7 +83,11 @@ class UpdateProcessor:
         task_message.resident_name = self.current_cloud_status[system]['remote'][remote]['resident_name']
         task_message.object_type = self.current_cloud_status[system]['remote'][remote]['button'][button]['object_type']
         task_message.relative_name = self.current_cloud_status[system]['remote'][remote]['button'][button]['relative_name']
-        
+
+
+        print("MESSAGE", task_message)
+
+
         self.task_publisher.publish(task_message)
 
         self.server_updater.reset_button_state(button, remote, system)
