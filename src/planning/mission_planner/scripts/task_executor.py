@@ -8,7 +8,6 @@ from alfred_navigation.msg import NavManAction, NavManGoal
 import rospkg
 import os
 import json
-from update_server import ServerUpdater
 
 
 class TaskExecutor:
@@ -69,14 +68,11 @@ class TaskExecutor:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(location_name))
 
-        self.server_updater.update_emotion(Emotions.HAPPY)
+        # self.server_updater.update_emotion(Emotions.HAPPY)
         # self.bot_state.update_state()
         # self.bot_state.currentGlobalState = GlobalStates.REACHED_GOAL
         # rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))
         return True
-
-
-    def (self):
     
 
 

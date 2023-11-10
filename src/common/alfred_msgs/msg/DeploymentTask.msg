@@ -1,4 +1,4 @@
-# Alfred Deployment Task type
+# Alfred Deployment Task Message
 
 string task_type
 string object_type

@@ -12,7 +12,7 @@ import json
 import pyrebase
 import time
 from collections import defaultdict
-from alfred_msgs.msg import DeploymentTask
+from alfred_msgs.msg import DeploymentTask, StatusMessage
 from update_server import ServerUpdater
 
 
@@ -20,11 +20,16 @@ class UpdateProcessor:
     
     def __init__(self):
         
-        rospy.init_node("process_updates")
+        rospy.init_node("interface_manager")
+
+        self.server_updater = ServerUpdater()      
          
         self.firebase_schema_path = os.path.expanduser("~/ws/src/interface/interface_manager/config/firebase_schema.json")
         
         self.task_publisher = rospy.Publisher('deployment_task_info', DeploymentTask, queue_size=10)
+
+        self.status_subscriber = rospy.Subscriber('system_status_info', StatusMessage, self.server_updater.update_system_status)
+        
          
         with open(self.firebase_schema_path) as f:
             self.initial_cloud_status = json.load(f)
@@ -37,7 +42,7 @@ class UpdateProcessor:
             
         self.update_delay = 2       # seconds
           
-        self.server_updater = ServerUpdater()      
+
     
 
           
@@ -103,8 +108,7 @@ if __name__ == "__main__":
     
     server.process_updates()
     
-    
-    while not rospy.is_shutdown():
-        rospy.spin()
+
+    rospy.spin()
 
     print("Shutting down")

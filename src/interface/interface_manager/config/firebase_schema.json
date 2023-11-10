@@ -1,5 +1,72 @@
 {
     "system_1": {
+        "bot_joint_params": {
+            "gripper_aperture": {
+                "effort": 0,
+                "position": 0,
+                "velocity": 0
+            },
+            "joint_arm_l0": {
+                "effort": -18.361877553603225,
+                "position": -5.98237511161004e-07,
+                "velocity": -2.8050344875669757e-05
+            },
+            "joint_arm_l1": {
+                "effort": -18.361877553603225,
+                "position": -5.98237511161004e-07,
+                "velocity": -2.8050344875669757e-05
+            },
+            "joint_arm_l2": {
+                "effort": -18.361877553603225,
+                "position": -5.98237511161004e-07,
+                "velocity": -2.8050344875669757e-05
+            },
+            "joint_arm_l3": {
+                "effort": -18.361877553603225,
+                "position": -5.98237511161004e-07,
+                "velocity": -2.8050344875669757e-05
+            },
+            "joint_gripper_finger_left": {
+                "effort": 0,
+                "position": 0,
+                "velocity": 0
+            },
+            "joint_gripper_finger_right": {
+                "effort": 0,
+                "position": 0,
+                "velocity": 0
+            },
+            "joint_head_pan": {
+                "effort": -4.78515625,
+                "position": -0.009203884727313847,
+                "velocity": 0.11990411961201045
+            },
+            "joint_head_tilt": {
+                "effort": 0,
+                "position": -0.17333982903107745,
+                "velocity": 0
+            },
+            "joint_lift": {
+                "effort": 19.88553201451021,
+                "position": 0.39999839009945104,
+                "velocity": -7.898569494420261e-05
+            },
+            "joint_mobile_base_translation": {
+                "effort": 0,
+                "position": 0,
+                "velocity": 0
+            },
+            "joint_wrist_yaw": {
+                "effort": 0,
+                "position": 3.399684921151552,
+                "velocity": 0
+            },
+            "wrist_extension": {
+                "effort": -18.361877553603225,
+                "position": -2.392950044644016e-06,
+                "velocity": -0.00011220137950267903
+            }
+        },
         "id": "",
         "remote": {
             "remote_1": {
@@ -52,8 +119,26 @@
                 "room_number": "",
                 "task_type": ""
             },
-            "operation_mode": "",
-            "state": ""
+            "global_state": "",
+            "hri_params": {
+                "emotion": "",
+                "music": ""
+            },
+            "last_update": "",
+            "operation_mode": ""
+        },
+        "teleop_commands": {
+            "last_command_stamp": 0,
+            "manipulator": {
+                "gripper_open": false,
+                "vel_extend": 0,
+                "vel_lift": 0,
+                "yaw_position": 0
+            },
+            "mobile_base": {
+                "veltheta": 0,
+                "velx": 0
+            }
         }
     }
 }

@@ -3,8 +3,18 @@
 from enum import Enum
 
 
-class TaskType(Enum):
 
+class BotState:
+    def __init__(self):
+        self.current_global_state = GlobalStates.IDLE
+        self.operation_mode = OperationModes.AUTONOMOUS
+        self.emotion = Emotions.NEUTRAL
+        self.battery_percent = None
+        self.music = None
+
+
+
+class TaskType(Enum):
     DELIVERY = 0
     VIDEOCALL = 1
 
@@ -22,30 +32,16 @@ class OperationModes(Enum):
     TELEOPERATION = 0
     AUTONOMOUS = 1
 
+
 class GlobalStates(Enum):
     IDLE = 10
-    BOOTING = 0
-    WAITING_FOR_COMMAND = 1
-    RECEIVED_COMMAND = 2
-    NAVIGATING = 3
-    REACHED_GOAL = 4
-    RECOVERY = 9
+    NAVIGATION = 3
     MANIPULATION = 6
-    COMPLETED_TASK = 7
-    CALL = 8
+    VIDEOCALL = 5
     
 
 class ObjectOfInterest(Enum): 
-    # FILL WITH CLASS LABELS FOR THE OBJECT DETECTION PIPELINE
-    NONE = -1
-    USER = 0
     BOTTLE = 39
-    BOX = 2
-    GLASS = 3
-    TABLE = 60
-    REMOTE = 65
-    APPLE = 47
-    BANANA = 46
     
 
 class LocationOfInterest(Enum):

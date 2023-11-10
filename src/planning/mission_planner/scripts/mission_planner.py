@@ -11,11 +11,12 @@ Mission Planner works as follows:
 
 from collections import deque 
 import rospy
-from alfred_msgs.msg import DeploymentTask
+from alfred_msgs.msg import DeploymentTask, StatusMessage
 from enum import Enum
 from task_executor import TaskExecutor
-from state_manager import TaskType, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
-
+from state_manager import BotState, TaskType, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
+import time
+from sensor_msgs.msg import BatteryState
 
 
 class Mission_Planner():
@@ -29,14 +30,25 @@ class Mission_Planner():
         self.count = 0
         
         self.TaskExecutor = TaskExecutor()
-        self.server_updater = ServerUpdater()
+        self.bot_state = BotState()
               
-        self.task_listener = rospy.Subscriber('deployment_task_info', DeploymentTask, self.allocate_task)        # callback: task_allocator
-        # self.bat_sub = rospy.Subscriber('/battery', BatteryState, self.battery_check)
+        self.task_listener = rospy.Subscriber('deployment_task_info', DeploymentTask, self.allocate_task)       
+        self.battery_sub = rospy.Subscriber('/battery', BatteryState, self.health_manager)
+
+        self.status_publisher = rospy.Publisher('system_status_info', StatusMessage, queue_size=10)
+
+
+        self.current_task_type = ""
+        self.current_task_room = ""
+        self.current_task_resident = ""
+        self.current_task_object = ""
+        self.current_task_relative = ""
+
+        self.update_mission_status(GlobalStates.IDLE)
         
-        # health_client()             # callback: 
-        
-        
+        print("Mission Planner initialized..")
+    
+
         
     def allocate_task(self, msg):
         """
@@ -47,35 +59,32 @@ class Mission_Planner():
         self.task_queue.append(msg)
 
 
-    # def battery_check(self, data):
-    #     if(int(data.voltage)==0):
-    #         self.db.child("battery_state").set(0) #updates firebase to 0 if battery above recommended threshold
-    #     else:
-    #         self.db.child("battery_state").set(1) #updates firebase to 1 if battery below recommended threshold
-
 
     
-    def health_manager():
+    def health_manager(self, data):
         """
         Health Manager updates battery status (and other health parameters, if applicable) 
         """
-        pass
+
+        # print("GOT BATTERY STATE!")
+
+        min_voltage = 11.6
+        max_voltage = 13
+
+        self.bot_state.battery_percent = max(min(100 * ((data.voltage - min_voltage) / (max_voltage - min_voltage)), 100), 0)
+
+        # print(self.bot_state.battery_percent)
 
 
-    def update_mission_status(self, result, state):
+    def update_mission_status(self, state, mode = OperationModes.AUTONOMOUS, emotion = Emotions.HAPPY):
 
-        print(" ----- MISSION STATUS ----- ", result)
+        print("--- Updating Mission Status ---")
 
-        if not result:
-            # Abort mission, update state
-            pass
-        else:
-            self.server_updater.update_emotion(Emotions.HAPPY)
-            self.server_updater.currentGlobalState = GlobalStates.REACHED_GOAL
-            self.server_updater.update_state()
-            
-    
-        return True
+        self.bot_state.emotion = emotion
+        self.bot_state.global_state = state
+        self.bot_state.operation_mode = mode
+
+        self.status_update_to_interface_manager()
 
 
     
@@ -88,11 +97,12 @@ class Mission_Planner():
         self.current_task_object = next_task.object_type
         self.current_task_resident = next_task.resident_name
         self.current_task_relative = next_task.relative_name
+        self.current_task_room = next_task.room_number
         
         if self.current_task_type == TaskType.DELIVERY.name:
 
             self.current_task_location_1 = ObjectOfInterest.BOTTLE.name # object pickup location / Enum name (string)
-            self.current_task_location_2 = next_task.room_number # / Enum of room_number name (string)
+            self.current_task_location_2 = self.current_task_room  # / Enum of room_number name (string)
 
         # elif self.current_task_type = "videocall":
         #     self.current_task_location_1 = next_task.room_number
@@ -102,17 +112,22 @@ class Mission_Planner():
         #     self.current_task_location_1 = # home base location
         #     self.current_task_location_2 = None
 
+        self.status_update_to_interface_manager()
+
 
     def execute_task(self):
 
         print("Executing next task!", self.count)
 
         if self.current_task_type == TaskType.DELIVERY.name:
-    
+
+            
             # Navigate to Pick-up Location            
+            self.update_mission_status(GlobalStates.NAVIGATION)
             navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
-            if not self.update_mission_status(navSuccess):
+            if not navSuccess:
                 return
+
 
             print("Reached pick-up location")
             # # Search for and pick-up object
@@ -122,6 +137,7 @@ class Mission_Planner():
 
 
             # Navigate to delivery location
+            self.update_mission_status(GlobalStates.NAVIGATION)
             navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
             if not self.update_mission_status(navSuccess):
                 return 
@@ -145,6 +161,30 @@ class Mission_Planner():
 
 
         print("Mission Completed")
+
+
+
+    def status_update_to_interface_manager(self):
+
+        status_message = StatusMessage()
+
+        status_message.last_update = time.time()
+        status_message.battery_percent = self.bot_state.battery_percent
+        status_message.operation_mode = self.bot_state.operation_mode
+        status_message.global_state = self.bot_state.global_state
+        status_message.emotion = self.bot_state.emotion
+        status_message.music = self.bot_state.music
+
+        status_message.task_type = self.current_task_type
+        status_message.room_number = self.current_task_room
+        status_message.resident_name = self.current_task_resident
+        status_message.object_type = self.current_task_object
+        status_message.relative_name = self.current_task_relative
+
+        self.status_publisher.publish(status_message)
+
+        print("Mission Planner sent status update to Interface Manager")
+
 
     def main(self):
 

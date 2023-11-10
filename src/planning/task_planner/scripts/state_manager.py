@@ -159,28 +159,15 @@ class OperationModes(Enum):
 
 class GlobalStates(Enum):
     IDLE = 10
-    BOOTING = 0
-    WAITING_FOR_COMMAND = 1
     RECEIVED_COMMAND = 2
-    NAVIGATING = 3
-    REACHED_GOAL = 4
-    RECOVERY = 9
+    NAVIGATION = 3
     MANIPULATION = 6
-    COMPLETED_TASK = 7
-    CALL = 8
+    VIDEOCALL = 5
     
 
 class ObjectOfInterest(Enum): 
-    # FILL WITH CLASS LABELS FOR THE OBJECT DETECTION PIPELINE
-    NONE = -1
-    USER = 0
     BOTTLE = 39
-    BOX = 2
-    GLASS = 3
-    TABLE = 60
-    REMOTE = 65
-    APPLE = 47
-    BANANA = 46
+
     
 
 class LocationOfInterest(Enum):
@@ -190,6 +177,7 @@ class LocationOfInterest(Enum):
     KITCHEN = 1
     TABLE = 2
     NET = 3
+
 
 class VerbalResponseStates(Enum):
     # FILL WITH VERBAL RESPONSES
