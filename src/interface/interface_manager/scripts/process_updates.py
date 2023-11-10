@@ -1,5 +1,10 @@
 #!/usr/local/lib/robot_env/bin/python3
 
+"""
+This script reads the latest state of the database from config/firebase_schema.json and informs mission planner whenever a button is pressed by a resident
+"""
+
+
 import rospy
 from firebase_node import FirebaseNode
 import os
@@ -73,10 +78,11 @@ class UpdateProcessor:
         
         task_message = DeploymentTask()
         
-        task_message.task_type = "delivery"
-        task_message.object_type = "Bottle"
-        task_message.room_number = 201
-
+        task_message.task_type = self.current_cloud_status[system]['remote'][remote]['button'][button]['task_type']
+        task_message.room_number = self.current_cloud_status[system]['remote'][remote]['room_number']
+        task_message.resident_name = self.current_cloud_status[system]['remote'][remote]['resident_name']
+        task_message.object_type = self.current_cloud_status[system]['remote'][remote]['button'][button]['object_type']
+        task_message.relative_name = self.current_cloud_status[system]['remote'][remote]['button'][button]['relative_name']
         
         self.task_publisher.publish(task_message)
 

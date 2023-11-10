@@ -1,21 +1,21 @@
 #!/usr/local/lib/robot_env/bin/python3
 
+"""
+Mission Planner works as follows: 
+1. Listens to new task updates from Interface Manager
+2. If new task, allocate new task in task queue
+3. If tasks in queue, battery health good and system is not performing another task, update next task information
+4. Offload task execution to TaskExecutor and monitor progress. 
+"""
+
+
 from collections import deque 
 import rospy
 from alfred_msgs.msg import DeploymentTask
 from enum import Enum
 from task_executor import TaskExecutor
+from state_manager import TaskType, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
 
-
-class States(Enum):
-    
-    IDLE = 1
-    TASK_MODE = 2
-
-# class Task_Message:
-    
-#     def __init__(self):
-#         self.
 
 
 class Mission_Planner():
@@ -88,22 +88,31 @@ class Mission_Planner():
         
         self.current_task_type = next_task.task_type
         self.current_task_object = next_task.object_type
-        self.current_task_room = next_task.room_number
-        # self.current_goal_x = 
-        # self.current_goal_y = 
-                    
-
+        self.current_task_resident = next_task.resident_name
+        self.current_task_relative = next_task.relative_name
         
-    def execute_task(self):
+        if self.current_task_type == TaskType.DELIVERY.name:
 
-        self.count += 1
+            self.current_task_location_1 = ObjectOfInterest.BOTTLE.name # object pickup location / Enum name (string)
+            self.current_task_location_2 = next_task.room_number # / Enum of room_number name (string)
+
+        # elif self.current_task_type = "videocall":
+        #     self.current_task_location_1 = next_task.room_number
+        #     self.current_task_location_2 = next_task.room_number
+
+        # elif self.current_task_type == "return_home":
+        #     self.current_task_location_1 = # home base location
+        #     self.current_task_location_2 = None
+
+
+    def execute_task(self):
 
         print("Executing next task!", self.count)
 
-        if self.current_task_type == "delivery":
+        if self.current_task_type == TaskType.DELIVERY.name:
     
             # Navigate to Pick-up Location            
-            navSuccess = self.TaskExecutor.navigate_to_location()
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
             if not self.update_mission_status(navSuccess):
                 return
 
@@ -126,15 +135,15 @@ class Mission_Planner():
             #     return 
 
 
-        elif self.current_task_type == "videocall":
-            navigate_to_location()      # In front of door
-            wait_for_door_open()
-            navigate_to_location()      # At videocall spot in room 
-            align_to_user()
-            start_videocall()
+        # elif self.current_task_type == "videocall":
+        #     navigate_to_location()      # In front of door
+        #     wait_for_door_open()
+        #     navigate_to_location()      # At videocall spot in room 
+        #     align_to_user()
+        #     start_videocall()
 
-        elif self.current_task_type == "return_to_home_base":
-            pass
+        # elif self.current_task_type == "return_to_home_base":
+        #     pass
 
             
     def main(self):

@@ -1,12 +1,15 @@
 
+"""
+This script is responsible for updating any state changes to firebase
+"""
+
+
+
 import rospy
 import os
 import json
 import pyrebase
 import time
-
-
-
 
 
 

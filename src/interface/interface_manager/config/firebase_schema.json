@@ -7,10 +7,10 @@
                     "button_1": {
                         "goal_x": "33",
                         "goal_y": "",
-                        "object_type": "lion",
-                        "relative_name": "",
+                        "object_type": "BOTTLE",
+                        "relative_name": "Tony",
                         "state": "0",
-                        "task_type": ""
+                        "task_type": "DELIVERY"
                     },
                     "button_2": {
                         "goal_x": "",

@@ -2,4 +2,6 @@
 
 string task_type
 string object_type
-int64 room_number
+string room_number
+string resident_name
+string relative_name

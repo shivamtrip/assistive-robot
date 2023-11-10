@@ -1,5 +1,10 @@
 #!/usr/local/lib/robot_env/bin/python3
 
+"""
+This script reads from the firebase server and updates the latest state of the database in config/firebase_schema.json
+"""
+
+
 import rospy
 from firebase_node import FirebaseNode
 import os
