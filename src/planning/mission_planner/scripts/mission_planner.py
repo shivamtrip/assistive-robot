@@ -71,9 +71,10 @@ class Mission_Planner():
         min_voltage = 11.6
         max_voltage = 13
 
-        self.bot_state.battery_percent = max(min(100 * ((data.voltage - min_voltage) / (max_voltage - min_voltage)), 100), 0)
+        self.bot_state.battery_percent = int(max(min(100 * ((data.voltage - min_voltage) / (max_voltage - min_voltage)), 100), 0))
 
-        # print(self.bot_state.battery_percent)
+        # print("Voltage", data.voltage)
+        # print("Battery", self.bot_state.battery_percent)
 
 
     def update_mission_status(self, state, mode = OperationModes.AUTONOMOUS, emotion = Emotions.HAPPY):
@@ -170,9 +171,9 @@ class Mission_Planner():
 
         status_message.last_update = time.time()
         status_message.battery_percent = self.bot_state.battery_percent
-        status_message.operation_mode = self.bot_state.operation_mode
-        status_message.global_state = self.bot_state.global_state
-        status_message.emotion = self.bot_state.emotion
+        status_message.operation_mode = self.bot_state.operation_mode.name
+        status_message.global_state = self.bot_state.global_state.name
+        status_message.emotion = self.bot_state.emotion.name
         status_message.music = self.bot_state.music
 
         status_message.task_type = self.current_task_type

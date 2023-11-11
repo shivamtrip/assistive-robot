@@ -16,11 +16,13 @@ from alfred_msgs.msg import DeploymentTask, StatusMessage
 from update_server import ServerUpdater
 
 
-class UpdateProcessor:
+class InterfaceManager:
     
     def __init__(self):
         
         rospy.init_node("interface_manager")
+
+        self.system_id = os.environ["HELLO_FLEET_ID"]
 
         self.server_updater = ServerUpdater()      
          
@@ -29,7 +31,6 @@ class UpdateProcessor:
         self.task_publisher = rospy.Publisher('deployment_task_info', DeploymentTask, queue_size=10)
 
         self.status_subscriber = rospy.Subscriber('system_status_info', StatusMessage, self.server_updater.update_system_status)
-        
          
         with open(self.firebase_schema_path) as f:
             self.initial_cloud_status = json.load(f)
@@ -42,7 +43,7 @@ class UpdateProcessor:
             
         self.update_delay = 2       # seconds
           
-
+        print("Interface Manager initialized..")
     
 
           
@@ -67,15 +68,21 @@ class UpdateProcessor:
                 self.current_cloud_status = json.load(f)
 
             for system in self.system_list:
-                for remote in self.remote_list:
-                    for button in self.button_list:
-                        
-                        if self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] == "1":
+
+                if self.current_cloud_status[system]['id'] == self.system_id:
+
+                    for remote in self.remote_list:
+                        for button in self.button_list:
                             
-                            print(f"{button} -- {remote} -- {system} is ON")
-                            
-                            self.inform_mission_planner(button, remote, system)
-                            
+                            if self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] == "1":
+                                
+                                print(f"{button} -- {remote} -- {system} is ON")
+                                
+                                self.inform_mission_planner(button, remote, system)
+                
+                self.server_updater.system_number = system
+
+                break
             rospy.sleep(self.update_delay)
                             
                             
@@ -104,7 +111,7 @@ class UpdateProcessor:
 
 if __name__ == "__main__":
     
-    server = UpdateProcessor()
+    server = InterfaceManager()
     
     server.process_updates()
     

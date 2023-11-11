@@ -205,11 +205,12 @@ class AlfredBodyNode:
         battery_state = BatteryState()
         battery_state.header.stamp = current_time
         v = float(robot_status['pimu']['voltage'])
-        if(v<robot_status['pimu']['low_voltage_alert']):
-            battery_state.voltage = 1
-        elif(v>robot_status['pimu']['low_voltage_alert']):
-            battery_state.voltage = 0
+        # if(v<robot_status['pimu']['low_voltage_alert']):
+        #     battery_state.voltage = v
+        # elif(v>robot_status['pimu']['low_voltage_alert']):
+        #     battery_state.voltage = v
         # battery_state.current = i
+        battery_state.voltage = v
         self.power_pub.publish(battery_state)
         self.robot_mode_rwlock.release_read()
 

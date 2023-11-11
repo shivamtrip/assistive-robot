@@ -9,8 +9,8 @@ class BotState:
         self.current_global_state = GlobalStates.IDLE
         self.operation_mode = OperationModes.AUTONOMOUS
         self.emotion = Emotions.NEUTRAL
-        self.battery_percent = None
-        self.music = None
+        self.battery_percent = 0
+        self.music = ""
 
 
 
