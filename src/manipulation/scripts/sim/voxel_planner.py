@@ -286,9 +286,9 @@ def astar(start, goal):
     resolutions = np.array(
         [
             0.01,  # x
-            0.05,  # z
+            0.1,  # z
             1,  # phi
-            0.05,  # ext
+            0.1,  # ext
         ]
     ).tolist()
     start = tuple(start.tolist())
@@ -390,47 +390,39 @@ def convert_to_full_path(path, orig_state):
 
 if __name__ == "__main__":
     # x, y, theta, z, phi, ext
+    import time
     start =  np.array([  0,   0,  np.pi/2, 0.3,  -1,   0])
     target = np.array([0.0, 0.0,  np.pi/2, 0.95,   1, 0.5])
     
     # path = astar(start, target)
 
     # path = dfs(start, target, resolutions)
+    starttime = time.time()
     path = astar(start, target)
+    endtime = time.time()
     # path, successs = plan_naive_path(start, target)
     if path is not None :
-        print("Found path:", len(path))
+        print("Found path:", len(path), "in", endtime - starttime, "seconds")
     else:
         print("Path not found")
     # visualize(target)
     print(path)
     path = convert_to_full_path(path, start)
-    
+    target[4] = np.pi
+    path.append(target)
     
     # for i in range(0, len(path)):
     #     print(path[i])
     #     visualize(path[i])
         
     
-    # o3d.visualization.draw_geometries([og_pcd] + boxes + centers)
     
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(og_pcd)
-    import time
-    time.sleep(1)
+    geometries = []
     for waypoint in path:
         boxes, centers =  get_boxes(waypoint, get_centers = True)
-        for box in boxes:
-            vis.add_geometry(box)
-            
-        for center in centers:
-            vis.add_geometry(center)
-
-        vis.poll_events()
-        vis.update_renderer()
-    vis.run()            
+        geometries += boxes + centers
         
+    o3d.visualization.draw_geometries([og_pcd] + geometries)
     
     
     
