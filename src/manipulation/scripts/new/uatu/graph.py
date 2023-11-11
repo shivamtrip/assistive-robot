@@ -2,6 +2,7 @@
 import numpy as np
 from typing import List
 import open3d as o3d
+import rospy
 mahalanobis = lambda pos, cov, mean : np.sqrt(np.dot(np.dot(pos - mean, np.linalg.inv(cov)), pos - mean))
 
 
@@ -15,12 +16,12 @@ class Node:
         self.intrinsics = intrinsics
         
         
-    def add_sample(self, colorimg, depthimg, extrinsics_image_to_base, detections, extrinsics_image_to_map):
-        
+    def add_sample(self, colorimg, depthimg, extrinsics_image_to_base, extrinsics_image_to_map, detections):
+        rospy.loginfo(f"[uatu]: Adding sample to node {self.cls_type}. detections: {len(detections)}")
         if len(detections) == 0:
             return False
         # instance disambiguation
-        if len(detections) > 1:
+        if len(detections) > 1 :
             mean, cov = self.estimate_location('base')
             detection = None
             for d in detections:
@@ -34,7 +35,8 @@ class Node:
         else:
             detection = detections[0]
             
-        
+        detection = np.array(detection, dtype = int)
+        print(detection)
         colormask = np.zeros_like(colorimg)
         colormask[detection[1]:detection[3], detection[0]:detection[2]] = 1
         depthmask = np.zeros_like(depthimg)
@@ -78,7 +80,7 @@ class Node:
         
         for sample in self.samples:
             colorimg, depthimg, detection, extrinsics_image_to_base, extrinsics_image_to_map = sample
-            depth = o3d.geometry.Image(depthimg)
+            depth = o3d.geometry.Image(depthimg.astype(np.uint16))
             color = o3d.geometry.Image(colorimg.astype(np.uint8))
             rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
                 color, depth, depth_scale=1000, convert_rgb_to_intensity=False

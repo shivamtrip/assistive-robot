@@ -31,10 +31,7 @@ class ObjectDetectionNode:
         self.class_id_map = {self.class_list[i]: i for i in range(len(self.class_list))}
         rospy.loginfo(f"[{rospy.get_name()}] Loaded class list: {self.class_list}")
         self.model = YOLO(rospy.get_param('/object_detection/base_model'))
-        self.model.to(rospy.get_param('/object_detection/device_1'))
-        
-        self.model_custom = YOLO(rospy.get_param('/object_detection/custom_model'))
-        self.model_custom.to(rospy.get_param('/object_detection/device_2'))
+        # self.model.to(rospy.get_param('/object_detection/device_1'))
         
         rospy.loginfo(f"[{rospy.get_name()}] " + "Loaded model")
         self.visualize = rospy.get_param('/object_detection/visualize')
@@ -42,22 +39,20 @@ class ObjectDetectionNode:
         if self.visualize:
             self.annotated_image_pub = rospy.Publisher(rospy.get_param('/object_detection/visualize_topic'), Image, queue_size=1)
 
-        self.rgb_image_subscriber = message_filters.Subscriber(rospy.get_param('/object_detection/subscribe_topic'), Image)
-        self.rgb_image_subscriber.registerCallback(self.callback)
+        self.rgb_image_subscriber = rospy.Subscriber(rospy.get_param('/object_detection/subscribe_topic'), Image, self.callback)
         self.cv_bridge = CvBridge()
+        
+        self.upscale_fac = 1.0 
+        
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
         self.last_image_time = time.time()
         self.started_publishing = False
     
     def runModel(self, img, model, outputs):
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
         results = model(img, show = False, verbose= False)
-        
-        if self.started_publishing == False:
-            self.started_publishing = True
-            rospy.loginfo(f"[{rospy.get_name()}] " + "Started publishing data")
-        
         boxes =  results[0].boxes
-        detections = sv.Detections.from_yolov8(results[0])
+        detections = sv.Detections.from_ultralytics(results[0])
         confs, box_cls, box = detections.confidence, detections.class_id, detections.xyxy
 
         final_results = [
@@ -67,12 +62,24 @@ class ObjectDetectionNode:
             []
         ]
 
+        h, w = img.shape[:2]
+        # img = cv2.resize(img, (0, 0), fx = 0.5, fy = 0.5)
+        upscale_fac = self.upscale_fac
+        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         
         for (b,cls, conf) in zip(box,box_cls, confs):
             
             if model.names[cls.item()] in self.class_list:
                 
                 new_class_id = self.class_id_map[model.names[cls.item()]]
+                x1, y1, x2, y2 = b
+                
+                y_new1 = w - x2 * upscale_fac
+                x_new1 = y1 * upscale_fac
+                y_new2 = w - x1 * upscale_fac
+                x_new2 = y2 * upscale_fac
+                
+                b = [x_new1, y_new1, x_new2, y_new2]
                 final_results[0].append(b)
                 final_results[1].append(new_class_id) #remapped class index
                 final_results[2].append(conf)
@@ -103,20 +110,16 @@ class ObjectDetectionNode:
     def callback(self,ros_rgb_image):
         self.last_image_time = time.time()
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
-        rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
+        
         
         r1 = [None, None, None, None]
         r2 = [None, None, None, None]
-        
-        t1 = threading.Thread(target = self.runModel, args = (rgb_image, self.model, r1))
-        t2 = threading.Thread(target = self.runModel, args = (rgb_image, self.model_custom, r2))
-        t1.start()
-        t2.start()
-        
-        t1.join()
-        t2.join()   
 
-        boxes, classes, confs, annotated_img = self.mergeResults(r1, r2)
+        self.runModel(rgb_image, self.model, r1)
+        boxes, classes, confs, annotated_img = r1
+        boxes = np.array(boxes)
+        classes = np.array(classes)
+        confs = np.array(confs)
         
         classes = classes.flatten()
         boxes = boxes.flatten()
@@ -131,10 +134,12 @@ class ObjectDetectionNode:
         msg.confidences = confs
 
         self.data_pub.publish(msg)
+        if self.started_publishing == False:
+            self.started_publishing = True
+            rospy.loginfo(f"[{rospy.get_name()}] " + "Started publishing data")
         
         if self.visualize:
             annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
-            annotated_img = cv2.rotate(annotated_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(annotated_img))
 
 

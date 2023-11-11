@@ -20,7 +20,7 @@ class Planner:
         ]
     
     def plan_base(self, point_cloud, object_location, viz = False):
-        points = point_cloud
+        points = np.array(point_cloud.points)
         x_proj = points[:,0]
         y_proj = points[:,1]
 
@@ -33,21 +33,26 @@ class Planner:
         source = np.array([0.0, 0.0])
         target = object_location
 
-        x_grid = np.arange(x_min, x_max, self.resolution)
-        y_grid = np.arange(y_min, y_max, self.resolution)
+        x_grid = np.arange(x_min - 1.0, x_max + 1.0, self.resolution)
+        y_grid = np.arange(y_min - 1.0, y_max + 1.0, self.resolution)
 
         img = np.zeros((len(x_grid), len(y_grid)))
+        h, w = img.shape[:2]
         sorted_points = points[np.argsort(points[:,2])]
 
-        def convert_point(x, y):
-            x_ind = int((x - x_min)/self.resolution)
-            y_ind = int((y - y_min)/self.resolution)
+        def convert_point_to_img(x, y, offset = h//2):
+            x_ind = int((x - x_min)/self.resolution) + offset
+            y_ind = int((y - y_min)/self.resolution) + offset
             return x_ind, y_ind
             
+        def convert_point_to_world(x, y, offset = h//2):
+            x = (x - offset) * self.resolution + x_min
+            y = (y - offset) * self.resolution + y_min
+            return x, y
 
         for point in sorted_points:
             x, y, z = point
-            x_ind, y_ind = convert_point(x, y)
+            x_ind, y_ind = convert_point_to_img(x, y)
             img[x_ind, y_ind] = z
 
         img -= np.min(img)
@@ -62,8 +67,8 @@ class Planner:
         reachability_map = np.zeros_like(img[:, :, 0], dtype = np.uint8)
         source_reachability_map = np.zeros_like(reachability_map)
 
-        cv2.circle(reachability_map, convert_point(target[0], target[1])[::-1], self.radius_reachable, 255, -1)
-        cv2.circle(source_reachability_map, convert_point(source[0], source[1])[::-1], self.max_dist_traverse, 255, -1)
+        cv2.circle(reachability_map, convert_point_to_img(target[0], target[1])[::-1], self.radius_reachable, 255, -1)
+        cv2.circle(source_reachability_map, convert_point_to_img(source[0], source[1])[::-1], self.max_dist_traverse, 255, -1)
 
         target_reachable_dist = cv2.distanceTransform(reachability_map, cv2.DIST_L2, 5)
         source_reachabile_dist = cv2.distanceTransform(source_reachability_map, cv2.DIST_L2, 5)
@@ -71,17 +76,35 @@ class Planner:
         safety_dist[safety_dist < self.characteristic_dist] = 0
 
         reachability_map = target_reachable_dist * source_reachabile_dist * safety_dist
+        
+        is_plan_reqd = True
+        if reachability_map[convert_point_to_img(0, 0)] != 0:
+            is_plan_reqd = False
+        
         reachability_map -= np.min(reachability_map)
         reachability_map /= np.max(reachability_map)
         reachability_map[reachability_map < 0.8] = 0
-
+        
+        
+        
         # pick the point with the highest distance
         base_loc = np.unravel_index(np.argmax(reachability_map), reachability_map.shape)
-        base_theta = np.arctan2(-(target[0] - base_loc[0]), (target[1] - base_loc[1]))
 
+        img[:, :, 2][reachability_map != 0] = reachability_map[reachability_map!=0] * 255
+
+        img = cv2.circle(img, (base_loc[0], base_loc[1])[::-1], 1, (0, 255, 255), -1)
+
+
+        img = cv2.circle(img, convert_point_to_img(source[0], source[1])[::-1], 2, (0, 255, 0), -1)
+        img = cv2.circle(img, convert_point_to_img(target[0], target[1])[::-1], self.radius_reachable, (255, 0, 0), 1)
+        img = cv2.circle(img, convert_point_to_img(target[0], target[1])[::-1], 2, (255, 0, 0), -1)
+        img = cv2.circle(img, convert_point_to_img(source[0], source[1])[::-1], self.max_dist_traverse, (0, 255, 0), 1)
+
+        cv2.imwrite("/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/new/reachability_map.png", img)        
         # we want base_dir to be perpendicular to the line joining base_loc and target
         
-        base_loc = convert_point(base_loc[0], base_loc[1])
+        base_loc = convert_point_to_world(base_loc[0], base_loc[1])
+        base_theta = np.arctan2(-(target[0] - base_loc[0]), (target[1] - base_loc[1]))
         navigation_target = np.array(
             [
                 base_loc[0],
@@ -89,8 +112,7 @@ class Planner:
                 base_theta
             ]
         )
-        
-        return navigation_target
+        return navigation_target, is_plan_reqd
     
     def get_collision_boxes(self, state, get_centers = False):
         boxes = []
@@ -221,13 +243,23 @@ class Planner:
     def get_astar_path(self, point_cloud, curstate, target):
         return [], False
     
-    def plan_manipulator(self, point_cloud, curstate, target):
-        path, success = self.plan_naive_manipulator(point_cloud, curstate, target)
+    def get_state_from_ee_target(self, ee_target):
+        tx, ty, tz = ee_target
+        ttheta = np.arctan2(ty, tx)
+        tphi = np.pi/2 - np.arctan2(tz, np.sqrt(tx**2 + ty**2))
+        text = np.sqrt(tx**2 + ty**2 + tz**2) - 0.3
+        return np.array([tx, ty, ttheta, tz, tphi, text])
+    
+    def plan_manipulator(self, point_cloud, curstate, ee_target):
+        
+        state_target = self.get_state_from_ee_target(ee_target)
+        
+        path, success = self.plan_naive_manipulator(point_cloud, curstate, state_target)
         
         if success:
             return path, True
         
-        path, success = self.get_astar_path(point_cloud, curstate, target)
+        path, success = self.get_astar_path(point_cloud, curstate, state_target)
         
         if success:
             return path, True
@@ -235,18 +267,17 @@ class Planner:
             return [], False
             
     
-    def plan_grasp_target(self, point_cloud, object_location):
-        bbox_points = self.get_three_d_bbox_from_tracker(object_location)
-        o3d_box = o3d.geometry.OrientationBoundingBox.create_from_points(o3d.utility.Vector3dVector(bbox_points))
+    def plan_grasp_target(self, point_cloud, object_bbox):
+        o3d_box = o3d.geometry.OrientationBoundingBox.create_from_points(o3d.utility.Vector3dVector(object_bbox))
         cropped_cloud = point_cloud.crop(o3d_box)
         
-        points = np.array(cropped_cloud.points)
-        
-        median_grasp = np.median(points, axis = 0)
+        object_points = np.asarray(cropped_cloud.points)
+        medianz = np.median(object_points[:,2])
+        x, y = np.mean(object_points[object_points[:,2] == medianz, :2], axis=0)
+
+        median_grasp = np.array([x, y, medianz])
         
         return median_grasp
-        
-        
                 
     @staticmethod
     def get_rotation_mat(theta):
