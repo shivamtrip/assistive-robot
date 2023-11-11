@@ -20,6 +20,14 @@ class Manipulation:
         # self.navigate_to_location_service = rospy.ServiceProxy('/navigate_to_location', Trigger)
         # self.navigate_to_location_service.wait_for_service()
         
+        
+        self.switch_to_manipulation_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+        self.switch_to_manipulation_mode.wait_for_service()
+        
+        self.switch_to_navigation_mode = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        self.switch_to_navigation_mode.wait_for_service()
+        
+        
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         
         # self.search_range = rospy.get_param('/manipulation/search_range')
@@ -79,12 +87,21 @@ class Manipulation:
     
     def execute_base_plan(self, plan):
         # write code that converts local plan into map coordinates and sends it to movebase
-        pass
-    
+        
+        self.switch_to_navigation_mode()
+
+
+        self.switch_to_manipulation_mode()
+            
     def execute_manipulator_plan(self, plan):
+        for waypoint in plan:
+            # write code that converts local plan into map coordinates and sends it to movebase
+            pass
+    
+    def closed_loop_grasp(self):
         pass
     
-    def main(self):
+    def main(self):  
         
         object_bbox, path_to_tsdf = self.pan_camera_region(
             range = self.search_range,

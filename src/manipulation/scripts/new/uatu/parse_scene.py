@@ -82,7 +82,7 @@ class SceneParser:
     def start_accumulate_tsdf(self, req = None):
         self.accumulating_tsdf = True
         self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length=4.0 / 512.0,
+            voxel_length= 0.01,
             sdf_trunc=0.04,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )
