@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="interface_manager" pkg="interface_manager" type="interface_manager.py" output="screen"/>
+    <node name="monitor_server" pkg="interface_manager" type="monitor_server.py" output="screen"/>
+</launch>

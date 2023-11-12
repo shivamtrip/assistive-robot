@@ -6,7 +6,6 @@ This script reads the latest state of the database from config/firebase_schema.j
 
 
 import rospy
-from firebase_node import FirebaseNode
 import os
 import json
 import pyrebase

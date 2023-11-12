@@ -6,7 +6,6 @@ This script reads from the firebase server and updates the latest state of the d
 
 
 import rospy
-from firebase_node import FirebaseNode
 import os
 import json
 import pyrebase
@@ -49,7 +48,7 @@ class CloudListener:
             with open(self.firebase_schema_path, "w") as f:
                 json.dump(deployment_server_json, f, indent = 4)
             
-            print("Updated latest server state")
+            # print("Updated latest server state")
             rospy.sleep(self.update_delay)
         
         

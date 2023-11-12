@@ -31,7 +31,7 @@ class Mission_Planner():
         
         self.TaskExecutor = TaskExecutor()
         self.bot_state = BotState()
-              
+
         self.task_listener = rospy.Subscriber('deployment_task_info', DeploymentTask, self.allocate_task)       
         self.battery_sub = rospy.Subscriber('/battery', BatteryState, self.health_manager)
 
@@ -44,6 +44,8 @@ class Mission_Planner():
         self.current_task_object = ""
         self.current_task_relative = ""
 
+
+        rospy.sleep(0.5)
         self.update_mission_status(GlobalStates.IDLE)
         
         print("Mission Planner initialized..")
@@ -68,7 +70,7 @@ class Mission_Planner():
 
         # print("GOT BATTERY STATE!")
 
-        min_voltage = 11.6
+        min_voltage = 11.3
         max_voltage = 13
 
         self.bot_state.battery_percent = int(max(min(100 * ((data.voltage - min_voltage) / (max_voltage - min_voltage)), 100), 0))
@@ -124,21 +126,22 @@ class Mission_Planner():
 
             
             # Navigate to Pick-up Location            
-            self.update_mission_status(GlobalStates.NAVIGATION)
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
             navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
             if not navSuccess:
                 return
 
-
             print("Reached pick-up location")
-            # # Search for and pick-up object
-            # manipulationSuccess = manipulate_object()
-            # if not self.update_mission_status(manipulationSuccess):
-            #     return 
+
+            # Search for and pick-up object
+            self.update_mission_status(GlobalStates.MANIPULATION_TO_PICK)
+            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], isPick = True)
+            if not manipulationSuccess:
+                rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
 
 
             # Navigate to delivery location
-            self.update_mission_status(GlobalStates.NAVIGATION)
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PLACE)
             navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
             if not self.update_mission_status(navSuccess):
                 return 

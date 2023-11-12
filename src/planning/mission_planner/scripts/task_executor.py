@@ -5,6 +5,7 @@ import rospy
 import actionlib
 from std_srvs.srv import Trigger, TriggerResponse
 from alfred_navigation.msg import NavManAction, NavManGoal
+from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 import rospkg
 import os
 import json
@@ -24,17 +25,30 @@ class TaskExecutor:
         self.goal_locations = json.load(open(locations_path))
 
 
-
-
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
+        self.stow_robot_service.wait_for_service()
+
+        self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+        self.startManipService.wait_for_service()
 
 
+        self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        
 
         self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
+
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
+
+
+        self.heightOfObject = 0.84 # change this to a local variable later on 
+
+
+        self.stow_robot_service()
+
 
         print("Task Executor Initialized")
 
@@ -44,6 +58,10 @@ class TaskExecutor:
 
 
     def navigate_to_location(self, location_name : str):
+
+        self.startNavService()
+        rospy.sleep(0.5)
+
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Executing task. Going to {}".format(location_name))
  
@@ -61,19 +79,43 @@ class TaskExecutor:
 
         if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach {}".format(location_name))
-            # cancel navigation
-            # self.navigation_client.cancel_goal()
             return False
         
-
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(location_name))
 
-        # self.server_updater.update_emotion(Emotions.HAPPY)
-        # self.bot_state.update_state()
-        # self.bot_state.currentGlobalState = GlobalStates.REACHED_GOAL
-        # rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))
         return True
     
+
+    
+
+    def manipulate_object(self, object, isPick = True):
+
+        self.startManipService()
+
+        rospy.loginfo("Task Executor starting manipulation, going to perform object" + (" picking" if isPick else " placing"))
+        rospy.loginfo("Manipulating {}".format(object.name))
+        # send goal
+        goalObject = object.value
+        if not isPick:
+            goalObject = 60 #table
+
+        goal = TriggerGoal(isPick = isPick, heightOfObject = self.heightOfObject)
+        goal.objectId = goalObject
+        self.manipulation_client.send_goal(goal, feedback_cb = self.dummy_cb)
+        self.manipulation_client.wait_for_result()
+        result: TriggerResult = self.manipulation_client.get_result()
+        if result.success:
+            self.heightOfObject = result.heightOfObject
+            rospy.loginfo("Manipulation complete")
+
+        if isPick:  
+            self.stow_robot_service()
+
+        return result.success
+
+
+
+
 
 
     def dummy_cb(self, msg):

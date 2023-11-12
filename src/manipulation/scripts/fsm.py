@@ -63,14 +63,14 @@ class ManipulationFSM:
         self.planeFitClient = actionlib.SimpleActionClient('plane_detector', PlaneDetectAction)
 
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
-        self.trajectoryClient.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
+        # self.trajectoryClient.wait_for_server()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
-        self.graspActionClient.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
+        # self.graspActionClient.wait_for_server()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
-        self.planeFitClient.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
+        # self.planeFitClient.wait_for_server()
 
 
         self.visualServoing = AlignToObject(-1)

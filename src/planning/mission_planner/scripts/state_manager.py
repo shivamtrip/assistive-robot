@@ -35,8 +35,10 @@ class OperationModes(Enum):
 
 class GlobalStates(Enum):
     IDLE = 10
-    NAVIGATION = 3
-    MANIPULATION = 6
+    NAVIGATION_TO_PICK = 3
+    NAVIGATION_TO_PLACE = 7
+    MANIPULATION_TO_PICK = 6
+    MANIPULATION_TO_PLACE = 9
     VIDEOCALL = 5
     
 

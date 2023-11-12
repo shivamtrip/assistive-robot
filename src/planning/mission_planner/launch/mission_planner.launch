@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <rosparam command="load" file="$(find mission_planner)/config/config.yaml" /> <!--Load parameters from config files-->
+    <node name="mission_planner_node" pkg="mission_planner" type="mission_planner.py" output="screen" respawn = "true"></node>
+</launch>
