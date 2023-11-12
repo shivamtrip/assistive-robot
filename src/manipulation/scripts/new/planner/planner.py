@@ -108,10 +108,11 @@ class Planner:
             [
                 base_loc[0],
                 base_loc[1],
+                0,
                 base_theta
             ]
         )
-        return navigation_target, is_plan_reqd
+        return [navigation_target], is_plan_reqd
     
     
     

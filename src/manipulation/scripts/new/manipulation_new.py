@@ -6,6 +6,8 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from planner.planner import Planner
 import open3d as o3d
 from uatu.parse_scene import SceneParser
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+import scipy
 
 class Manipulation:
     def __init__(self):
@@ -118,12 +120,26 @@ class Manipulation:
         return True
     
     
+    
+    
     def execute_base_plan(self, plan):
-        # write code that converts local plan into map coordinates and sends it to movebase
         
+        goal = plan[0]
+        theta = goal[3]
+        goal = self.scene_parser.transform_point_to(goal, "base_link", "map")
         self.switch_to_navigation_mode()
-
-        # TODO -  Navigation stuff
+        self.navigate_to_location_service(goal)
+        
+        goal = MoveBaseGoal()
+        goal.target_pose.header.frame_id = "map"
+        goal.target_pose.pose.position.x = goal[0]
+        goal.target_pose.pose.position.y = goal[1]
+        quaternion = scipy.spatial.transform.Rotation.from_euler('z', theta).as_quat()
+        goal.target_pose.pose.orientation = quaternion
+        
+        # TODO convert this to navigation manager instead.
+        self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
+        wait = self.navigation_client.wait_for_result()
 
         self.switch_to_manipulation_mode()
             
@@ -140,21 +156,20 @@ class Manipulation:
 
     
     def main(self):  
-        
         object_bbox, path_to_tsdf = self.pan_camera_region(
             range = self.search_range,
             pitch = 0 * np.pi/180,
             object_of_interest = 8
         )
-        
+
         point_cloud = o3d.io.read_point_cloud(path_to_tsdf)
-        
+
         object_cloud = point_cloud.crop(
             o3d.geometry.OrientedBoundingBox.create_from_points(
                 o3d.utility.Vector3dVector(object_bbox)
             )
         )
-        
+
         object_points = np.asarray(object_cloud.points)
         medianz = np.median(object_points[:,2])
         x, y = np.mean(object_points[object_points[:,2] == medianz, :2], axis=0)

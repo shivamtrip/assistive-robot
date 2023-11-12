@@ -88,6 +88,16 @@ class SceneParser:
         )
         return True, "Accumulated TSDF"
     
+    def transform_point_to(self, point, from_frame, to_frame):
+        point = PointStamped()
+        point.header.frame_id = from_frame
+        point.point.x = point[0]
+        point.point.y = point[1]
+        point.point.z = point[2]
+        point = self.listener.transformPoint(to_frame, point).point
+        return point
+    
+    
     def stop_accumulate_tsdf(self, req = None):
         self.accumulating_tsdf = False
         pcd = self.tsdf_volume.extract_point_cloud()
