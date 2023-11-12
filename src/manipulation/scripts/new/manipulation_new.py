@@ -82,11 +82,48 @@ class Manipulation:
         path_to_tsdf = "/home/praveenvnktsh/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply"
         return object_bbox, path_to_tsdf
         
+    def closed_loop_align_to_grasp(self, grasp_target, offset = 0.0):
+        # write code that aligns the robot to the grasp target
+        # TODO 
+        # xerr = np.inf
+        # rospy.loginfo("Aligning object horizontally")
+        # prevxerr = np.inf
+        # curvel = 0.0
+        # prevsettime = time.time()
+        # while abs(xerr) > 0.008:
+        #     x, y, z, confidence = self.objectLocArr[-1]
+        #     print(xerr)
+        #     if self.isDetected:
+        #         xerr = (x) + offset
+        #     else:
+        #         rospy.logwarn("Object not detected. Using open loop motions")
+        #         xerr = (x - curvel * (time.time() - prevsettime)) + offset
+        #     rospy.loginfo("Alignment Error = " + str(xerr))
+        #     dxerr = (xerr - prevxerr)
+        #     vx = (self.kp['velx'] * xerr + self.kd['velx'] * dxerr)
+        #     prevxerr = xerr
+        #     move_to_pose(self.trajectoryClient, {
+        #             'base_translate;vel' : vx,
+        #     }) 
+        #     curvel = vx
+        #     prevsettime = time.time()
+            
+        #     rospy.sleep(0.1)
+        # move_to_pose(self.trajectoryClient, {
+        #     'base_translate;vel' : 0.0,
+        # }) 
+        # risk
+        # if self.isDetected is False:
+        #     return False
+        return True
+    
+    
     def execute_base_plan(self, plan):
         # write code that converts local plan into map coordinates and sends it to movebase
         
         self.switch_to_navigation_mode()
 
+        # TODO -  Navigation stuff
 
         self.switch_to_manipulation_mode()
             
