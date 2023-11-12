@@ -3,7 +3,7 @@ import rospy
 from std_srvs.srv import Trigger
 from helpers_sim import *
 from control_msgs.msg import FollowJointTrajectoryAction
-from planner import Planner
+from planner.planner import Planner
 import open3d as o3d
 from uatu.parse_scene import SceneParser
 
@@ -82,9 +82,6 @@ class Manipulation:
         path_to_tsdf = "/home/praveenvnktsh/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply"
         return object_bbox, path_to_tsdf
         
-    def execute_plan(self, plan):
-        pass
-    
     def execute_base_plan(self, plan):
         # write code that converts local plan into map coordinates and sends it to movebase
         
@@ -95,11 +92,15 @@ class Manipulation:
             
     def execute_manipulator_plan(self, plan):
         for waypoint in plan:
-            # write code that converts local plan into map coordinates and sends it to movebase
-            pass
-    
-    def closed_loop_grasp(self):
-        pass
+            x, y, theta, z, phi, ext = waypoint
+            move_to_pose(self.trajectoryClient, {
+                'base_translate;by' : y, 
+                'base_rotate;by' : theta,
+                'lift;to' : z,
+                'arm_phi;to' : phi,
+                'arm_ext;to' : ext,
+            })
+
     
     def main(self):  
         
@@ -136,7 +137,7 @@ class Manipulation:
 
         grasp_target = self.planner.plan_grasp_target(point_cloud, object_bbox)
         
-        # x, y, theta, z, phi, ext
+        # x, y, theta, z, phi, ext - this is the stowed state
         curstate = np.array(
             [
                 0, 0, 0, 0.3, np.pi, 0

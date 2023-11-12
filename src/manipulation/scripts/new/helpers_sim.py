@@ -40,7 +40,7 @@ diffdrive = rospy.Publisher('/stretch_diff_drive_controller/cmd_vel', Twist, que
 headclient = actionlib.SimpleActionClient('/stretch_head_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 gripperclient = actionlib.SimpleActionClient('/stretch_gripper_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 
-def move_to_pose(trajectoryClient, pose):
+def move_to_pose(trajectoryClient, pose, asynchronous = False):
     
     trajectory_goal = FollowJointTrajectoryGoal()
     trajectory_goal.goal_time_tolerance = rospy.Time(1.0)

@@ -385,7 +385,7 @@ def convert_to_full_path(path, orig_state):
         
         
         full_state[5] = ext
-        full_path.append(full_state)
+        full_path.append(full_state)    
     return full_path
 
 if __name__ == "__main__":
