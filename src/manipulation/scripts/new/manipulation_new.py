@@ -84,6 +84,9 @@ class Manipulation:
         path_to_tsdf = "/home/praveenvnktsh/alfred-autonomy/src/perception/uatu/outputs/tsdf.ply"
         return object_bbox, path_to_tsdf
         
+    
+        
+    
     def closed_loop_align_to_grasp(self, grasp_target, offset = 0.0):
         # write code that aligns the robot to the grasp target
         # TODO 
@@ -119,11 +122,7 @@ class Manipulation:
         #     return False
         return True
     
-    
-    
-    
     def execute_base_plan(self, plan):
-        
         goal = plan[0]
         theta = goal[3]
         goal = self.scene_parser.transform_point_to(goal, "base_link", "map")
@@ -158,7 +157,7 @@ class Manipulation:
     def main(self):  
         object_bbox, path_to_tsdf = self.pan_camera_region(
             range = self.search_range,
-            pitch = 0 * np.pi/180,
+            pitch = -10 * np.pi/180,
             object_of_interest = 8
         )
 
@@ -182,7 +181,7 @@ class Manipulation:
         
             object_bbox, path_to_tsdf = self.pan_camera_region(
                 range = self.search_range,
-                pitch = -30 * np.pi/180,
+                pitch = -10 * np.pi/180,
             )
             
             point_cloud = o3d.io.read_point_cloud(path_to_tsdf)

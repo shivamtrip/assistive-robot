@@ -170,17 +170,16 @@ class SceneParser:
         self.color_image = self.bridge.imgmsg_to_cv2(color_img, desired_encoding="passthrough")
         self.is_receiving_images = True
             
-    def get_three_d_bbox_from_tracker(self):
+    def get_three_d_bbox_from_tracker(self, dump_cloud = False):
         if self.trackedNode == None or self.point_cloud == None:
             return False
         
         cloud = self.trackedNode.reconstruct_object()
-        # o3d.visualization.draw_geometries([cloud])
+        if dump_cloud:
+            o3d.io.write_point_cloud("/home/praveenvnktsh/alfred-autonomy/src/perception/uatu/outputs/box_tracked.ply", cloud)
         
         bbox = cloud.get_oriented_bounding_box()
         box_points = np.array(bbox.get_box_points())
-        
-        
         
         return box_points
         
