@@ -12,8 +12,8 @@ print("sending trajectory")
 
 
 dic = {
-    'lift;to' : 0.8, 
-    'arm;to' : 0.1,
+    'lift;to' : (0.8, 40), 
+    'arm;to' : (0.5),
     'head_pan;to' : 0.1,
     'head_tilt;to' : 0.1,
     'wrist_yaw;to' : 0.1,
@@ -24,12 +24,12 @@ rospy.loginfo("Reached 0.8")
 
 
 dic = {
-    'lift;to' : 0.5, 
-    'arm;to' : 0.0,
+    'lift;to' : (0.5, 25), 
+    # 'arm;to' : 0.0,
     'head_pan;to' : 0.0,
     'head_tilt;to' : 0.0,
     'wrist_yaw;to' : 0.0,
 }
-move_to_pose(trajectoryClient, dic, asynchronous= True )
+move_to_pose(trajectoryClient, dic )
 
 rospy.loginfo("Reached 0.5")

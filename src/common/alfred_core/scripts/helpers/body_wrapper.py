@@ -26,11 +26,25 @@ class JointTrajectoryAction:
         with self.node.robot_stop_lock:
             self.node.stop_the_robot = False
         # self.node.robot_mode_rwlock.acquire_read()
-
+        wait_for_contact = {
+            'arm' : False,
+            'lift' : False
+        }
         for i, name in enumerate(goal.trajectory.joint_names):
             joint, motionType = name.split(';')
-            pos = goal.trajectory.points[0].positions[i]
-            rospy.loginfo("joint: {0}, motionType: {1}, by {2}".format(joint, motionType, pos))
+            point = goal.trajectory.points[0]
+            pos = point.positions[i]
+            effort = point.effort[i]
+            wait_for_contact[joint] = False
+            if effort == 0:
+                effort_p = None
+                effort_n = None
+            else:
+                effort_p = effort
+                effort_n = -effort
+                wait_for_contact[joint] = True
+            
+            rospy.loginfo("joint: {0}, motionType: {1}, by {2}, contact thresh {3}".format(joint, motionType, pos, effort))
             if 'head' in joint:
                 if motionType == 'to':
                     self.robot.head.move_to(joint, pos)
@@ -48,30 +62,36 @@ class JointTrajectoryAction:
                     self.robot.base.rotate_by(pos)
             elif 'lift' in joint:
                 if motionType == 'to':
-                    self.robot.lift.move_to(pos)
+                    self.robot.lift.move_to(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
                 elif motionType == 'vel':
-                    self.robot.lift.set_velocity(pos)
+                    self.robot.lift.set_velocity(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
                 elif motionType == 'by':
-                    self.robot.lift.move_by(pos)
+                    self.robot.lift.move_by(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
             elif 'arm' in joint:
                 if motionType == 'to':
-                    self.robot.arm.move_to(pos)
+                    self.robot.arm.move_to(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
                 elif motionType == 'vel':
-                    self.robot.arm.set_velocity(pos)
+                    self.robot.arm.set_velocity(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
                 elif motionType == 'by':
-                    self.robot.arm.move_by(pos)
+                    self.robot.arm.move_by(pos, contact_thresh_neg= effort_n, contact_thresh_pos=effort_p)
             elif 'stretch_gripper' in joint:
                 if motionType == 'to':
                     self.robot.end_of_arm.move_to("stretch_gripper", pos) 
             elif 'wrist_yaw' in joint:
                 if motionType == 'to':
-                    self.robot.end_of_arm.move_to("wrist_yaw", pos * np.pi/180)  
+                    self.robot.end_of_arm.move_to("wrist_yaw", pos)  
         self.robot.push_command()
         
-        rospy.loginfo("Waiting for arm to stop moving")
-        self.robot.arm.wait_until_at_setpoint()
-        rospy.loginfo("Waiting for lift to stop moving")
-        self.robot.lift.wait_until_at_setpoint()
+        
+        if wait_for_contact['lift']:
+            self.robot.lift.wait_for_contact()
+        else:
+            self.robot.lift.wait_until_at_setpoint()
+
+        if wait_for_contact['arm']:
+            self.robot.arm.wait_for_contact()
+        else:
+            self.robot.arm.wait_until_at_setpoint()
         
         # rospy.loginfo("Waiting for base to stop moving")
         # self.robot.base.wait_until_at_setpoint()
