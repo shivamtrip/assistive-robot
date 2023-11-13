@@ -18,7 +18,7 @@ dic = {
     'head_tilt;to' : 0.1,
     'wrist_yaw;to' : 0.1,
 }
-move_to_pose(trajectoryClient, dic)
+move_to_pose(trajectoryClient, dic, asynchronous= False)
 
 rospy.loginfo("Reached 0.8")
 
