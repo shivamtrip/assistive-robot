@@ -37,7 +37,7 @@ from std_srvs.srv import Trigger
 class WakewordDetector():
     def __init__(self, triggerCallback):
         self.wakeword = rospy.get_param("wakeword", "Hey Alfred")
-        self.keywords_path = rospy.get_param("keywords_path", "resources/keywords/Hey-Alfred_en_linux_v2_1_0.ppn")
+        self.keywords_path = rospy.get_param("keywords_path", "resources/keywords/Hey-Alfred_en_linux_v3_0_0.ppn")
         self.models_path = rospy.get_param("models_path", "resources/models/porcupine_params.pv")
         self.audio_device_index = rospy.get_param("audio_device_index", 5)
         self.rospack = rospkg.RosPack()
@@ -70,8 +70,7 @@ class WakewordDetector():
         self.porcupine = pvporcupine.create(
                 access_key=self.access_key,
                 keyword_paths=self.keyword_paths,
-                sensitivities=self.keyword_sensitivities,
-                model_path=self.models_path)
+                sensitivities=self.keyword_sensitivities)
 
         self.recorder = PvRecorder(
                 device_index=self.audio_device_index,

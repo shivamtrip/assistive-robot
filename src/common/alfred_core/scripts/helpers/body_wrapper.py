@@ -22,37 +22,30 @@ class JointTrajectoryAction:
         self.result = FollowJointTrajectoryResult()
 
     def execute_cb(self, goal):
+        
         with self.node.robot_stop_lock:
             self.node.stop_the_robot = False
         # self.node.robot_mode_rwlock.acquire_read()
-        commanded_joint_names = goal.trajectory.joint_names
-        rospy.loginfo(("[{0}] joint_traj action: New trajectory received with joint_names = "
-                       "{1}").format(self.node.node_name, commanded_joint_names))
-        # TODO: Add safety constraints with respect to the robot state.
 
-        for name in goal.trajectory.joint_names:
+        for i, name in enumerate(goal.trajectory.joint_names):
             joint, motionType = name.split(';')
-            pos = goal.trajectory.points[0].positions[0]
+            pos = goal.trajectory.points[0].positions[i]
+            rospy.loginfo("joint: {0}, motionType: {1}, by {2}".format(joint, motionType, pos))
             if 'head' in joint:
                 if motionType == 'to':
                     self.robot.head.move_to(joint, pos)
                 else:
                     self.robot.head.move_by(joint, pos)
             elif 'base_translate' in joint:
-                if motionType == 'to':
-                    self.robot.base.move_to(pos)
-                elif motionType == 'vel':
+                if motionType == 'vel':
                     self.robot.base.set_translate_velocity(pos)
                 elif motionType == 'by':
-                    self.robot.base.move_by(pos)
+                    self.robot.base.translate_by(pos)
             elif 'base_rotate' in joint:
-                if motionType == 'to':
-                    self.robot.base.rotate_to(pos)
-                elif motionType == 'vel':
+                if motionType == 'vel':
                     self.robot.base.set_rotational_velocity(pos)
                 elif motionType == 'by':
                     self.robot.base.rotate_by(pos)
-
             elif 'lift' in joint:
                 if motionType == 'to':
                     self.robot.lift.move_to(pos)
@@ -67,7 +60,6 @@ class JointTrajectoryAction:
                     self.robot.arm.set_velocity(pos)
                 elif motionType == 'by':
                     self.robot.arm.move_by(pos)
-                    
             elif 'stretch_gripper' in joint:
                 if motionType == 'to':
                     self.robot.end_of_arm.move_to("stretch_gripper", pos) 
@@ -75,14 +67,29 @@ class JointTrajectoryAction:
                 if motionType == 'to':
                     self.robot.end_of_arm.move_to("wrist_yaw", pos * np.pi/180)  
         self.robot.push_command()
-
-        # self.robot.arm.wait_until_at_setpoint()
-        # self.robot.lift.wait_until_at_setpoint()
-        # while self.robot.end_of_arm.motors['wrist_yaw'].motor.is_moving():
-        #     time.sleep(0.1)
-        # while self.robot.end_of_arm.motors['stretch_gripper'].motor.is_moving():
-        #     time.sleep(0.1)
+        
+        rospy.loginfo("Waiting for arm to stop moving")
+        self.robot.arm.wait_until_at_setpoint()
+        rospy.loginfo("Waiting for lift to stop moving")
+        self.robot.lift.wait_until_at_setpoint()
+        
+        # rospy.loginfo("Waiting for base to stop moving")
+        # self.robot.base.wait_until_at_setpoint()
+        while self.robot.head.motors['head_pan'].motor.is_moving():
+            rospy.loginfo("head_pan is still moving")
+            time.sleep(0.1)
+        while self.robot.head.motors['head_tilt'].motor.is_moving():
+            rospy.loginfo("head_tilt is still moving")
+            time.sleep(0.1)
             
+        while self.robot.end_of_arm.motors['wrist_yaw'].motor.is_moving():
+            rospy.loginfo("wrist_yaw is still moving")
+            time.sleep(0.1)
+        while self.robot.end_of_arm.motors['stretch_gripper'].motor.is_moving():
+            rospy.loginfo("stretch_gripper is still moving")
+            time.sleep(0.1)
+            
+        rospy.loginfo("Complete")
         self.success_callback("set command.")
         # self.robot_mode_rwlock.release_read()
         

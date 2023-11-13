@@ -21,7 +21,7 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import JointState, CameraInfo, Image
 
-# from helpers.joint_trajectory_server import JointTrajectoryAction
+# from helpers.joint_traj_server import JointTrajectoryAction
 from helpers.body_wrapper import JointTrajectoryAction
 
 

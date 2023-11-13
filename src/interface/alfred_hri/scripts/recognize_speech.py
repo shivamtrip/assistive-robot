@@ -33,22 +33,39 @@ from std_srvs.srv import Trigger, TriggerResponse
 class SpeechRecognition():
     def __init__(self):
         self.r = sr.Recognizer()
-        self.m = sr.Microphone()
         rospy.loginfo("Speech recognition adjusting for ambient noise")
-        with self.m as source:
-            self.r.adjust_for_ambient_noise(source, duration=5)
 
-        rospy.loginfo("Set minimum energy threshold to {}".format(self.r.energy_threshold))
+        secrets_file = os.path.expanduser("~/.secrets.json")
+        config = {}
+        with open(secrets_file, "r") as f:
+            config = f.read()
+            config = json.loads(config)
+
+        self.openai_access_key = None
+
+        if "OPENAI_API_KEY" not in config.keys():
+            sys.exit("ERROR: OPENAI_API_KEY is not set. Please add it to ~/.secrets.json.")
+
+        self.openai_access_key = config["OPENAI_API_KEY"]
+
+        # rospy.loginfo("Set minimum energy threshold to {}".format(self.r.energy_threshold))
         
 
     def speech_to_text(self):
         # Record audio
+        self.m = sr.Microphone()
+
+        with self.m as source:
+            self.r.adjust_for_ambient_noise(source, duration=0.5)
+
         with self.m as source:
             audio = self.r.listen(source, timeout=5, phrase_time_limit=5)
 
+        # self.stream.close()
+
         # Convert audio to text
         try:
-            text = self.r.recognize_google(audio)
+            text = self.r.recognize_whisper_api(audio, api_key=self.openai_access_key)
             return text
         except sr.UnknownValueError:
             print("Google Speech Recognition could not understand audio")
