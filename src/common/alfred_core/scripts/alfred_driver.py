@@ -51,6 +51,37 @@ class AlfredBodyNode:
         self.robot_mode = None
         # camera services
         
+        
+        self.rotated_intrinsics_pub = rospy.Publisher('/camera/color/camera_info_rotated', CameraInfo, queue_size=1)
+        
+    def get_rotated_intrinsics(self):
+        self.camera_intrinsics = rospy.wait_for_message('/camera/color/camera_info', CameraInfo)
+        K = np.array(self.camera_intrinsics.K).reshape((3,3))
+        height = self.camera_intrinsics.height
+        width = self.camera_intrinsics.width
+        fx_old = K[0,0]
+        fy_old = K[1,1]
+        cx_old = K[0,2]
+        cy_old = K[1,2]
+        fx_new = fy_old
+        fy_new = fx_old
+        cx_new = width - cy_old
+        cy_new = cx_old
+        rotated_intrinsic = np.array([[fx_new,0,cx_new],[0,fy_new,cy_new],[0,0,1]])
+        
+        new_intrinsics = CameraInfo()
+        new_intrinsics.header = Header()
+        new_intrinsics.header.frame_id = self.camera_intrinsics.header.frame_id
+        new_intrinsics.height = self.camera_intrinsics.height
+        new_intrinsics.width = self.camera_intrinsics.width
+        new_intrinsics.distortion_model = self.camera_intrinsics.distortion_model
+        new_intrinsics.D = self.camera_intrinsics.D
+        new_intrinsics.K = rotated_intrinsic.flatten().tolist()
+        new_intrinsics.R = self.camera_intrinsics.R
+        
+        self.rotated_camera_intrinsics = new_intrinsics
+        
+        
     ###### MOBILE BASE VELOCITY METHODS #######
 
     def set_mobile_base_velocity_callback(self, twist):
@@ -111,6 +142,10 @@ class AlfredBodyNode:
             t.transform.rotation.z = q[2]
             t.transform.rotation.w = q[3]
             self.tf_broadcaster.sendTransform(t)
+            
+            self.rotated_intrinsics_pub.publish(self.rotated_camera_intrinsics)
+            
+            
 
         # publish odometry
         odom = Odometry()
