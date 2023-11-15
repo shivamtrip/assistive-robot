@@ -1,5 +1,5 @@
 {
-    "fetch_banana": [
+    "banana": [
         "Could you grab me a banana, please?",
         "I'd like a banana, if you don't mind.",
         "Can you get me a banana real quick?",
@@ -99,7 +99,7 @@
         "Got a banana?",
         "I'm hungry for a banana"
     ],
-    "fetch_water": [
+    "water": [
         "I am thirsty",
         "I'm thirsty",
         "I need water",
@@ -464,7 +464,7 @@
         "Can you stop video chatting please",
         "Can you stop video call now"
     ],
-    "fetch_book": [
+    "book": [
         "I want to read a book",
         "Get me a book.",
         "I'd like to read a book.",
@@ -740,7 +740,7 @@
         "Please bring me a book on entrepreneurship in the digital age.",
         "Can you find me a book on moral psychology?"
     ],
-    "fetch_glasses": [
+    "glasses": [
         "Hand me my glasses",
         "Hand me my reading glasses",
         "Can you hand me my glasses",
@@ -986,7 +986,7 @@
         "Can you bring me my glasses? I need to read this book.",
         "I need my glasses to see the label, please get them."
     ],
-    "fetch_medicines": [
+    "medicines": [
         "Retrieve my medication",
         "Bring me the medicine box",
         "Get the pills for me",
@@ -1200,7 +1200,7 @@
         "Please find my medication bottle for me",
         "Where is my pill container stored?"
     ],
-    "fetch_apple": [
+    "apple": [
         "Can you bring me an apple?",
         "Could you grab me an apple?",
         "May I have an apple, please?",
@@ -1312,7 +1312,7 @@
         "Please obtain a Pink Lady apple for me.",
         "Can you bring me a Fuji apple, please?"
     ],
-    "fetch_remote": [
+    "remote": [
         "Bring me the remote.",
         "Get me the remote.",
         "Fetch me the remote.",
@@ -1360,5 +1360,101 @@
         "Can you please hand me the Blu-ray remote?",
         "Can you get me the soundbar remote?",
         "Please obtain the speaker remote for me."
+    ],
+    "soda": [
+        "Fetch me a soda.",
+        "Bring me a cola.",
+        "Could you grab me a pop?",
+        "I'd like a soda, please.",
+        "Get me a fizzy drink.",
+        "Bring me a carbonated beverage.",
+        "Fetch me a soft drink.",
+        "I'm thirsty for a soda.",
+        "Could you snag me a cola?",
+        "Grab me a sparkling water.",
+        "How about getting me a tonic?",
+        "Fetch me a refreshing drink.",
+        "Can you hook me up with a soda?",
+        "Bring me a cold pop.",
+        "I'm in the mood for a cola.",
+        "Get me a bubbly beverage.",
+        "I'd love a soda, if you don't mind.",
+        "Fetch me a soda, please and thank you.",
+        "Bring me a soda, if it's not too much trouble.",
+        "Could you grab me a carbonated drink?",
+        "I need a soda, pronto.",
+        "How about a fizzy refreshment?",
+        "Get me a cola, would you?",
+        "Bring me a soft drink, if you can.",
+        "I'm craving a soda.",
+        "Fetch me a pop from the fridge.",
+        "Can you grab me a sparkling beverage?",
+        "I could really go for a soda right now.",
+        "Bring me a cold soda, please.",
+        "Get me a carbonated treat.",
+        "How about fetching me a refreshing cola?",
+        "I'd appreciate it if you could grab me a pop.",
+        "Bring me a fizzy drink when you have a moment.",
+        "I'm parched, get me a soda.",
+        "Could you bring me a cola, please?",
+        "Fetch me a cold pop.",
+        "I'd love a soda, thank you.",
+        "Get me a fizzy beverage, would you?",
+        "Bring me a soft drink when you get a chance.",
+        "I'm really craving a soda right now.",
+        "Could you grab me a sparkling refreshment?",
+        "Fetch me a soda from the store.",
+        "Can you bring me a cold cola?",
+        "Get me a pop, if you don't mind.",
+        "Bring me a carbonated treat when you can.",
+        "I'm quite thirsty; fetch me a soda.",
+        "Could you grab me a fizzy drink?",
+        "How about a cold soda, please?",
+        "Get me a refreshing beverage.",
+        "Bring me a pop, and I'll owe you one.",
+        "Fetch me a cold cola when you have time.",
+        "I'm in the mood for a soda; can you get me one?",
+        "Could you bring me a carbonated drink, please?",
+        "Get me a fizzy refreshment, and I'll be happy.",
+        "Bring me a soda, if it's not too much trouble.",
+        "I'd appreciate it if you could grab me a pop.",
+        "Fetch me a cold, bubbly beverage.",
+        "Can you bring me a soda from the kitchen?",
+        "I'm in the mood for a pop.",
+        "How about bringing me a carbonated refreshment?",
+        "Get me a soda, if it's not too much trouble.",
+        "Bring me a cola, and I'll be grateful.",
+        "Could you fetch me a cold pop?",
+        "I'd love a soda; thank you.",
+        "Get me a fizzy beverage, would you?",
+        "Bring me a soft drink when you get a chance.",
+        "I'm really craving a soda right now.",
+        "Could you grab me a sparkling refreshment?",
+        "Fetch me a soda from the store.",
+        "Can you bring me a cold cola?",
+        "Get me a pop, if you don't mind.",
+        "Bring me a carbonated treat when you can.",
+        "I'm quite thirsty; fetch me a soda.",
+        "Could you grab me a fizzy drink?",
+        "How about a cold soda, please?",
+        "Get me a refreshing beverage.",
+        "Bring me a pop, and I'll owe you one.",
+        "Fetch me a cold cola when you have time.",
+        "I'm in the mood for a soda; can you get me one?",
+        "Could you bring me a carbonated drink, please?",
+        "Get me a fizzy refreshment, and I'll be happy.",
+        "Bring me a soda, if it's not too much trouble.",
+        "I'd appreciate it if you could grab me a pop.",
+        "Fetch me a cold, bubbly beverage.",
+        "Can you bring me a soda from the kitchen?",
+        "I'm in the mood for a pop.",
+        "How about bringing me a carbonated refreshment?",
+        "Get me a soda, if it's not too much trouble.",
+        "Bring me a cola, and I'll be grateful.",
+        "Could you fetch me a cold pop?",
+        "I'd love a soda; thank you.",
+        "Get me a fizzy beverage, would you?",
+        "Bring me a soft drink when you get a chance.",
+        "I'm really craving a soda right now."
     ]
 }

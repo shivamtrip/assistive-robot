@@ -66,24 +66,20 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
             })
-        rospy.sleep(5)
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to" : 0,
-            
-        })
-        move_to_pose(trajectoryClient, {
             "stretch_gripper;to" : 100,
         })
-        rospy.sleep(2)
+        rospy.sleep(5)
 
     def getEndEffectorPose(self):
-        from_frame_rel = 'base_link'
-        to_frame_rel = 'link_grasp_center'
+        from_frame_rel = 'link_grasp_center'
+        to_frame_rel = 'base_link'
         while not rospy.is_shutdown():
             try:
                 translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
                 rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
-                return [abs(translation[0]), translation[1], translation[2]]
+                return [(translation[0]), translation[1], translation[2]]
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 continue
             
@@ -106,12 +102,9 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "lift;to": z,
         })
-        rospy.sleep(3)
-
         move_to_pose(trajectoryClient, {
             "arm;to": y,
         })
-        rospy.sleep(5)
 
         if moveUntilContact:
             self.move_until_contact(
@@ -124,29 +117,18 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "stretch_gripper;to": -80,
         })
+        rospy.sleep(3)
 
-        rospy.sleep(5)
         move_to_pose(trajectoryClient, {
             "lift;to": z + 0.10,
+            "arm;to" : 0,
+            "wrist_yaw;to" : np.pi,
         })
-        rospy.sleep(3)
 
         move_to_pose(trajectoryClient, {
-           "arm;to" : 0,
-        })
-        rospy.sleep(2)
-        move_to_pose(trajectoryClient, {
-           "wrist_yaw;to" : np.pi,
-        })
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
             "lift;to": z - 0.3,
-        })
-        move_to_pose(trajectoryClient, {
             "head_pan;to": 0,
-        }
-        )
-        rospy.sleep(3)
+        })
 
         
     def pick_with_feedback(self, trajectoryClient, x, y, z, theta):

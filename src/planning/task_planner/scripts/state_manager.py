@@ -32,7 +32,7 @@ class BotStateManager():
         self.currentSemanticLocation = LocationOfInterest.HOME # GEOFENCE THIS USING DEFINED BOXES TODO(@shivamtrip)
         self.navigationOrigin = LocationOfInterest.HOME
         self.navigationGoal = LocationOfInterest.HOME
-        self.objectOfInterest = ObjectOfInterest.NONE
+        self.objectOfInterest = -1
         self.currentGlobalState = GlobalStates.WAITING_FOR_COMMAND
         self.operationMode = OperationModes.AUTONOMOUS
         self.emotion = Emotions.NEUTRAL
@@ -165,17 +165,18 @@ class GlobalStates(Enum):
     CALL = 8
     
 
-class ObjectOfInterest(Enum): 
-    # FILL WITH CLASS LABELS FOR THE OBJECT DETECTION PIPELINE
-    NONE = -1
-    USER = 0
-    BOTTLE = 39
-    BOX = 2
-    GLASS = 3
-    TABLE = 60
-    REMOTE = 65
-    APPLE = 47
-    BANANA = 46
+# class ObjectOfInterest(Enum): 
+#     # FILL WITH CLASS LABELS FOR THE OBJECT DETECTION PIPELINE
+#     NONE = -1
+#     SODA = 1
+#     USER = 0
+#     BOTTLE = 39
+#     BOX = 2
+#     GLASS = 3
+#     TABLE = 60
+#     REMOTE = 65
+#     APPLE = 47
+#     BANANA = 46
     
 
 class LocationOfInterest(Enum):

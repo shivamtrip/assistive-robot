@@ -30,7 +30,7 @@ from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, Verb
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 
-from state_manager import BotStateManager, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
+from state_manager import BotStateManager, Emotions, LocationOfInterest, GlobalStates, VerbalResponseStates, OperationModes
 import os
 import json
 from enum import Enum
@@ -95,22 +95,27 @@ class TaskPlanner:
         self.runningTeleop = False
 
         self.mappings = {
-            'fetch_water' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.BOTTLE],
-            'fetch_apple' : [LocationOfInterest.NET, ObjectOfInterest.APPLE],
-            'fetch_remote' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.REMOTE],
-            'do_nothing' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.NONE],
-            'fetch_banana' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.BANANA],
+            # 'fetch_water' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.BOTTLE],
+            # 'fetch_apple' : [LocationOfInterest.NET, ObjectOfInterest.APPLE],
+            # 'fetch_remote' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.REMOTE],
+            # 'fetch_banana' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.BANANA],
+            # 'fetch_soda' : [LocationOfInterest.LIVING_ROOM, ObjectOfInterest.SODA],
         }
 
+        self.class_list = rospy.get_param("/object_detection/class_list")
+        
+        for i, cls in enumerate(self.class_list):
+            self.mappings[cls] = [LocationOfInterest.LIVING_ROOM, i]
+            
+        self.mappings['do_nothing'] = [LocationOfInterest.LIVING_ROOM, -1]
+        
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
-        # create a timed callback to check if we have, Obj been idle for too long
 
     def idleCallback(self, event):
         if not self.bot_state.isAutonomous() and self.bot_state.isExtendedCommunicationLossTeleop():
             self.bot_state.currentGlobalState = GlobalStates.IDLE
 
-    def stateUpdateCallback(self):
-        
+    def stateUpdateCallback(self):        
         if not self.bot_state.isAutonomous():
             if not self.isManipMode :
                 self.isManipMode = True
@@ -137,16 +142,12 @@ class TaskPlanner:
             if commands['manipulator']['gripper_open']:
                 gripperpos = 100
             move_to_pose(self.trajectoryClient, 
-                {'stretch_gripper;to' : gripperpos},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'wrist_yaw;to' : commands['manipulator']['yaw_position']},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'lift;vel' : commands['manipulator']['vel_lift']},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'arm;vel' : commands['manipulator']['vel_extend']},
+                {
+                    'stretch_gripper;to' : gripperpos,
+                    'wrist_yaw;to' : commands['manipulator']['yaw_position'],
+                    'lift;vel' : commands['manipulator']['vel_lift'],
+                    'arm;vel' : commands['manipulator']['vel_extend']
+                },
             )
             
             rospy.sleep(0.1)
@@ -167,7 +168,7 @@ class TaskPlanner:
         self.stow_robot_service()
         self.startNavService()
         rospy.sleep(0.5)
-        rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.objectOfInterest.name))
+        rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.class_list[self.objectOfInterest]))
         
         navSuccess = self.navigate_to_location(self.navigationGoal)
         if not navSuccess:
@@ -208,13 +209,13 @@ class TaskPlanner:
         self.task_requested = False
         self.time_since_last_command = rospy.Time.now()
 
-
-    def manipulate_object(self, object : Enum, isPick = True):
+    def manipulate_object(self, object, isPick = True):
         rospy.loginfo("Starting manipulation, going to perform object" + (" picking" if isPick else " placing"))
-        rospy.loginfo("Manipulating {}".format(object.name))
+        rospy.loginfo("Manipulating object")
+        
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         # send goal
-        goalObject = object.value
+        goalObject = object
         if not isPick:
             goalObject = 60 #table
 

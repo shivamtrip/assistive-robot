@@ -51,9 +51,9 @@ class AlfredBodyNode:
         self.robot_mode = None
         # camera services
         
-        
-        self.rotated_intrinsics_pub = rospy.Publisher('/camera/color/camera_info_rotated', CameraInfo, queue_size=1)
-        
+        # TODO CONFLICT WITH REALSENSE
+        # self.rotated_intrinsics_pub = rospy.Publisher('/camera/color/camera_info_rotated', CameraInfo, queue_size=1)
+        # self.get_rotated_intrinsics()
     def get_rotated_intrinsics(self):
         self.camera_intrinsics = rospy.wait_for_message('/camera/color/camera_info', CameraInfo)
         K = np.array(self.camera_intrinsics.K).reshape((3,3))
@@ -72,8 +72,8 @@ class AlfredBodyNode:
         new_intrinsics = CameraInfo()
         new_intrinsics.header = Header()
         new_intrinsics.header.frame_id = self.camera_intrinsics.header.frame_id
-        new_intrinsics.height = self.camera_intrinsics.height
-        new_intrinsics.width = self.camera_intrinsics.width
+        new_intrinsics.height = self.camera_intrinsics.width
+        new_intrinsics.width = self.camera_intrinsics.height
         new_intrinsics.distortion_model = self.camera_intrinsics.distortion_model
         new_intrinsics.D = self.camera_intrinsics.D
         new_intrinsics.K = rotated_intrinsic.flatten().tolist()
@@ -143,7 +143,7 @@ class AlfredBodyNode:
             t.transform.rotation.w = q[3]
             self.tf_broadcaster.sendTransform(t)
             
-            self.rotated_intrinsics_pub.publish(self.rotated_camera_intrinsics)
+            # self.rotated_intrinsics_pub.publish(self.rotated_camera_intrinsics)
             
             
 
@@ -348,23 +348,23 @@ class AlfredBodyNode:
     def batteryCheck(self, msg):
         # TODO(@praveenvnktsh): finish this function
         
-        def val_in_range(val_name, val,vmin, vmax):
-            p=val <=vmax and val>=vmin
-            if p:
+        def val_in_range(val_name, val, alert = False):
+            if not alert:
                 print(Fore.GREEN +'[Pass] ' + val_name + ' with ' + str(val))
                 return True
             else:
-                print(Fore.RED +'[Fail] ' + val_name + ' with ' +str(val)+ ' out of range ' +str(vmin) + ' to ' + str(vmax))
+                print(Fore.RED +'[Fail] ' + val_name + ' with ' +str(val)+ ' out of range ')
                 return False
 
         # #####################################################
         
-        p = self.robot.pimu
+        robot_status = self.robot.get_status()
+        pimu_status = robot_status['pimu']
+        
         self.robot.pimu.pull_status()
-        ready = val_in_range('Voltage',p.status['voltage'], vmin=p.config['low_voltage_alert'], vmax=14.0)
-        ready = ready and val_in_range('Current',p.status['current'], vmin=0.1, vmax=p.config['high_current_alert'])
+        ready = val_in_range('Voltage',pimu_status['voltage'], alert=pimu_status['low_voltage_alert'])
+        ready = ready and val_in_range('Current',pimu_status['current'], alert=pimu_status['high_current_alert'])
         print(Style.RESET_ALL)
-        p.stop()
         if not ready:
             msg = "Please Recharge the battery!"
         else:
@@ -385,7 +385,8 @@ class AlfredBodyNode:
         self.robot.push_command()
         self.robot.lift.move_to(0.4)
         self.robot.push_command()
-        time.sleep(1)
+        
+        self.robot.lift.wait_until_at_setpoint()
         if temp == 'navigation':
             self.turn_on_navigation_mode()
         else:
@@ -394,10 +395,9 @@ class AlfredBodyNode:
         return TriggerResponse()
     
     def check_battery_thread(self):
-        
         while not rospy.is_shutdown():
-            self.batteryCheck(None)
             time.sleep(300)
+            self.batteryCheck(None)
 
     def main(self):
 
@@ -408,16 +408,15 @@ class AlfredBodyNode:
 
         self.robot = rb.Robot()
         self.robot.startup()
+        
         if self.batteryCheck(None).success == False:
             exit()
-            
             
         threading.Thread(target=self.check_battery_thread).start()
         rospy.loginfo("Battery is fine!")
         if not self.robot.is_calibrated():
             rospy.loginfo("Homing the robot. Please wait :)")
             self.robot.home()
-
 
         self.stow(None)
 

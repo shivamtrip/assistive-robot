@@ -36,7 +36,7 @@ def odom(data):
     global odometry
     odometry = data
 
-def move_to_pose(trajectoryClient, pose, asynchronous=False, custom_contact_thresholds=False):
+def move_to_pose(trajectoryClient, pose, asynchronous=False):
     joint_names = [key for key in pose]
     point = JointTrajectoryPoint()
     point.time_from_start = rospy.Duration(0.0)
@@ -44,26 +44,25 @@ def move_to_pose(trajectoryClient, pose, asynchronous=False, custom_contact_thre
     trajectory_goal = FollowJointTrajectoryGoal()
     trajectory_goal.goal_time_tolerance = rospy.Time(1.0)
     trajectory_goal.trajectory.joint_names = joint_names
-    if not custom_contact_thresholds: 
-        joint_positions = [pose[key] for key in joint_names]
-        point.positions = joint_positions
-        trajectory_goal.trajectory.points = [point]
-    else:
-        pose_correct = all([len(pose[key])==2 for key in joint_names])
-        if not pose_correct:
-            rospy.logerr("[ALFRED].move_to_pose: Not sending trajectory due to improper pose. custom_contact_thresholds requires 2 values (pose_target, contact_threshold_effort) for each joint name, but pose = {0}".format(pose))
-            return
-        joint_positions = [pose[key][0] for key in joint_names]
-        joint_efforts = [pose[key][1] for key in joint_names]
-        point.positions = joint_positions
-        point.effort = joint_efforts
-        trajectory_goal.trajectory.points = [point]
+    
+    joint_positions = []
+    joint_efforts = []
+    for key in joint_names:
+        if isinstance(pose[key], tuple):
+            joint_positions.append(pose[key][0])
+            joint_efforts.append(pose[key][1])
+        else:
+            joint_positions.append(pose[key])
+            joint_efforts.append(0)
+    
+    point.positions = joint_positions
+    point.effort = joint_efforts
+    trajectory_goal.trajectory.points = [point]
+
     trajectory_goal.trajectory.header.stamp = rospy.Time.now()
     trajectoryClient.send_goal(trajectory_goal)
     if not asynchronous: 
         trajectoryClient.wait_for_result()
-        #print('Received the following result:')
-        #print(self.trajectory_client.get_result())
 
 
 

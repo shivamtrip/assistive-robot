@@ -1,0 +1,28 @@
+
+offsets:
+  bottle: [0, 0.0, 0.0]
+  apple: [0, 0.0, 0.0]
+  remote: [0, 0.0, 0.0]
+  banana : [0, 0.0, 0.0]
+  soda_can : [0, 0.0, -0.02]
+  tissue_paper: [-0.0, 0.02, 0.05]
+  toothbrush: [-0.0, 0.0, 0.0]
+  tie: [-0.0, 0.0, 0.0]
+  cell_phone: [-0.0, 0.0, 0.0]
+  orange: [-0.0, 0.0, 0.0]
+  cup: [-0.0, 0.0, 0.0]
+  teddy_bear: [-0.0, 0.0, 0.0]
+
+contact: 
+  bottle: false
+  apple: true
+  remote: true
+  banana: true
+  soda_can: false
+  tissue_paper: false
+  toothbrush: false
+  tie: true
+  cell_phone: true
+  orange: false
+  cup: false
+  teddy_bear: false

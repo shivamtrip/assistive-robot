@@ -1,3 +1,6 @@
 <launch>
+    <group ns="manipulation">
+        <rosparam command="load" file="$(find manipulation)/config/config.yaml" /> <!--Load parameters from config files-->
+    </group>
     <node name="manipulation" pkg="manipulation" type="fsm.py" output="screen" />  
 </launch>

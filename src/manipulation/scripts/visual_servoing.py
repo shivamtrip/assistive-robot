@@ -58,13 +58,13 @@ class AlignToObject:
             'velx' : 0.7
         }
         self.kd =   {
-            'velx' : 0.1
+            'velx' : 0.0
         }         
 
         self.prevxerr = 0    
         self.isDetected = False 
         
-        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), np.deg2rad(5)] # [(left angle, right angle), stepsize]
+        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), 8] # [(left angle, right angle), stepsize]
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         self.listener = tf.TransformListener()
@@ -73,13 +73,13 @@ class AlignToObject:
 
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
         msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
+        self.intrinsics = np.array(msg.K).reshape(3,3)
         self.cameraParams = {
             'width' : msg.width,
             'height' : msg.height,
             'intrinsics' : np.array(msg.K).reshape(3,3),
             'focal_length' : self.intrinsics[0][0],
         }
-        self.intrinsics = np.array(msg.K).reshape(3,3)
         rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
         
@@ -125,14 +125,14 @@ class AlignToObject:
             'head_tilt;to' : -10 * np.pi/180,
             'head_pan;to' : self.vs_range[0][0],
         })
-        rospy.sleep(2)
+        
         nRotates = 0
         while True:
-            for i, angle in enumerate(np.arange(self.vs_range[0][0], self.vs_range[0][1], self.vs_range[1])):
+            for i, angle in enumerate(np.linspace(self.vs_range[0][0], self.vs_range[0][1], self.vs_range[1])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
-                rospy.sleep(0.5) # wait for the head to move
+                rospy.sleep(0.5)
 
             objectLocs = np.array(self.objectLocArr)
             if len(objectLocs) != 0:
@@ -296,39 +296,6 @@ class AlignToObject:
         point = self.listener.transformPoint('base_link', camera_point).point
         return point
 
-    
-    def get_transform(self, base_frame, camera_frame):
-
-        while not rospy.is_shutdown():
-            try:
-                t = self.listener.getLatestCommonTime(base_frame, camera_frame)
-                (trans,rot) = self.listener.lookupTransform(base_frame, camera_frame, t)
-
-                trans_mat = np.array(trans).reshape(3, 1)
-                rot_mat = R.from_quat(rot).as_matrix()
-                transform_mat = np.hstack((rot_mat, trans_mat))
-
-                return transform_mat
-                
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                continue
-    
-    
-    def getTransform(self, target_frame, source_frame):
-
-        if self.listener.frameExists(target_frame) and self.listener.frameExists(source_frame):
-        # if True: #TODO(@praveenvnktsh) DOWNGRADE THE PACKAGE. THIS IS A HAC
-            t = self.listener.getLatestCommonTime(target_frame, source_frame)
-            position, quaternion = self.listener.lookupTransform(target_frame, source_frame, t)
-
-            tf_matrix = self.tf_ros.fromTranslationRotation(position,quaternion)
-
-            # print("base2cam=",tf_matrix)
-
-            return tf_matrix
-        rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(target_frame, source_frame))
-        return None
-
 
     def parseScene(self, msg):
         if self.objectId is None:
@@ -350,25 +317,35 @@ class AlignToObject:
         upscale_fac = self.upscale_fac
         if len(loc) > 0:
             loc = loc[0]
-            box = np.squeeze(msg['boxes'][loc])
+            box = np.squeeze(msg['boxes'][loc]).astype(int)
             confidence = np.squeeze(msg['confidences'][loc])
             x1, y1, x2, y2 =  box
-            crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
+            # print(box)
+            crop = self.depth_image[y1 : y2, x1 : x2]
+            # crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
             
             z_f = np.median(crop[crop != 0])/1000.0
             h, w = self.depth_image.shape[:2]
-            y_new1 = w - x2 * upscale_fac
-            x_new1= y1 * upscale_fac
-            y_new2 = w - x1 * upscale_fac
-            x_new2 = y2 * upscale_fac
+            # y_new1 = w - x2 * upscale_fac
+            # x_new1 = y1 * upscale_fac
+            # y_new2 = w - x1 * upscale_fac
+            # x_new2 = y2 * upscale_fac
+            
+            # viz = crop.copy().astype(np.float32)
+            # viz /= np.max(viz)
+            # viz *= 255
+            # viz = viz.astype(np.uint8)
+            # cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
+            
+            x_f = (x1 + x2)/2
+            y_f = (y1 + y2)/2
+            
+            # x_f = (x_new1 + x_new2)/2
+            # y_f = (y_new1 + y_new2)/2
 
-            x_f = (x_new1 + x_new2)/2
-            y_f = (y_new1 + y_new2)/2
-            # print("cam frame", x_f, y_f, z_f)
             point = self.convertPointToBaseFrame(x_f, y_f, z_f)
 
             x, y, z = point.x, point.y, point.z
-            rospy.logdebug("Object detected at" + str((x, y, z)))
 
             radius = np.sqrt(x**2 + y**2)
             
@@ -377,6 +354,7 @@ class AlignToObject:
             if (z > 0.7  and radius < 2.5): # to remove objects that are not in field of view
                 self.isDetected = True
                 self.objectLocArr.append((x, y, z, confidence))
+                # rospy.loginfo("Object detected at" + str((x, y, z)))
             else:
                 self.isDetected = False
         else:
@@ -384,8 +362,8 @@ class AlignToObject:
 
     def depthCallback(self, depth_img):
         depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
-        depth_img = np.array(depth_img, dtype=np.float32)
-        self.depth_image = cv2.rotate(depth_img, cv2.ROTATE_90_CLOCKWISE)
+        self.depth_image = np.array(depth_img, dtype=np.float32)
+        # self.depth_image = cv2.rotate(depth_img, cv2.ROTATE_90_CLOCKWISE)
     
     def reset(self):
         self.isDetected = False
@@ -395,7 +373,8 @@ class AlignToObject:
 
     def alignObjectHorizontalTest(self, offset = 0.0):
         self.requestClearObject = True
-        if not self.clearAndWaitForNewObject():
+        rospy.loginfo("Waiting for clearing object")
+        if not self.clearAndWaitForNewObject(5):
             return False
 
         xerr = np.inf
@@ -431,7 +410,7 @@ class AlignToObject:
         #     return False
         return True
     
-    def alignObjectHorizontal(self, offset = 0.0):
+    def alignObjectHorizontal(self, ee_pose_x = 0.0, debug_print = None):
         self.requestClearObject = True
         if not self.clearAndWaitForNewObject():
             return False
@@ -441,28 +420,42 @@ class AlignToObject:
         prevxerr = np.inf
         curvel = 0.0
         prevsettime = time.time()
-        while abs(xerr) > 0.008:
+        moving_avg_n = 50
+        moving_avg_err = []
+        mean_err = np.inf
+        
+        while len(moving_avg_err) <= moving_avg_n and  mean_err > 0.008:
             x, y, z, confidence = self.objectLocArr[-1]
-            print(xerr)
+            # print(xerr)
             if self.isDetected:
-                xerr = (x) + offset
-            else:
-                rospy.logwarn("Object not detected. Using open loop motions")
-                xerr = (x - curvel * (time.time() - prevsettime)) + offset
+                xerr = (x - ee_pose_x)
+                
+            moving_avg_err.append(xerr)
+            if len(moving_avg_err) > moving_avg_n:
+                moving_avg_err.pop(0)
+            # else:
+            #     rospy.logwarn("Object not detected. Using open loop motions")
+            #     xerr = (x - curvel * (time.time() - prevsettime)) + offset
             rospy.loginfo("Alignment Error = " + str(xerr))
             dxerr = (xerr - prevxerr)
             vx = (self.kp['velx'] * xerr + self.kd['velx'] * dxerr)
             prevxerr = xerr
+            
+            mean_err = np.mean(np.abs(np.array(moving_avg_err)))
+            debug_print["xerr"] = xerr
+            debug_print["mean_err"] = mean_err
+            debug_print["x, y, z"] = [x, y, z]
+            print(debug_print)
             move_to_pose(self.trajectoryClient, {
                     'base_translate;vel' : vx,
-            }) 
+            }, asynchronous= True) 
             curvel = vx
             prevsettime = time.time()
             
             rospy.sleep(0.1)
         move_to_pose(self.trajectoryClient, {
             'base_translate;vel' : 0.0,
-        }) 
+        }, asynchronous= True) 
         # risk
         # if self.isDetected is False:
         #     return False
@@ -474,7 +467,10 @@ class AlignToObject:
     def main(self, objectId):
         self.objectId = objectId
         print("Triggered Visual Servoing for object of interest:" , objectId)
-        # self.alignObjectHorizontalTest()
+        # self.alignObjectHorizontal()
+        # while not rospy.is_shutdown():
+        #     rospy.sleep(0.5)
+        # exit()
         self.state = State.SEARCH
         while True:
             if self.state == State.SEARCH:
@@ -499,7 +495,7 @@ class AlignToObject:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
                     return False
-                self.state = State.ALIGN_HORIZONTAL
+                self.state = State.COMPLETE
 
             elif self.state == State.ALIGN_HORIZONTAL:
                 success = self.alignObjectHorizontal()
@@ -523,9 +519,10 @@ if __name__ == "__main__":
     switch_to_manipulation.wait_for_service()
     switch_to_manipulation()
     rospy.init_node("align_to_object", anonymous=True)
-    node = AlignToObject(39)
-    # node.main(39)
-    node.moveTowardsObject()
+    node = AlignToObject(8)
+    # node.main(8)
+    node.findAndOrientToObject()
+    # node.moveTowardsObject()
     
     try:
         rospy.spin()

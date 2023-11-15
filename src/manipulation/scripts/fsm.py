@@ -33,61 +33,14 @@ class ManipulationFSM:
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
-        # REFACTOR this to be a ros parameter loaded upon launch.
-        # self.label2name = {
-        #     0: "soda_can"
-        #     39: "bottle",
-        #     47: "apple",
-        #     65: "remote", 
-        #     46: "banana",
-        # }
-        self.label2name = {
-            0: 'soda_can',
-            1: 'tissue_paper',
-            2: 'toothbrush',
-            3: 'tie',
-            4: 'cell phone',
-            5: 'banana',
-            6: 'apple',
-            7: 'orange',
-            8: 'bottle',
-            9: 'cup',
-            10: 'teddy_bear'
-        }
 
-        #Initiliaze object specific params. 
-        self.offset_dict = {
-            'bottle': (0, 0.0, 0.0),
-            'apple': (0, 0.0, 0.0),
-            'remote': (0, 0.0, 0.0), 
-            "banana" : (0, 0.0, 0.0),
-            "soda_can" : (0, 0.0, 0.0),
-            'tissue_paper': (-0.0, 0.02, 0.05),
-            'toothbrush': (-0.0, 0.0, 0.0),
-            'tie': (-0.0, 0.0, 0.0),
-            'cell phone': (-0.0, 0.0, 0.0),
-            'orange': (-0.0, 0.0, 0.0),
-            'cup': (-0.0, 0.0, 0.0),
-            'teddy_bear': (-0.0, 0.0, 0.0)
-        } 
+        self.class_list = rospy.get_param('/object_detection/class_list')
+        self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
 
-        self.isContactDict = {
-            'bottle': False,
-            'apple':  True,
-            'remote': True,
-            'banana': True,
-            "soda_can": False,
-            'tissue_paper': False,
-            'toothbrush': False,
-            'tie': True,
-            'cell phone': True,
-            'apple': False,
-            'orange': False,
-            'bottle': False,
-            'cup': False,
-            'teddy_bear': False
-        }
-
+        self.offset_dict = rospy.get_param('/manipulation/offsets')
+        
+        self.isContactDict = rospy.get_param('/manipulation/contact')
+        
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
@@ -104,11 +57,8 @@ class ManipulationFSM:
         # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
         # self.planeFitClient.wait_for_server()
 
-
         self.visualServoing = AlignToObject(-1)
 
-        
-        
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow_robot service...")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
@@ -182,10 +132,11 @@ class ManipulationFSM:
     def main(self, goal : TriggerGoal):
         self.goal = goal
         self.state = States.IDLE
+        
         print("Requested goal", goal)
         objectManipulationState = States.PICK
         self.visualServoing.objectId = goal.objectId
-        rospy.loginfo("Stowing robot prior to manipulation!")
+        # rospy.loginfo("Stowing robot prior to manipulation!")
         self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
@@ -194,7 +145,10 @@ class ManipulationFSM:
             rospy.loginfo("Received place request.")
             objectManipulationState = States.PLACE
 
-
+        # self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
+        # ee_pose = self.manipulationMethods.getEndEffectorPose()
+        # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
+        # exit()
         nServoTriesAttempted = 0
         nServoTriesAllowed = 2
 
@@ -229,15 +183,16 @@ class ManipulationFSM:
                     self.state = States.WAITING_FOR_GRASP_AND_PLANE
                     self.send_feedback({'msg' : "moving to pregrasp pose"})
                     self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-                    self.visualServoing.alignObjectHorizontal(offset = self.manipulationMethods.getEndEffectorPose()[1])
-                    # self.requestGraspAndPlaneFit(getGrasp = True, getPlane = True)   
+                    ee_pose = self.manipulationMethods.getEndEffectorPose()
+                    self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
+                    rospy.sleep(2)
                     self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = True, getPlane = False)   
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    
+                    ee_pose = self.manipulationMethods.getEndEffectorPose()
                     x_grasp = self.grasp.x + offsets[0]
+                    y_grasp = abs(self.grasp.y - ee_pose[1]) + offsets[1]
                     z_grasp = self.grasp.z + offsets[2]
-                    y_grasp = abs(abs(self.grasp.y) - self.manipulationMethods.getEndEffectorPose()[0]) + offsets[1]
-                    
+                    # exit()
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
                         x_grasp, 
@@ -268,7 +223,6 @@ class ManipulationFSM:
                     move_to_pose(self.trajectoryClient, {
                         'head_pan;to' : -np.pi/2,
                     })
-                    rospy.sleep(0.5)
                     move_to_pose(
                         self.trajectoryClient,
                         {

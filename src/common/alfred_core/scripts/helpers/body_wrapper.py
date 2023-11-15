@@ -30,8 +30,11 @@ class JointTrajectoryAction:
             'arm' : False,
             'lift' : False
         }
+        
+        joints_to_wait = []
         for i, name in enumerate(goal.trajectory.joint_names):
             joint, motionType = name.split(';')
+            joints_to_wait.append(joint)
             point = goal.trajectory.points[0]
             pos = point.positions[i]
             effort = point.effort[i]
@@ -86,29 +89,38 @@ class JointTrajectoryAction:
         if wait_for_contact['lift']:
             self.robot.lift.wait_for_contact()
         else:
-            self.robot.lift.wait_until_at_setpoint()
+            if 'lift' in joints_to_wait:
+                self.robot.lift.wait_until_at_setpoint()
 
         if wait_for_contact['arm']:
             self.robot.arm.wait_for_contact()
         else:
-            self.robot.arm.wait_until_at_setpoint()
+            if 'arm' in joints_to_wait:
+                self.robot.arm.wait_until_at_setpoint()
         
         # rospy.loginfo("Waiting for base to stop moving")
         # self.robot.base.wait_until_at_setpoint()
-        while self.robot.head.motors['head_pan'].motor.is_moving():
-            rospy.loginfo("head_pan is still moving")
-            time.sleep(0.1)
-        while self.robot.head.motors['head_tilt'].motor.is_moving():
-            rospy.loginfo("head_tilt is still moving")
-            time.sleep(0.1)
+        if 'head_pan' in joints_to_wait:
+            while self.robot.head.motors['head_pan'].motor.is_moving():
+                rospy.loginfo("head_pan is still moving")
+                time.sleep(0.1)
+                
+        if 'head_tilt' in joints_to_wait:
+            while self.robot.head.motors['head_tilt'].motor.is_moving():
+                rospy.loginfo("head_tilt is still moving")
+                time.sleep(0.1)
             
-        while self.robot.end_of_arm.motors['wrist_yaw'].motor.is_moving():
-            rospy.loginfo("wrist_yaw is still moving")
-            time.sleep(0.1)
-        while self.robot.end_of_arm.motors['stretch_gripper'].motor.is_moving():
-            rospy.loginfo("stretch_gripper is still moving")
-            time.sleep(0.1)
+        if "wrist_yaw" in joints_to_wait:
+            while self.robot.end_of_arm.motors['wrist_yaw'].motor.is_moving():
+                rospy.loginfo("wrist_yaw is still moving")
+                time.sleep(0.1)
             
+        
+        if "stretch_gripper" in joints_to_wait:
+            while self.robot.end_of_arm.motors['stretch_gripper'].motor.is_moving():
+                rospy.loginfo("stretch_gripper is still moving")
+                time.sleep(0.1)
+                
         rospy.loginfo("Complete")
         self.success_callback("set command.")
         # self.robot_mode_rwlock.release_read()
