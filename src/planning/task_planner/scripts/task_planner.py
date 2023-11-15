@@ -260,7 +260,7 @@ class TaskPlanner:
             rospy.loginfo("Updating operation mode to autonomous")
             self.bot_state.update_operation_mode(OperationModes.AUTONOMOUS)
         elif msg.primitive != 'do_nothing':
-            self.navigationGoal, self.objectOfInterest = self.mappings[msg.primitive]
+            self.navigationGoal, self.objectOfInterest = self.mappings[(msg.primitive)]
             self.executeTask()
 
         return GlobalTaskResponse(success = True)

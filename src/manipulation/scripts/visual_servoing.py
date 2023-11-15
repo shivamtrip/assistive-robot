@@ -64,7 +64,7 @@ class AlignToObject:
         self.prevxerr = 0    
         self.isDetected = False 
         
-        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), 8] # [(left angle, right angle), stepsize]
+        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), 12] # [(left angle, right angle), stepsize]
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         self.listener = tf.TransformListener()
@@ -219,7 +219,7 @@ class AlignToObject:
         maxGraspableDistance = 0.77
         if self.objectId == 41:
             maxGraspableDistance = 1
-
+            
         distanceToMove = self.computeObjectLocation(self.objectLocArr)[3] - maxGraspableDistance
         rospy.loginfo("Object distance = {}".format(self.computeObjectLocation(self.objectLocArr)[4]))
         # rospy.loginfo("Distance to move = {}. Threshold = {}".format(distanceToMove, distanceThreshold))

@@ -221,7 +221,7 @@ class ManipulationMethods:
                 break
             move_to_pose(trajectory_client, {
                 'lift;to': curz - 0.01,
-            })
+            }, asynchronous = True)
             rospy.sleep(0.05)
         move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
             'lift;to': curz + 0.04,

@@ -122,7 +122,7 @@ class BotStateManager():
         self.state_dict["global_state"] = self.currentGlobalState.name
         self.state_dict['current_task']["origin"] = self.navigationOrigin.name
         self.state_dict['current_task']["goal"] = self.navigationGoal.name
-        self.state_dict['current_task']["object_of_interest"] = self.objectOfInterest.name
+        self.state_dict['current_task']["object_of_interest"] = self.objectOfInterest
 
         # emotion params
 

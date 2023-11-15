@@ -24,8 +24,8 @@ class HRI():
         self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
         
         rospy.loginfo("Waiting for services")
-        # self.startedListeningService.wait_for_service()
-        # self.commandService.wait_for_service()
+        self.startedListeningService.wait_for_service()
+        self.commandService.wait_for_service()
         rospy.loginfo("HRI Node ready")
         self.attention_sounds = ["uh yes?", "yes?", "what's up?", "how's life?", "hey!", "hmm?"]
 
@@ -55,7 +55,7 @@ class HRI():
 
     def wakeword_triggered(self):
         print("Wakeword triggered!")
-        # self.startedListeningService()
+        self.startedListeningService()
         # thread = Thread(target=self.triggerWakewordThread)
         # thread.start()
         self.triggerWakewordThread()
@@ -71,7 +71,7 @@ class HRI():
         print(text, primitive, response)
         task = GlobalTaskRequest(speech = text, type = primitive, primitive = primitive)
         self.wakeword_detector.startRecorder()
-        # self.commandService(task)
+        self.commandService(task)
     def run(self):
         self.wakeword_detector.run()
 

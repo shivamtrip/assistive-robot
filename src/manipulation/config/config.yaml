@@ -8,7 +8,7 @@ offsets:
   tissue_paper: [-0.0, 0.02, 0.05]
   toothbrush: [-0.0, 0.0, 0.0]
   tie: [-0.0, 0.0, 0.0]
-  cell_phone: [-0.0, 0.0, 0.0]
+  cell phone: [-0.0, 0.0, 0.0]
   orange: [-0.0, 0.0, 0.0]
   cup: [-0.0, 0.0, 0.0]
   teddy_bear: [-0.0, 0.0, 0.0]
@@ -22,7 +22,7 @@ contact:
   tissue_paper: false
   toothbrush: false
   tie: true
-  cell_phone: true
+  cell phone: true
   orange: false
   cup: false
   teddy_bear: false
