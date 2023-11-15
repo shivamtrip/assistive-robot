@@ -9,6 +9,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
 import time
+import tf
 # from visual import AlignToObject
 
 def get_camera_params(camera_info_topic):
@@ -62,6 +63,7 @@ class ArUcoDetector:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
         self.pose_pub = rospy.Publisher("/aruco/pose", PoseStamped, queue_size=1)
+        self.aruco_tf_broadcaster = tf.TransformBroadcaster()
         self.image_pub = rospy.Publisher("/aruco/image", Image, queue_size=1)
         self.detections = []
         self.lastDetectedtime = time.time()
@@ -72,6 +74,7 @@ class ArUcoDetector:
         # Convert ROS image message to OpenCV image
         detections = []
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        # print('ros time:',time.time())
         # cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
 
         # Detect ArUco markers
@@ -100,6 +103,10 @@ class ArUcoDetector:
                 pose_msg.pose.orientation.z = quat[2][0]
                 pose_msg.pose.orientation.w = 1.0
                 detections.append((id, pose_msg))
+
+                quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
+                quaternion = quaternion/np.linalg.norm(quaternion)
+                self.aruco_tf_broadcaster.sendTransform((tvec[0][0], tvec[0][1], tvec[0][2]),quaternion,rospy.Time.now(),"aruco_pose","camera_color_optical_frame")
                 
                 if(id==0):
                     # print("Detected Aruco ID: ", id)
@@ -107,6 +114,8 @@ class ArUcoDetector:
             self.lastDetectedTime = time.time()
             self.detections = detections
             self.ids = ids
+        else:
+            self.detections = []
 
 if __name__ == '__main__':
     rospy.init_node('arucodetector')

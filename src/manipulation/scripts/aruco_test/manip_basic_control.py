@@ -73,20 +73,21 @@ class ManipulationMethods:
             "wrist_yaw;to" : 0,
             
         })
-        move_to_pose(trajectoryClient, {
-            "stretch_gripper;to" : 100,
-        })
+        # move_to_pose(trajectoryClient, {
+        #     "stretch_gripper;to" : 100,
+        # })
+        rospy.sleep(5)
         rospy.loginfo("Pregrasp pose achieved.")
         # rospy.sleep(25)
 
     def getEndEffectorPose(self):
-        from_frame_rel = 'base_link'
-        to_frame_rel = 'link_grasp_center'
+        to_frame_rel = 'base_link'
+        from_frame_rel = 'link_grasp_center'
         while not rospy.is_shutdown():
             try:
                 translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
                 rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
-                return [abs(translation[0]), translation[1], translation[2]]
+                return translation
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 continue
             
@@ -100,28 +101,50 @@ class ManipulationMethods:
         print("reading distance",msg.data)
         self.grip_dist = msg.data
 
-    def pick(self, trajectoryClient, x, y, z, theta, moveUntilContact = False):
+    def pick(self, trajectoryClient, x, y, z, theta, moveUntilContact = False, place = False):
         """ Called after the pregrasp pose is reached"""
         # rospy.sleep(200)
         print("Extending to ", x, y, abs(z), theta)
         print("EXECUTING GRASP")
 
         move_to_pose(trajectoryClient, {
-            "lift;to": z+0.06, # have added + 0.06 for cm offset from aruco with bottle
+            "lift;to": z+0.03, # have added + 0.03 for cm offset from aruco with bottle
         })
         rospy.sleep(3)
-
+        if not place:
+            move_to_pose(trajectoryClient, {
+                "stretch_gripper;to": 100,
+            })
+        rospy.sleep(3)
         move_to_pose(trajectoryClient, {
-            "arm;to": (abs(y+0.07)-abs(y-0.4)), # + 0.07 for cm offset from aruco with center of bottle
+            "arm;to": y + 0.08, # + 0.08 for cm offset from aruco with center of bottle
         })
-        rospy.sleep(30)
-        rospy.loginfo("Object grabbed")
+        # rospy.sleep(30)
 
-        rospy.sleep(5)
+        rospy.sleep(10)
         # self.stow_robot_service()
+        if place:
+            move_to_pose(trajectoryClient, {
+                "stretch_gripper;to": 100,
+            })
+            rospy.loginfo("Object release attempted.") 
+
+        else:
+            move_to_pose(trajectoryClient, {
+                "stretch_gripper;to": -40,
+            })
+            rospy.loginfo("Object grab attempted.") 
+        rospy.sleep(5)
+        move_to_pose(trajectoryClient, {
+            "lift;to": z + 0.10,
+        })
 
         move_to_pose(trajectoryClient, {
            "arm;to" : 0,
+        })
+
+        move_to_pose(trajectoryClient, {
+           "wrist_yaw;to" : np.pi,
         })
         rospy.sleep(10)
 
@@ -134,19 +157,7 @@ class ManipulationMethods:
             )
         
         move_to_pose(trajectoryClient, {
-            "stretch_gripper;to": -40,
-        })
-
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": z + 0.10,
-        })
-        rospy.sleep(3)
-
-
-        rospy.sleep(0.1)
-        move_to_pose(trajectoryClient, {
-            "head;to": 0,
+            "head_pan;to": 0,
         }
         )
 

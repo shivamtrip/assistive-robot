@@ -47,7 +47,7 @@ class AlignToObject:
         self.cameraParams = {}
         self.debug_out = True
         
-        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), np.deg2rad(5)] # [(left angle, right angle), stepsize]
+        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), np.deg2rad(15)] # [(left angle, right angle), stepsize]
 
         self.x, self.y, self.z = 0, 0, 0
         self.obtainedInitialImages = False
@@ -79,30 +79,29 @@ class AlignToObject:
         print("STARTING SEARCH")
         nRotates = 0
         while True:
+            poses = []
             for i, angle in enumerate(np.arange(self.vs_range[0][0], self.vs_range[0][1], self.vs_range[1])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
+                    # 'head_pan;to' : 0,
                 })
-                rospy.sleep(0.5) # wait for the head to move
-            _,[x, y, z]=self.movebot.getArucoLocation()
-            if(self.movebot.getArucoLocation()):
-                break
-
-            # objectLocs = np.array(self.objectLocArr)
-            if self.movebot.getArucoLocation():
-
-                _,[x, y, z]=self.movebot.getArucoLocation()
-                self.objectLocation = [x, y, z]
-                self.requestClearObject = True
-                # self.maxDistanceToMove = radius
-                    
+                rospy.sleep(1) # wait for the head to move
+                result = self.movebot.getArucoLocation()
+                if result is not None:
+                    poses.append(result.copy())
+                # rospy.sleep(0) # wait for the head to move
+            # This part of the code stitches detections together.
+            if len(poses) != 0:
+                pose_est = np.mean(poses, axis = 0)
+                x_est, y_est, z_est = pose_est
+                angle =  np.arctan2(y_est, x_est)
                 move_to_pose(self.trajectoryClient, {
-                    'base_rotate;by' : np.arctan2(y,x),
+                    'base_rotate;by' : angle,
                 })
                 move_to_pose(self.trajectoryClient, {
-                    'head_pan;to' : 0,
+                    'head_pan;to' : 0
                 })
-                rospy.loginfo(f"Rotated base by: {np.arctan2(y,x)} degrees")
+                rospy.loginfo(f"Rotated base by: {angle} degrees")
                 break
             else:
                 rospy.loginfo("Object not found, rotating base.")
@@ -115,7 +114,6 @@ class AlignToObject:
 
             if nRotates >= 3:
                 return False
-        print("Found object at ", angle)
         rospy.sleep(1)
         return True
 
@@ -156,14 +154,16 @@ class AlignToObject:
             'head_tilt;to' : -30 * np.pi/180,
         })
 
-
-
         maxGraspableDistance = 0.77
 
+        result = self.movebot.getArucoLocation()
+        if result is None:
+            return False
+        
+        distanceToMove = result[1] - maxGraspableDistance
 
-        distanceToMove = self.objectLocation[1] - maxGraspableDistance
         if distanceToMove < 0:
-            rospy.loginfo("Object is close enough. Not moving.")
+            rospy.loginfo("\nObject is close enough already. The robot doesn't need to move further forward.")
             return True
         rospy.sleep(5)
         while True:
@@ -175,19 +175,24 @@ class AlignToObject:
             })
 
             # rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
-            if 1:
-                if self.movebot.getArucoLocation():
-                    lastDetectedTime = time.time()
-                    if self.objectLocation[1] < maxGraspableDistance:
-                        rospy.loginfo("Object is close enough. Stopping.")
-                        break
-                if distanceMoved >= distanceToMove - 0.3:
-                    if time.time() - lastDetectedTime > intervalBeforeRestart:
-                        rospy.loginfo("Lost track of the object. Going back to search again.")
-                        move_to_pose(self.trajectoryClient, {
-                            'base_translate;vel' : 0.0,
-                        })  
-                        return False
+            result = self.movebot.getArucoLocation()
+        
+            if result is not None:
+                x, y, z = result
+                lastDetectedTime = time.time()
+                if y < maxGraspableDistance:
+                    rospy.loginfo("Object is close enough now. Stopping the robot.")
+                    break
+                lastDetectedTime = time.time()
+            else:
+                pass
+            if distanceMoved >= distanceToMove - 0.3:
+                if time.time() - lastDetectedTime > intervalBeforeRestart:
+                    rospy.loginfo("Lost track of the object. Going back to search again.")
+                    move_to_pose(self.trajectoryClient, {
+                        'base_translate;vel' : 0.0,
+                    })  
+                    return False
             else: # open loop movement for the table
                 if distanceMoved >= distanceToMove:
                     break
@@ -202,7 +207,6 @@ class AlignToObject:
 
 
     def alignObjectForManipulation(self):
-        print("Aligning object for manipulation")
         move_to_pose(self.trajectoryClient, {
                 'head_pan;to' : -np.pi/2,
             }
@@ -211,7 +215,7 @@ class AlignToObject:
                 'base_rotate;by' : np.pi/2,
             }
         )
-        rospy.sleep(4)
+        rospy.sleep(2)
         return True
 
         
@@ -244,19 +248,28 @@ class AlignToObject:
         # if not self.clearAndWaitForNewObject():
         #     return False
 
-        xerr = 0.09
+        xerr = np.inf
         rospy.loginfo("Aligning object horizontally")
         prevxerr = 0
         curvel = 0.0
+
+        result = self.movebot.getArucoLocation()
+        if result is not None:
+            x, y, z = result
+            xerr = (x - offset)
+        else:
+            return False
         prevsettime = time.time()
-        while abs(xerr) > 0.008:
-            # x = self.objectLocation[0]
-            _,[x,y,z]=self.movebot.getArucoLocation()
-            # if self.isDetected:
-            xerr = (x) + offset
-            # else:
-            #     rospy.logwarn("Object not detected. Using open loop motions")
-            xerr = (x - curvel * (time.time() - prevsettime)) + offset
+        while abs(xerr) > 0.005:
+
+            result = self.movebot.getArucoLocation()
+            if result is not None:
+                x, y, z = result
+                xerr = (x - offset)
+            else:
+                rospy.logwarn("Object not detected. Using open loop motions")
+                xerr = (x - curvel * (time.time() - prevsettime)) + offset
+            
             rospy.loginfo("Alignment Error = " + str(xerr))
             dxerr = (xerr - prevxerr)
             vx = (self.kp['velx'] * xerr + self.kd['velx'] * dxerr)
@@ -277,7 +290,7 @@ class AlignToObject:
     def recoverFromFailure(self):
         pass
 
-    def main(self):
+    def main(self, place = False):
         
         self.state = State.SEARCH
         while True:
@@ -287,7 +300,8 @@ class AlignToObject:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
                     return False
-                rospy.loginfo("\n Object found and oriented.")
+                rospy.loginfo("\n Object found and oriented.\nAbout to check if object is too far.")
+                rospy.sleep(2)
                 self.state = State.MOVE_TO_OBJECT
 
             elif self.state == State.MOVE_TO_OBJECT:
@@ -296,7 +310,8 @@ class AlignToObject:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
                     return False
-                rospy.loginfo("\n Object found and move successful.")
+                rospy.loginfo("\nAbout to align the robot.")
+                rospy.sleep(2)
                 self.state = State.ROTATE_90
 
             elif self.state == State.ROTATE_90:
@@ -306,11 +321,15 @@ class AlignToObject:
                     self.reset()
 
                     return False
-                rospy.loginfo("\n Object found and rotated.")
+                rospy.loginfo("\nThe robot will now align itself to the object.")
+                rospy.sleep(2)
                 self.state = State.ALIGN_HORIZONTAL
 
             elif self.state == State.ALIGN_HORIZONTAL:
-                success = self.alignObjectHorizontal()
+                self.movebot.manipulationMethods.move_to_pregrasp(self.trajectoryClient) # Received at height, opens the gripper and makes yaw 0
+                ee_x, ee_y, ee_z = self.movebot.manipulationMethods.getEndEffectorPose() # Transforming from base coordinate to gripper coordinate and retrieving the displacement in x
+                # print(ee_x, ee_y, ee_z)
+                success = self.alignObjectHorizontal(offset = ee_x - 0.07) # Fixing the displacement in x
                 if not success:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
@@ -320,9 +339,15 @@ class AlignToObject:
                 self.state = State.COMPLETE
 
             elif self.state == State.COMPLETE:
+                if not place:
+                    self.movebot.deliverIceCream()
+                    self.main(True)
+                else:
+                    self.movebot.place()
                 break
+
+
             rospy.sleep(0.5)
-        print("Visual Servoing Complete")
         self.reset()
         return True
     
