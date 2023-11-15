@@ -111,7 +111,6 @@ class GraspDetector():
         self.cameraInfoSub.unregister()
 
     def getBboxes(self,msg):
-        
         num_detections = (msg.nPredictions)
         self.bboxes = {
             "boxes" : np.array(msg.box_bounding_boxes).reshape(num_detections,4),
@@ -140,11 +139,11 @@ class GraspDetector():
         #     cloud = np.stack([points_x, points_y, points_z], axis=-1)
         #     pcd_points = cloud.reshape([-1, 3])
         #     pcd_points = np.hstack((pcd_points,np.ones((pcd_points.shape[0],1)))) 
-        #     transform_mat = self.getTransform('/base_link', '/camera_depth_optical_frame')            
-        #     pcd_points = np.matmul(transform_mat,pcd_points.T).T  
+            # transform_mat = self.getTransform('/base_link', '/camera_depth_optical_frame')            
+            # pcd_points = np.matmul(transform_mat,pcd_points.T).T  
 
-        #     #filter ground plane
-        #     pcd_points = pcd_points[pcd_points[:,2]>0.2]
+            #filter ground plane
+            # pcd_points = pcd_points[pcd_points[:,2]>0.2]
 
             #visualize point clouds using o3d
             # pcd = o3d.geometry.PointCloud()
@@ -240,7 +239,7 @@ class GraspDetector():
     def inference(self, goal):
         self.objectOfInterest = goal.request
         box_dict = self.bboxes
-        rospy.loginfo(f"[{rospy.get_name()}] " + "grasp generation failed since transforms are unavailable.")
+        rospy.loginfo(f"[{rospy.get_name()}] " + "Generating grasps.")
 
         source_frame = self.transform_source_frame
         target_frame = self.transform_target_frame
@@ -257,7 +256,7 @@ class GraspDetector():
         mask = None
         for idx,label in enumerate(box_dict["box_classes"]):
             if(int(label)==self.objectOfInterest):
-                mask = np.array(box_dict["boxes"][idx]).astype(np.int32)*self.image_scale
+                mask = np.array(box_dict["boxes"][idx]).astype(np.int32)#*self.image_scale
         
         if mask is None:
             rospy.logerr(f"[{rospy.get_name()}] " + "grasp generation failed since object is not in field of view of the robot.")

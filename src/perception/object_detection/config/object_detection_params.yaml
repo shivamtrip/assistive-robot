@@ -1,6 +1,7 @@
 
 base_model: 'yolov8x.pt'
 custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/sodacan_tissue.pt'
+# custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/drawers.pt'
 
 subscribe_topic: '/camera/color/small_image'
 # subscribe_topic: '/camera/color/image_raw'
@@ -13,11 +14,12 @@ device_1: 'cuda:0'
 device_2: 'cuda:1'
 
 class_list:
+  # - 'drawer'
   - 'soda_can'
   - 'tissue_paper'
   - 'toothbrush'
   - 'tie'
-  - 'cell phone'
+  - 'cell_phone'
   - 'banana'
   - 'apple'
   - 'orange'

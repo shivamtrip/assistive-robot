@@ -28,6 +28,7 @@ class PlaneDetector:
         
         self.server = actionlib.SimpleActionServer('plane_detector', PlaneDetectAction, self.getPlane, False)
 
+
         self.point_cloud_topic = rospy.get_param('plane_detector/point_cloud_topic')
         self.base_frame = rospy.get_param('plane_detector/base_frame')
         self.camera_frame = rospy.get_param('plane_detector/camera_frame')

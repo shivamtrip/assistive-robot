@@ -77,24 +77,38 @@ class GraspGenerator:
         y1 = bbox[1]
         x2 = bbox[2]
         y2 = bbox[3]
-        print(x1, y1, x2, y2)
+        
+        # y_new1 = w - x2 * upscale_fac
+        # x_new1 = y1 * upscale_fac
+        # y_new2 = w - x1 * upscale_fac
+        # x_new2 = y2 * upscale_fac
+        
+        
         h, w = color.shape[:2]
-        x1 = h - x1
-        x2 = h - x2
+        
 
         self.workspace_mask = np.zeros((color.shape[0],color.shape[1]),dtype=np.uint8)
         self.workspace_mask[
-            x2-inflate:x1+inflate,
-            y1-inflate:y2 - inflate
+            y1:y2,
+            x1:x2,
         ] = 255
 
-        print("New bb", x2, x1, y1, y2)
+        # self.workspace_mask[
+        #     y1-inflate:y2 + inflate,
+        #     x1-inflate : x2+inflate,
+        # ] = 255
+
+        print("New bb", x1, x2, y1, y2)
 
         factor_depth = 1000
         
         camera = CameraInfo(self.color.shape[1], self.color.shape[0], intrinsic[0][0], intrinsic[1][1], intrinsic[0][2], intrinsic[1][2], factor_depth)
 
         # print("camera=",(camera.height,camera.width))
+        color = self.color * np.stack([self.workspace_mask, self.workspace_mask, self.workspace_mask], axis=2)
+        cv2.imwrite('/home/praveen/alfred-autonomy/src/perception/grasp_detector/scripts/color.png',color)
+        cv2.imwrite('/home/praveen/alfred-autonomy/src/perception/grasp_detector/scripts/color_full.png',(self.color * 255).astype(np.uint8))
+        
         cloud = create_point_cloud_from_depth_image(depth, camera, organized=True) #shape=(480,640,3)
         mask = (self.workspace_mask & (depth > 0)) #shape =(720,1280)
       
