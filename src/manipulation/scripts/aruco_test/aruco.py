@@ -9,6 +9,7 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
 import time
+# from visual import AlignToObject
 
 def get_camera_params(camera_info_topic):
     """
@@ -24,6 +25,7 @@ def get_camera_params(camera_info_topic):
     distortion_coefficients = None
 
     def camera_info_callback(msg):
+        print("Inside camera info callback")
         nonlocal camera_matrix, distortion_coefficients
         camera_matrix = np.array(msg.K).reshape((3, 3))
         distortion_coefficients = np.array(msg.D)
@@ -31,8 +33,11 @@ def get_camera_params(camera_info_topic):
     # Subscribe to the camera info topic and wait for first message
     rospy.loginfo(f"Subscribing to camera info topic '{camera_info_topic}'...")
     sub = rospy.Subscriber(camera_info_topic, CameraInfo, camera_info_callback)
+    print("About to see camera matrix")
     while camera_matrix is None or distortion_coefficients is None:
         rospy.sleep(0.1)
+        print("Seeing camera matrix")
+    print("Saw camera matrix")
     sub.unregister()
     rospy.loginfo("Received camera parameters:")
     rospy.loginfo(f"Camera matrix: {camera_matrix}")
@@ -106,4 +111,5 @@ class ArUcoDetector:
 if __name__ == '__main__':
     rospy.init_node('arucodetector')
     aruco_detector = ArUcoDetector()
+    print("Inside the main function")
     rospy.spin()

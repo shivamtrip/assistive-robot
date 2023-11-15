@@ -19,14 +19,13 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
-
 from std_srvs.srv import Trigger, TriggerResponse
 import tf
 
 class MoveRobot:
 
     def __init__(self):
-        rospy.init_node('move_robot')
+        # rospy.init_node('move_robot')
 
         # self.hri = HRI(self.deliverIceCream)
         self.x=0
@@ -55,6 +54,7 @@ class MoveRobot:
         return True
     
     def getTransform(self):
+        print("Inside the transform function")
         from_frame_rel = '/camera_color_optical_frame'
         to_frame_rel = '/base_link'
         lastCommonTime =  self.listener.getLatestCommonTime(to_frame_rel, from_frame_rel)
@@ -106,34 +106,39 @@ class MoveRobot:
         self.marker_pub.publish(marker)
 
     def getArucoLocation(self, index = 0) -> PoseStamped:
+        print("Inside the function")
         detections = self.arucos.detections
         ids = [det[0] for det in detections]
-        
-        while index not in ids:
-            detections = self.arucos.detections
-            ids = [det[0] for det in detections]
-            continue
-        
-        idx = ids.index(index)
-        _,  detection = detections[idx]
+        print("detections received")
+        # while index not in ids:
+        #     detections = self.arucos.detections
+        #     ids = [det[0] for det in detections]
+        #     continue
+        print("going fine")
+        try:
+            
+            idx = ids.index(index)
+            _,  detection = detections[idx]
+            print("goingfine")
+            x, y, z= detection.pose.position.x, detection.pose.position.y, detection.pose.position.z
+            print("Retreiving transforms")
+            transform = self.getTransform()
+            # self.publishTransform(transform, 'base_link', 'your_visualized_frame')
 
-        x, y, z= detection.pose.position.x, detection.pose.position.y, detection.pose.position.z
-        transform = self.getTransform()
-        # self.publishTransform(transform, 'base_link', 'your_visualized_frame')
-
-        print("\nBottle coordinates before transformation:",x,y,z)
-        # x, y, z = np.dot(translation, np.array([1, 0, 0])), np.dot(translation, np.array([0, 1, 0])), np.dot(translation, np.array([0, 0, 1]))
-        aruco_coord_in_base_frame = np.dot(transform, np.array([[x, y, z, 1]]).T)
-        print("ARUCO", aruco_coord_in_base_frame)
-        self.publishMarker(x, y, z)
-
-        print("\nBottle coordinates after transformation:",x,y,z)
-        # rospy.sleep(30)
-        # print(x, y, z)
+            print("\nBottle coordinates before transformation:",x,y,z)
+            # x, y, z = np.dot(translation, np.array([1, 0, 0])), np.dot(translation, np.array([0, 1, 0])), np.dot(translation, np.array([0, 0, 1]))
+            aruco_coord_in_base_frame = np.dot(transform, np.array([[x, y, z, 1]]).T)
+            print("ARUCO", aruco_coord_in_base_frame)
+            self.publishMarker(x, y, z)
+            
+            print("\nBottle coordinates after transformation:",x,y,z)
+            # rospy.sleep(30)
+            # print(x, y, z)
 
 
-        return detection, [x, y, z]
-
+            return _, [x, y, z]
+        except:
+            print("Aruco not found")
 
     def deliverIceCream(self):
         # self.moveToGraspPose()
@@ -143,23 +148,23 @@ class MoveRobot:
         # print(detections)
         # detection = np.random.choice(detections)
         det, _ = self.getArucoLocation()
-        self.rotateBase()
-        # self.moveToGraspPose()
-        det, _ = self.getArucoLocation()
-        self.alignWithAruco()
-        det, _ = self.getArucoLocation()
-        self.grasp(det)
+        # self.rotateBase()
+        # # self.moveToGraspPose()
+        # det, _ = self.getArucoLocation()
+        # self.alignWithAruco()
+        _,[x, y, z], _ = self.getArucoLocation()
+        self.grasp([0, y, z])
         # self.moveToTable()
         # self.place()
         rospy.loginfo("Pick cycle completed")
 
-    def alignWithAruco(self):
-        rospy.loginfo("Aligning object horizontally")
-        det ,  trans = self.getArucoLocation()
-        move_to_pose(self.trajectoryClient, {
-            'base_translate;by' : trans[0],
-        }) 
-        rospy.sleep(5)
+    # def alignWithAruco(self):
+    #     rospy.loginfo("Aligning object horizontally")
+    #     det ,  trans = self.getArucoLocation()
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_translate;by' : trans[0],
+    #     }) 
+    #     rospy.sleep(5)
         # prevxerr = np.inf
         # xerr = np.inf
         # curvel = 0.0
@@ -186,29 +191,29 @@ class MoveRobot:
         # # risk
         # # if self.isDetected is False:
         # #     return False
-        return True
-    def rotateBase(self):
-        rospy.loginfo(f"Moving robot towards object by {abs(self.y-0.4)} meters")
-        if(self.y>0.4):    
-            move_to_pose(self.trajectoryClient, {
-                'base_translate;by': (abs(self.y)-0.4),
-            })
-        rospy.sleep(5)
-        move_to_pose(self.trajectoryClient, {
-            'base_translate;vel' : 0.4,
-        })
-        rospy.sleep(1)
-        # move_to_pose(self.trajectoryClient, {
-        #     'base_translate;vel' : 0.0,
-        # })
-        rospy.sleep(6)
-        move_to_pose(self.trajectoryClient, {
-            'base_rotate;by': np.pi/2,
-        })
-        rospy.sleep(3)
-        move_to_pose(self.trajectoryClient, {
-            "head_pan;to" : -np.pi/2})
-        rospy.sleep(5)
+        # return True
+    # def rotateBase(self):
+    #     rospy.loginfo(f"Moving robot towards object by {abs(self.y-0.4)} meters")
+    #     if(self.y>0.4):    
+    #         move_to_pose(self.trajectoryClient, {
+    #             'base_translate;by': (abs(self.y)-0.4),
+    #         })
+    #     rospy.sleep(5)
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_translate;vel' : 0.4,
+    #     })
+    #     rospy.sleep(1)
+    #     # move_to_pose(self.trajectoryClient, {
+    #     #     'base_translate;vel' : 0.0,
+    #     # })
+    #     rospy.sleep(6)
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_rotate;by': np.pi/2,
+    #     })
+    #     rospy.sleep(3)
+    #     move_to_pose(self.trajectoryClient, {
+    #         "head_pan;to" : -np.pi/2})
+    #     rospy.sleep(5)
 
     def run(self):
         move_to_pose(
@@ -235,12 +240,12 @@ class MoveRobot:
             'base_rotate;by' : -np.pi/2
         })
 
-    def grasp(self, detection : PoseStamped):
+    def grasp(self, a):
         # pass
-        x, y, z= detection.pose.position.x, detection.pose.position.y, detection.pose.position.z
-        transform = self.getTransform()
+        x, y, z= a[0], a[1], a[2]
+        # transform = self.getTransform()
         # x, y, z = np.dot(translation, np.array([1, 0, 0])), np.dot(translation, np.array([0, 1, 0])), np.dot(translation, np.array([0, 0, 1]))
-        x, y, z = np.dot(transform, np.array([x, y, z, 1]))[:3]
+        # x, y, z = np.dot(transform, np.array([x, y, z, 1]))[:3]
         # print(x, y, z)
         self.x=x
         self.y=y
@@ -261,63 +266,64 @@ class MoveRobot:
 
         
 
-    def moveToGraspPose(self):
-        move_to_pose(self.trajectoryClient, {
-            'base_rotate;by': np.pi/2,
-        })
-        rospy.sleep(2)
-        move_to_pose(self.trajectoryClient, {
-            'base_translate;by': 0.5,
-        })
-        rospy.sleep(5)
-        move_to_pose(self.trajectoryClient, {
-            'base_rotate;by': np.pi/2,
-        })
-        rospy.sleep(0.5)
-        move_to_pose(self.trajectoryClient, {
-            "head_pan;to" : -np.pi/2
-        })
-        rospy.sleep(0.5)
-        move_to_pose(self.trajectoryClient, {
-            # 'head_pan;to': -np.pi/2,
-            'head_tilt;to': -20  * np.pi/ 180,
-        })
-        rospy.sleep(2)
+    # def moveToGraspPose(self):
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_rotate;by': np.pi/2,
+    #     })
+    #     rospy.sleep(2)
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_translate;by': 0.5,
+    #     })
+    #     rospy.sleep(5)
+    #     move_to_pose(self.trajectoryClient, {
+    #         'base_rotate;by': np.pi/2,
+    #     })
+    #     rospy.sleep(0.5)
+    #     move_to_pose(self.trajectoryClient, {
+    #         "head_pan;to" : -np.pi/2
+    #     })
+    #     rospy.sleep(0.5)
+    #     move_to_pose(self.trajectoryClient, {
+    #         # 'head_pan;to': -np.pi/2,
+    #         'head_tilt;to': -20  * np.pi/ 180,
+    #     })
+    #     rospy.sleep(2)
 
 
 
-    def moveToTable(self):
-        # pass
-        move_to_pose(
-            self.trajectoryClient,
-            {
-                "base_rotate;by" : np.pi/2
-            }
-        )
-        rospy.sleep(3)
-        move_to_pose(
-            self.trajectoryClient,
-            {
-                "base_translate;by" : 2
-            }
-        )
-        rospy.sleep(10)
-        move_to_pose(
-            self.trajectoryClient,
-            {
-                "base_rotate;by" : np.pi/2
-            }
-        )
-        rospy.sleep(5)
-        # move_to_pose(
-        #     self.trajectoryClient,
-        #     {
-        #         "base_rotate;by" : -np.pi/2
-        #     }
-        # )
+    # def moveToTable(self):
+    #     # pass
+    #     move_to_pose(
+    #         self.trajectoryClient,
+    #         {
+    #             "base_rotate;by" : np.pi/2
+    #         }
+    #     )
+    #     rospy.sleep(3)
+    #     move_to_pose(
+    #         self.trajectoryClient,
+    #         {
+    #             "base_translate;by" : 2
+    #         }
+    #     )
+    #     rospy.sleep(10)
+    #     move_to_pose(
+    #         self.trajectoryClient,
+    #         {
+    #             "base_rotate;by" : np.pi/2
+    #         }
+    #     )
+    #     rospy.sleep(5)
+    #     # move_to_pose(
+    #     #     self.trajectoryClient,
+    #     #     {
+    #     #         "base_rotate;by" : -np.pi/2
+    #     #     }
+    #     # )
 
     
 
 if __name__ == "__main__":
+    rospy.init_node('move_robot')
     moveRobot = MoveRobot()
     moveRobot.run()
