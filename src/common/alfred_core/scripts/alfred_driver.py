@@ -256,6 +256,7 @@ class AlfredBodyNode:
         def code_to_run():
             self.linear_velocity_mps = 0.0
             self.angular_velocity_radps = 0.0
+            self.robot.head.move_to('head_tilt', -30 * np.pi/180)
         self.change_mode('navigation', code_to_run)
 
     def turn_on_manipulation_mode(self):

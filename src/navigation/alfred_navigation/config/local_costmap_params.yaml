@@ -1,12 +1,25 @@
 local_costmap:
   global_frame: map
   robot_base_frame: base_link
-  update_frequency: 5.0
+  update_frequency: 2.0
   publish_frequency: 2.0
   static_map: false
   rolling_window: true
   width: 6.0 #6.0
   height: 6.0 #6.0
   resolution: 0.05
-  inflation_radius: 0.1 #0.05     # reduce it according to the tight spaces
+  inflation_radius: 0.05     # reduce it according to the tight spaces #probably keep it 0.05 because changingt this harmed more than helping
   cost_scaling_factor: 10.0 #2.58     #1.5    
+
+  plugins:
+  - {name: rgbd_obstacle_layer,     type: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"}
+  - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+  - {name: inflated_layer, type: "costmap_2d::InflationLayer"}
+
+  obstacle_layer:
+    track_unknown_space: false
+
+  rgbd_obstacle_layer:
+    track_unknown_space: false
+    voxel_decay: 10
+  

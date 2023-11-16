@@ -78,10 +78,7 @@ void MovebackRecovery::runBehavior()
   geometry_msgs::PoseStamped global_pose;
   local_costmap_->getRobotPose(global_pose);
 
-  double current_angle = tf2::getYaw(global_pose.pose.orientation);
-  double start_angle = current_angle;
 
-  bool got_180 = false;
   bool reverse = true;      // if reverse is true, move back
 
 
@@ -116,7 +113,7 @@ void MovebackRecovery::runBehavior()
 
   double cur_x; 
   double cur_y; 
-  double dist_travelled; 
+  double dist_travelled = 0; 
 
   cur_x = init_x;
   cur_y = init_y;
@@ -188,33 +185,44 @@ void MovebackRecovery::runBehavior()
 
   // Rotate Recovery Behavior
 
+  bool done_rotating = false;
+  double current_angle = tf2::getYaw(global_pose.pose.orientation);
+  double start_angle = current_angle;
+  double rotation_angle = 22.5;
+  double goal_angle = start_angle + rotation_angle * (M_PI/180);
+  double dist_left = rotation_angle;
+
   std::cout << "Rotating In-Place " << dist_travelled << std::endl;
+  
   while (n.ok() &&
-        (!got_180 ||
-        std::fabs(angles::shortest_angular_distance(current_angle, start_angle)) > tolerance_))
+        (!done_rotating))
   {
     // Update Current Angle
     local_costmap_->getRobotPose(global_pose);
     current_angle = tf2::getYaw(global_pose.pose.orientation);
-
+ 
     // compute the distance left to rotate
-    double dist_left;
-    if (!got_180)
+    if (!done_rotating)
     {
-      // If we haven't hit 180 yet, we need to rotate a half circle plus the distance to the 180 point
-      double distance_to_180 = std::fabs(angles::shortest_angular_distance(current_angle, start_angle + M_PI));
-      dist_left = M_PI + distance_to_180;
 
-      if (distance_to_180 < tolerance_)
+      std::cout << "The distance left to rotate is " << dist_left * (180/M_PI) << " degrees" << std::endl;
+
+      double distance_to_goal = std::fabs(angles::shortest_angular_distance(current_angle, goal_angle));
+      dist_left = distance_to_goal;
+
+      if (distance_to_goal < tolerance_)
       {
-        got_180 = true;
+        std::cout << "Done rotating!" << std::endl;
+        done_rotating = true;
       }
+
+      
     }
-    else
-    {
-      // If we have hit the 180, we just have the distance back to the start
-      dist_left = std::fabs(angles::shortest_angular_distance(current_angle, start_angle));
-    }
+    // else
+    // {
+    //   // If we have hit the 180, we just have the distance back to the start
+    //   dist_left = std::fabs(angles::shortest_angular_distance(current_angle, start_angle));
+    // }
 
     double x = global_pose.pose.position.x, y = global_pose.pose.position.y;
 

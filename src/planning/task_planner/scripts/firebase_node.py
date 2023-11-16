@@ -18,14 +18,15 @@ class FirebaseNode:
 
         self.firebase = pyrebase.initialize_app(config)
         self.db = self.firebase.database()
-        self.db.remove("")
-        self.db.set(schema)
+        # self.db.remove("")
+        # self.db.set(schema)
+
+        self.last_update = time.time()
         self.operation_stream = self.db.child("operation_mode").stream(operation_mode_callback)
         self.teleoperation_stream = self.db.child("teleop_commands").stream(teleop_mode_callback)
-        self.last_update = time.time()
     
-    def update_operation_mode(self, mode):
-        self.db.update(mode)
+    # def update_operation_mode(self, mode):
+    #     self.db.update(mode)
 
 
     def update_node(self, dict):
@@ -41,7 +42,6 @@ class FirebaseNode:
                     del dict[key]
             self.db.update(dict)
             self.last_update = time.time()
-    
 
 
     
