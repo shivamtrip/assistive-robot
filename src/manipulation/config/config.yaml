@@ -1,4 +1,34 @@
 
+# for visual servoing controllers
+vs_range : [-60, 60, 12] # [(left angle, right angle), n_steps]. Angles in degrees, converted to rad in code. 
+
+pid_gains:
+  kp : 0.7
+  kd : 0.1
+
+# move_towards_object
+forward_velocity: 0.1 #m/s
+interval_till_restart : 10 # seconds
+
+# head_tilt
+head_tilt_angle_search : 10 # degrees
+head_tilt_angle_grasp : 30 # degrees
+
+
+
+moving_average_n : 50 # for PID settling time
+max_graspable_distance: 0.77
+mean_err_horiz_alignment : 0.008
+
+recoveries:
+  n_scan_attempts : 3
+
+# scene_parser:
+time_diff_for_realtime : 0.2 #seconds - for scene parser to determine whether the estimate is live or stale
+object_filter:
+  height : 0.7
+  radius : 2.5
+
 offsets:
   bottle: [0, 0.05, -0.1]
   apple: [0, 0.0, 0.0]
@@ -26,3 +56,8 @@ contact:
   orange: false
   cup: false
   teddy_bear: false
+
+
+# FSM params
+n_max_servo_attempts: 2
+n_max_pick_attempts: 2

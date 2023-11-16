@@ -27,6 +27,8 @@
   <!-- LOCALIZATION -->
   <include file="$(find alfred_navigation)/launch/localization/amcl.launch" />
 
+  <rosparam file="$(find alfred_navigation)/config/navman.yaml" command="load" ns="navigation" />
+
   <!-- NAVIGATION -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
     <param name="footprint_padding" value="0.01" />

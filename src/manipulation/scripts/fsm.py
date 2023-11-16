@@ -14,6 +14,7 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
+from scene_parser import SceneParser
 
 class States(Enum):
     IDLE = 0
@@ -34,13 +35,16 @@ class ManipulationFSM:
         self.grasp = None
         self.planeOfGrasp = None
 
+        self.scene_parser = SceneParser()
         self.class_list = rospy.get_param('/object_detection/class_list')
         self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
 
         self.offset_dict = rospy.get_param('/manipulation/offsets')
-        
         self.isContactDict = rospy.get_param('/manipulation/contact')
         
+        self.n_max_servo_attempts = rospy.get_param('/manipulation/n_max_servo_attempts')   
+        self.n_max_pick_attempts = rospy.get_param('/manipulation/n_max_pick_attempts')
+
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
@@ -51,20 +55,23 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
         self.trajectoryClient.wait_for_server()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
-        self.graspActionClient.wait_for_server()
+
+        # DEPRECATED
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
+        # self.graspActionClient.wait_for_server()
 
         # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
         # self.planeFitClient.wait_for_server()
 
-        self.visualServoing = AlignToObject(-1)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow_robot service...")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
 
-
+        self.visualServoing = AlignToObject(-1, self.scene_parser)
         self.manipulationMethods = ManipulationMethods()
+        
+        
         self.server.start() # start server only after everything under this is initialized
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
     
@@ -116,8 +123,6 @@ class ManipulationFSM:
         placingLocation = np.array([
             x, 
             abs(abs(y) - self.manipulationMethods.getEndEffectorPose()[0]), 
-            # 1.0,
-            # 0.85
             z
         ])
         placingLocation[2] += heightOfObject
@@ -132,11 +137,11 @@ class ManipulationFSM:
     def main(self, goal : TriggerGoal):
         self.goal = goal
         self.state = States.IDLE
-        
-        print("Requested goal", goal)
         objectManipulationState = States.PICK
         self.visualServoing.objectId = goal.objectId
-        # rospy.loginfo("Stowing robot prior to manipulation!")
+        
+        rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
+        
         self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
@@ -145,17 +150,12 @@ class ManipulationFSM:
             rospy.loginfo("Received place request.")
             objectManipulationState = States.PLACE
 
-        # self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-        # ee_pose = self.manipulationMethods.getEndEffectorPose()
-        # self.visualServoing.alignObjectHorizontal(ee_pose_x = 0, debug_print = {"ee_pose" : ee_pose})
-        # # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-        # exit()
         nServoTriesAttempted = 0
-        nServoTriesAllowed = 2
+        nServoTriesAllowed = self.n_max_servo_attempts
 
         nPickTriesAttempted = 0
-        nPickTriesAllowed = 2
-        # self.state = States.PICK
+        nPickTriesAllowed = self.n_max_pick_attempts
+
 
         try: 
             while True:
@@ -184,33 +184,23 @@ class ManipulationFSM:
                 elif self.state == States.PICK:
                     self.state = States.WAITING_FOR_GRASP_AND_PLANE
                     self.send_feedback({'msg' : "moving to pregrasp pose"})
+                    
+                    
                     self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
                     ee_pose = self.manipulationMethods.getEndEffectorPose()
                     self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
-                    rospy.sleep(2)
-                    self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = True, getPlane = False)   
-                    # self.grasp = GraspPoseResult()
+
+                    grasp = self.scene_parser.get_grasp()
+                    _, plane_height = self.scene_parser.get_plane()
                     
-                    # grasp, success = self.visualServoing.get_grasp()
-                    # if success:
-                    #     self.grasp.x = grasp[0]
-                    #     self.grasp.y = grasp[1]
-                    #     self.grasp.z = grasp[2]
-                    # else:
-                    #     break
+                    self.heightOfObject = plane_height
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    ee_pose = self.manipulationMethods.getEndEffectorPose()
-                    x_grasp = self.grasp.x + offsets[0]
-                    y_grasp = abs(self.grasp.y - ee_pose[1]) + offsets[1]
-                    z_grasp = self.grasp.z  + offsets[2]
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
-                        x_grasp, 
-                        y_grasp, 
-                        z_grasp, 
-                        self.grasp.yaw,
+                        grasp + np.array(offsets),
                         moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                     ) 
+                    
                     success = self.manipulationMethods.checkIfGraspSucceeded()
                     if success:
                         self.send_feedback({'msg' : "Pick succeeded! Starting to place."})
@@ -263,13 +253,9 @@ class ManipulationFSM:
         self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
 
 
-   
-
 
 if __name__ == '__main__':
-
     node = ManipulationFSM()
-
     try:
         rospy.spin()
     except KeyboardInterrupt:
