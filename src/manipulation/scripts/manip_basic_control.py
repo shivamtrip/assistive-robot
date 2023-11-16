@@ -19,6 +19,8 @@ from helpers import move_to_pose
 import tf
 from sensor_msgs.msg import JointState
 from control_msgs.msg import FollowJointTrajectoryAction
+from geometry_msgs.msg import PointStamped
+
 
 class ManipulationMethods:
     """Methods for object manipulation
@@ -65,6 +67,9 @@ class ManipulationMethods:
         # #Changed yaw to 180 since sometimes gripper will collide with table at yaw=0
         move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
+            "head_pan;to" : -np.pi/2,
+            "head_tilt;to" : -30 * np.pi/180
+            # "head_tilt;to" : 0 * np.pi/180
             })
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to" : 0,
@@ -72,19 +77,30 @@ class ManipulationMethods:
         })
         rospy.sleep(5)
 
+        
     def getEndEffectorPose(self):
-        from_frame_rel = 'link_grasp_center'
-        to_frame_rel = 'base_link'
-        while not rospy.is_shutdown():
-            try:
-                translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
-                rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
-                return [(translation[0]), translation[1], translation[2]]
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                continue
+        base_point = PointStamped()
+        base_point.header.frame_id = '/link_grasp_center'
+        base_point.point.x = 0
+        base_point.point.y = 0
+        base_point.point.z = 0
+        point = self.listener.transformPoint('base_link', base_point).point
+        return [point.x, point.y, point.z]
+
+
+    # def getEndEffectorPose(self):
+    #     from_frame_rel = 'link_grasp_center'
+    #     to_frame_rel = 'base_link'
+    #     while not rospy.is_shutdown():
+    #         try:
+    #             translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
+    #             rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
+    #             return [(translation[0]), translation[1], translation[2]]
+    #         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+    #             continue
             
-        rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(to_frame_rel, from_frame_rel))
-        return None
+    #     rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(to_frame_rel, from_frame_rel))
+    #     return None
     
        
     def get_grip_dist(self,msg):

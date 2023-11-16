@@ -1,6 +1,6 @@
 
 offsets:
-  bottle: [0, 0.0, 0.0]
+  bottle: [0, 0.05, -0.1]
   apple: [0, 0.0, 0.0]
   remote: [0, 0.0, 0.0]
   banana : [0, 0.0, 0.0]
@@ -10,7 +10,7 @@ offsets:
   tie: [-0.0, 0.0, 0.0]
   cell phone: [-0.0, 0.0, 0.0]
   orange: [-0.0, 0.0, 0.0]
-  cup: [-0.0, 0.0, 0.0]
+  cup: [-0.0, 0.05, -0.1]
   teddy_bear: [-0.0, 0.0, 0.0]
 
 contact: 

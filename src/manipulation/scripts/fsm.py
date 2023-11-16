@@ -147,13 +147,15 @@ class ManipulationFSM:
 
         # self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
         # ee_pose = self.manipulationMethods.getEndEffectorPose()
-        # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
+        # self.visualServoing.alignObjectHorizontal(ee_pose_x = 0, debug_print = {"ee_pose" : ee_pose})
+        # # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
         # exit()
         nServoTriesAttempted = 0
         nServoTriesAllowed = 2
 
         nPickTriesAttempted = 0
         nPickTriesAllowed = 2
+        # self.state = States.PICK
 
         try: 
             while True:
@@ -187,12 +189,20 @@ class ManipulationFSM:
                     self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
                     rospy.sleep(2)
                     self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = True, getPlane = False)   
+                    # self.grasp = GraspPoseResult()
+                    
+                    # grasp, success = self.visualServoing.get_grasp()
+                    # if success:
+                    #     self.grasp.x = grasp[0]
+                    #     self.grasp.y = grasp[1]
+                    #     self.grasp.z = grasp[2]
+                    # else:
+                    #     break
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
                     ee_pose = self.manipulationMethods.getEndEffectorPose()
                     x_grasp = self.grasp.x + offsets[0]
                     y_grasp = abs(self.grasp.y - ee_pose[1]) + offsets[1]
-                    z_grasp = self.grasp.z + offsets[2]
-                    # exit()
+                    z_grasp = self.grasp.z  + offsets[2]
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
                         x_grasp, 

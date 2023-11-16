@@ -28,6 +28,7 @@ from control_msgs.msg import FollowJointTrajectoryResult
 import actionlib
 from yolo.msg import Detections
 from termcolor import colored
+import message_filters
 
 class State(Enum):
     SEARCH = 1
@@ -95,14 +96,116 @@ class AlignToObject:
         self.objectLocArr = []
         self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio')
         
+        self.obj_tf_publisher = tf.TransformBroadcaster()
+        self.depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+        self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
+        self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
         
-        self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image,self.depthCallback)
-        self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.parseScene)
-        
+        synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
+        synced_messages.registerCallback(self.parseScene)
+        rospy.loginfo("Waiting for synchronized images")
         while not self.obtainedInitialImages:
             rospy.sleep(0.1)
         rospy.loginfo(f"[{self.node_name}]: Initial images obtained.")
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
+        self.prevtime = time.time()
+        
+    def create_point_cloud_from_depth_image(self, depth, organized=True):
+        """ Generate point cloud using depth image only.
+
+            Input:
+                depth: [numpy.ndarray, (H,W), numpy.float32]
+                    depth image
+                camera: [CameraInfo]
+                    camera intrinsics
+                organized: bool
+                    whether to keep the cloud in image shape (H,W,3)
+
+            Output:
+                cloud: [numpy.ndarray, (H,W,3)/(H*W,3), numpy.float32]
+                    generated cloud, (H,W,3) for organized=True, (H*W,3) for organized=False
+        """
+        camera = self.cameraParams
+        assert(depth.shape[1] == camera['width'] and depth.shape[0] == camera['height'])
+        # xmap = np.arange(-camera.width//2, camera.width//2)
+        xmap = np.arange(0, camera['width'])
+        ymap = np.arange(0, camera['height'])
+        xmap, ymap = np.meshgrid(xmap, ymap)
+        points_z = depth / 1000.0
+        self.intrinsics = camera['intrinsics']
+        
+        cx = self.intrinsics[0][2]
+        cy = self.intrinsics[1][2]
+        fx = self.intrinsics[0][0]
+        fy = self.intrinsics[1][1]
+        
+        points_x = (xmap - cx) * points_z / fx
+        points_y = (ymap - cy) * points_z / fy
+        cloud = np.stack([points_x, points_y, points_z], axis=-1)
+        if not organized:
+            cloud = cloud.reshape([-1, 3])
+        return cloud
+    
+    def transform_point_cloud(self, cloud, transform, format='4x4'):
+        """ Transform points to new coordinates with transformation matrix.
+
+            Input:
+                cloud: [np.ndarray, (N,3), np.float32]
+                    points in original coordinates
+                transform: [np.ndarray, (3,3)/(3,4)/(4,4), np.float32]
+                    transformation matrix, could be rotation only or rotation+translation
+                format: [string, '3x3'/'3x4'/'4x4']
+                    the shape of transformation matrix
+                    '3x3' --> rotation matrix
+                    '3x4'/'4x4' --> rotation matrix + translation matrix
+
+            Output:
+                cloud_transformed: [np.ndarray, (N,3), np.float32]
+                    points in new coordinates
+        """
+        if not (format == '3x3' or format == '4x4' or format == '3x4'):
+            raise ValueError('Unknown transformation format, only support \'3x3\' or \'4x4\' or \'3x4\'.')
+        if format == '3x3':
+            cloud_transformed = np.dot(transform, cloud.T).T
+        elif format == '4x4' or format == '3x4':
+            ones = np.ones(cloud.shape[0])[:, np.newaxis]
+            cloud_ = np.concatenate([cloud, ones], axis=1)
+            cloud_transformed = np.dot(transform, cloud_.T).T
+            cloud_transformed = cloud_transformed[:, :3]
+        return cloud_transformed
+    
+    def get_transform(self, base_frame, camera_frame):
+        listener = self.listener
+        while not rospy.is_shutdown():
+            try:
+                t = listener.getLatestCommonTime(base_frame, camera_frame)
+                (trans,rot) = listener.lookupTransform(base_frame, camera_frame, t)
+
+                trans_mat = np.array(trans).reshape(3, 1)
+                rot_mat = R.from_quat(rot).as_matrix()
+                transform_mat = np.hstack((rot_mat, trans_mat))
+                # print(listener.allFramesAsString())
+
+                return transform_mat
+                
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                print("Not found transform sorry.")
+                continue
+    def get_grasp(self):
+        if not self.clearAndWaitForNewObject(5):
+            return [], False
+        
+        dimg = self.depth_image.copy()
+        dimg *= self.ws_mask
+        
+        cloud = self.create_point_cloud_from_depth_image(dimg, organized = False)
+        transform = self.get_transform('camera_color_optical_frame', 'base_link')
+        cloud = self.transform_point_cloud(cloud, transform, format='3x4')
+        print(cloud.shape)
+        x, y, z = np.median(cloud, axis = 0)
+        
+        return [x, y, z], True
+        
 
     def computeObjectLocation(self, objectLocs):
         objectLocs = np.array(objectLocs)
@@ -147,17 +250,16 @@ class AlignToObject:
 
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : angleToGo,
-                })
-                move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : 0,
                 })
+                
                 
                 break
             else:
                 rospy.loginfo("Object not found, rotating base.")
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : -np.pi/2,
-                    'head_pan;to' : -self.vs_range[0][0],
+                    'head_pan;to' : self.vs_range[0][0],
                 })
                 rospy.sleep(5)
                 nRotates += 1
@@ -278,7 +380,7 @@ class AlignToObject:
         return True
     
 
-    def convertPointToBaseFrame(self, x_f, y_f, z):
+    def convertPointToFrame(self, x_f, y_f, z, to_frame = "base_link"):
         intrinsic = self.intrinsics
         fx = intrinsic[0][0]
         fy = intrinsic[1][1] 
@@ -289,15 +391,23 @@ class AlignToObject:
         y_gb = (y_f - cy) * z/ fy
 
         camera_point = PointStamped()
-        camera_point.header.frame_id = '/camera_depth_optical_frame'
+        camera_point.header.frame_id = '/camera_color_optical_frame'
         camera_point.point.x = x_gb
         camera_point.point.y = y_gb
         camera_point.point.z = z
-        point = self.listener.transformPoint('base_link', camera_point).point
+        point = self.listener.transformPoint(to_frame, camera_point).point
         return point
 
+    
 
-    def parseScene(self, msg):
+    def parseScene(self, depth_img, color_img, msg):
+        depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
+        self.depth_image = np.array(depth_img, dtype=np.float32)
+        
+        color_img = self.bridge.imgmsg_to_cv2(color_img, desired_encoding="passthrough")
+        self.color_image = np.array(color_img, dtype=np.uint8)
+        
+        
         if self.objectId is None:
             return
         self.obtainedInitialImages = True
@@ -315,6 +425,7 @@ class AlignToObject:
 
         loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
         upscale_fac = self.upscale_fac
+        
         if len(loc) > 0:
             loc = loc[0]
             box = np.squeeze(msg['boxes'][loc]).astype(int)
@@ -324,26 +435,48 @@ class AlignToObject:
             crop = self.depth_image[y1 : y2, x1 : x2]
             # crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
             
+            self.ws_mask = np.zeros_like(self.depth_image)
+            self.ws_mask[y1 : y2, x1 : x2] = 1
+            
+            
             z_f = np.median(crop[crop != 0])/1000.0
             h, w = self.depth_image.shape[:2]
             # y_new1 = w - x2 * upscale_fac
             # x_new1 = y1 * upscale_fac
             # y_new2 = w - x1 * upscale_fac
             # x_new2 = y2 * upscale_fac
-            
-            # viz = crop.copy().astype(np.float32)
-            # viz /= np.max(viz)
-            # viz *= 255
-            # viz = viz.astype(np.uint8)
-            # cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
-            
             x_f = (x1 + x2)/2
             y_f = (y1 + y2)/2
+            z_f = self.depth_image[int(y_f), int(x_f)]/1000.0
+            to_frame = 'base_link'
+            base_pt = self.convertPointToFrame(x_f, y_f, z_f, to_frame)
+            # print(base_pt.x, base_pt.y, base_pt.z)
+            self.obj_tf_publisher.sendTransform((base_pt.x, base_pt.y, base_pt.z),
+                    tf.transformations.quaternion_from_euler(0, 0, 0),
+                    rospy.Time.now(),
+                    "object_pose",
+                    to_frame)
+            
+            if time.time() - self.prevtime > 1:
+                viz = self.color_image.copy().astype(np.float32)
+                viz /= np.max(viz)
+                viz *= 255
+                viz = viz.astype(np.uint8)
+                # viz = cv2.cvtColor(viz, cv2.COLOR_GRAY2BGR)
+                
+                
+                
+                cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
+                viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
+                cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
+                self.prevtime = time.time()
+            
             
             # x_f = (x_new1 + x_new2)/2
             # y_f = (y_new1 + y_new2)/2
 
-            point = self.convertPointToBaseFrame(x_f, y_f, z_f)
+            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
 
             x, y, z = point.x, point.y, point.z
 
@@ -360,6 +493,12 @@ class AlignToObject:
         else:
             self.isDetected = False
 
+    def imageCallback(self, color_img):
+        color_img = self.bridge.imgmsg_to_cv2(color_img, desired_encoding="passthrough")
+        self.color_image = np.array(color_img, dtype=np.uint8)
+        # self.depth_image = cv2.rotate(depth_img, cv2.ROTATE_90_CLOCKWISE)
+    
+
     def depthCallback(self, depth_img):
         depth_img = self.bridge.imgmsg_to_cv2(depth_img, desired_encoding="passthrough")
         self.depth_image = np.array(depth_img, dtype=np.float32)
@@ -374,7 +513,7 @@ class AlignToObject:
     def alignObjectHorizontalTest(self, offset = 0.0):
         self.requestClearObject = True
         rospy.loginfo("Waiting for clearing object")
-        if not self.clearAndWaitForNewObject(5):
+        if not self.clearAndWaitForNewObject(2):
             return False
 
         xerr = np.inf
@@ -412,7 +551,7 @@ class AlignToObject:
     
     def alignObjectHorizontal(self, ee_pose_x = 0.0, debug_print = None):
         self.requestClearObject = True
-        if not self.clearAndWaitForNewObject():
+        if not self.clearAndWaitForNewObject(2):
             return False
 
         xerr = np.inf
@@ -429,6 +568,8 @@ class AlignToObject:
             # print(xerr)
             if self.isDetected:
                 xerr = (x - ee_pose_x)
+                
+                
                 
             moving_avg_err.append(xerr)
             if len(moving_avg_err) > moving_avg_n:

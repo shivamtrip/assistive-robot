@@ -17,7 +17,9 @@ class ShrinkImage:
     def callback(self, ros_rgb_image):
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'rgb8')
         rgb_image = cv2.resize(rgb_image, (0, 0), fx = self.scale, fy = self.scale) # 1/4th of the original size.
-        self.pub.publish(self.cv_bridge.cv2_to_imgmsg(rgb_image))
+        imgmsg = self.cv_bridge.cv2_to_imgmsg(rgb_image)
+        imgmsg.header = ros_rgb_image.header
+        self.pub.publish(imgmsg)
             
 
     def main(self):
