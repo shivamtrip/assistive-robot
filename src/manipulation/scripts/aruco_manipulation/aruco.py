@@ -67,6 +67,8 @@ class ArUcoDetector:
 
         # Subscribe to Image and Publish Aruco pose
         self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
+        # self.image_sub = rospy.Subscriber("/camera/infra1/image_rect_raw", Image, self.image_callback)
+
         self.pose_pub = rospy.Publisher("/aruco/pose", PoseStamped, queue_size=1)
         
         self.aruco_tf_broadcaster = tf.TransformBroadcaster()
@@ -105,10 +107,12 @@ class ArUcoDetector:
 
             # Draw the detected markers and their IDs on the color image
             cv2.aruco.drawDetectedMarkers(cv_image, corners, ids)
+            cv_image = cv2.rotate(cv_image, cv2.ROTATE_90_CLOCKWISE)
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
+            # self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "8UC3"))
 
             # Estimate the pose of each marker in the world coordinate system
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, 0.042, cameraMatrix=self.camera_matrix, distCoeffs=self.distortion_coefficients)
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, 0.05, cameraMatrix=self.camera_matrix, distCoeffs=self.distortion_coefficients)
             
             # Publish poses of detected markers
             for rvec, tvec, id in zip(rvecs, tvecs, ids):
@@ -181,8 +185,6 @@ class ArUcoDetector:
             return None
         
     def fetch(self):
-
-        rospy.sleep(3)
 
         move_to_pose(
             self.trajectoryClient,

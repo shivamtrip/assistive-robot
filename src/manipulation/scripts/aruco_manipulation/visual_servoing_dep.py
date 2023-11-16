@@ -161,7 +161,7 @@ class AlignToObject:
         lastDetectedTime = time.time()
         lastFailedTime = 0
         startTime = time.time()
-        vel = 0.1
+        movement_vel = 0.075
         intervalBeforeRestart = 10
         k=2
 
@@ -184,57 +184,34 @@ class AlignToObject:
             rospy.loginfo("\nObject is close enough already. The robot doesn't need to move further forward.")
             return True
         rospy.sleep(5)
+
+        i = 1
+        avg_vel = 0
+        vel_sum = 0
+
         while True:
-            motionTime = time.time() - startTime
-            distanceMoved = motionTime * vel
             
-            move_to_pose(self.trajectoryClient, {
-                'base_translate;vel' : vel,
-            })
-            
+            # detect aruco
             result = self.movebot.getArucoLocation()
-            print("\nCoordinates from Aruco: ", result)
-            print("\ndistance to move: ",distanceToMove)
-            print("\ncurrent distance moved: ",distanceMoved)
 
-            if(k==0):
-                lastFailedTime = time.time()
-                k=1
+            # if detected, vel = x else 0
+            if not result:
+                print("NO RESULT!")
+                vel = 0.0
+            else:
+                print("Found result")
 
-            if((time.time() - lastFailedTime > 2) and (k==1)):
-                print("Waited for too long")
-                return False
-
-            if result is not None:
                 x, y, z = result
-                lastDetectedTime = time.time()
                 if x < maxGraspableDistance:
                     rospy.loginfo("Object is close enough now. Stopping the robot.")
                     break
-                lastDetectedTime = time.time()
-            else:
-                k=0
-                rospy.loginfo("Object is not being detected anymore.")
-                # return False
-            
-            
-            if distanceMoved >= distanceToMove - 0.3:
-                if time.time() - lastDetectedTime > intervalBeforeRestart:
-                    rospy.loginfo("Lost track of the object. Going back to search again.")
-                    move_to_pose(self.trajectoryClient, {
-                        'base_translate;vel' : 0.0,
-                    })  
-                    return False
-            else: # open loop movement for the table
-                if distanceMoved >= distanceToMove:
-                    break
+                vel = movement_vel
 
-            rospy.sleep(0.1)
 
-        move_to_pose(self.trajectoryClient, {
-            'base_translate;vel' : 0.0,
-        })          
-        return True
+            # move forward with vel
+            move_to_pose(self.trajectoryClient, {
+                'base_translate;vel' : vel,
+            })  
 
 
 
@@ -292,7 +269,7 @@ class AlignToObject:
         else:
             return False
         prevsettime = time.time()
-        while abs(xerr) > 0.005:
+        while abs(xerr) > 0.008:
 
             result = self.movebot.getArucoLocation()
             if result is not None:
@@ -313,6 +290,10 @@ class AlignToObject:
             prevsettime = time.time()
             
             rospy.sleep(0.1)
+
+        move_to_pose(self.trajectoryClient, {
+            'base_translate;by' : -0.02,
+        }) 
         move_to_pose(self.trajectoryClient, {
             'base_translate;vel' : 0.0,
         }) 
@@ -360,7 +341,7 @@ class AlignToObject:
             elif self.state == State.ALIGN_HORIZONTAL:
                 self.movebot.manipulationMethods.move_to_pregrasp(self.trajectoryClient) # Received at height, opens the gripper and makes yaw 0
                 ee_x, ee_y, ee_z = self.movebot.manipulationMethods.getEndEffectorPose() # Transforming from base coordinate to gripper coordinate and retrieving the displacement in x
-                success = self.alignObjectHorizontal(offset = ee_x - 0.07) # Fixing the displacement in x
+                success = self.alignObjectHorizontal(offset = ee_x - 0.055) # Fixing the displacement in x was 0.07, now is 0.055
                 if not success:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
@@ -402,8 +383,8 @@ if __name__ == "__main__":
     rospy.init_node("visual_aruco", anonymous=True)
     node = AlignToObject(39)
     goal= TriggerGoal()
-    goal.isPick= True
-    # goal.isPick = False
+    # goal.isPick= True
+    goal.isPick = False
     node.main(goal)
     
     try:
