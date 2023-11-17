@@ -14,36 +14,36 @@ import matplotlib.pyplot as plt
 class SceneParser:
     def __init__(self):
 
-        # self.bridge = CvBridge()
-        # self.depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
-        # self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
-        # self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
+        self.bridge = CvBridge()
+        self.depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+        self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
+        self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
         
-        # synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
-        # synced_messages.registerCallback(self.parse_scene)
+        synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
+        synced_messages.registerCallback(self.parse_scene)
         
-        # rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
-        # msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
-        # self.intrinsics = np.array(msg.K).reshape(3,3)
-        # self.cameraParams = {
-        #     'width' : msg.width,
-        #     'height' : msg.height,
-        #     'intrinsics' : np.array(msg.K).reshape(3,3),
-        #     'focal_length' : self.intrinsics[0][0],
-        # }
-        # rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
+        rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
+        msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
+        self.intrinsics = np.array(msg.K).reshape(3,3)
+        self.cameraParams = {
+            'width' : msg.width,
+            'height' : msg.height,
+            'intrinsics' : np.array(msg.K).reshape(3,3),
+            'focal_length' : self.intrinsics[0][0],
+        }
+        rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
         
-        # rospy.loginfo("Waiting for initial images")
-        # while not self.obtained_initial_images:
-        #     rospy.sleep(0.5)
+        rospy.loginfo("Waiting for initial images")
+        while not self.obtained_initial_images:
+            rospy.sleep(0.5)
         
-        # self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
-        # self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
+        self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
+        self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
         
-        # self.listener = tf.TransformListener()
-        # self.tf_ros = tf.TransformerROS()
-        # self.tf_broadcaster = tf.TransformBroadcaster()
+        self.listener = tf.TransformListener()
+        self.tf_ros = tf.TransformerROS()
+        self.tf_broadcaster = tf.TransformBroadcaster()
 
         self.objectLocArr = []
         self.objectId = None
