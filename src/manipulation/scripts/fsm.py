@@ -5,7 +5,6 @@ from visual_servoing import AlignToObject
 import rospy
 import actionlib
 from enum import Enum
-import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
