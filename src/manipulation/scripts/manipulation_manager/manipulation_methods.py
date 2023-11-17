@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 
+"""
+This script contains methods for object manipulation
+"""
+
+
 import numpy as np
 import std_msgs
 import rospy
-import actionlib
-from helpers import move_to_pose
 import tf
 from sensor_msgs.msg import JointState
-from control_msgs.msg import FollowJointTrajectoryAction
 from std_srvs.srv import Trigger
+from control_msgs.msg import FollowJointTrajectoryGoal
+from trajectory_msgs.msg import JointTrajectoryPoint
+
 
 class ManipulationMethods:
-
-    """Methods for object manipulation"""
 
     def __init__(self):
 
@@ -31,7 +34,8 @@ class ManipulationMethods:
         self.efforts = [0 for i in range(self.av_effort_window_size)]
 
         rospy.Subscriber('/alfred/joint_states', JointState, self.callback)
-        
+
+
     def callback(self, msg):
 
         for i in range(len(msg.name)):
@@ -53,13 +57,13 @@ class ManipulationMethods:
     
     def move_to_pregrasp(self, trajectoryClient):
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
             })
 
         rospy.sleep(5)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "wrist_yaw;to" : 0,            
         })
 
@@ -73,7 +77,7 @@ class ManipulationMethods:
         while not rospy.is_shutdown():
             try:
                 translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
-                rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
+                # rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
                 return translation
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 continue
@@ -92,19 +96,19 @@ class ManipulationMethods:
         
         # Begin PLACE procedure
         
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "lift;to": z-0.019, # + 0.03 for cm offset from aruco with bottle
         })
         
         rospy.sleep(2)
         
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "arm;to": y - 0.08, # + 0.08 for cm offset from aruco with center of bottle
         })
 
         rospy.sleep(5)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "stretch_gripper;to": 100,
         })
 
@@ -112,17 +116,17 @@ class ManipulationMethods:
 
         rospy.sleep(5)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "lift;to": z + 0.10,
         })
 
         # Begin STOW procedure
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
            "arm;to" : 0,
         })
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
            "wrist_yaw;to" : np.pi,
         })
 
@@ -137,7 +141,7 @@ class ManipulationMethods:
                 }
             )
         
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "head_pan;to": 0,
         }
         )
@@ -151,42 +155,42 @@ class ManipulationMethods:
  
         # Begin PICK procedure
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "lift;to": z+0.03, # have added + 0.03 for cm offset from aruco with bottle
         })
 
         rospy.sleep(2)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
                 "stretch_gripper;to": 100,
             })
 
         rospy.sleep(3)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "arm;to": y + 0.04, # + 0.08 for cm offset from aruco with center of bottle
         })
         
         rospy.sleep(4)
             
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
                 "stretch_gripper;to": -40,
             })
         rospy.loginfo("Object grab attempted.") 
         
         rospy.sleep(3)
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "lift;to": z + 0.10,
         })
 
         # Begin STOW procedure
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
            "arm;to" : 0,
         })
 
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
            "wrist_yaw;to" : np.pi,
         })
 
@@ -200,7 +204,7 @@ class ManipulationMethods:
                 }
             )
         
-        move_to_pose(trajectoryClient, {
+        self.move_to_pose(trajectoryClient, {
             "head_pan;to": 0,
         }
         )
@@ -224,11 +228,38 @@ class ManipulationMethods:
             curz = self.states[-1]
             if self.isContact:
                 break
-            move_to_pose(trajectory_client, {
+            self.move_to_pose(trajectory_client, {
                 'lift;to': curz - 0.01,
             })
             rospy.sleep(0.05)
-        move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
+        self.move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
             'lift;to': curz + 0.04,
         })  
-    
+
+
+    def move_to_pose(self, trajectoryClient, pose, asynchronous=False, custom_contact_thresholds=False):
+        joint_names = [key for key in pose]
+        point = JointTrajectoryPoint()
+        point.time_from_start = rospy.Duration(0.0)
+
+        trajectory_goal = FollowJointTrajectoryGoal()
+        trajectory_goal.goal_time_tolerance = rospy.Time(1.0)
+        trajectory_goal.trajectory.joint_names = joint_names
+        if not custom_contact_thresholds: 
+            joint_positions = [pose[key] for key in joint_names]
+            point.positions = joint_positions
+            trajectory_goal.trajectory.points = [point]
+        else:
+            pose_correct = all([len(pose[key])==2 for key in joint_names])
+            if not pose_correct:
+                rospy.logerr("[ALFRED].move_to_pose: Not sending trajectory due to improper pose. custom_contact_thresholds requires 2 values (pose_target, contact_threshold_effort) for each joint name, but pose = {0}".format(pose))
+                return
+            joint_positions = [pose[key][0] for key in joint_names]
+            joint_efforts = [pose[key][1] for key in joint_names]
+            point.positions = joint_positions
+            point.effort = joint_efforts
+            trajectory_goal.trajectory.points = [point]
+        trajectory_goal.trajectory.header.stamp = rospy.Time.now()
+        trajectoryClient.send_goal(trajectory_goal)
+        if not asynchronous: 
+            trajectoryClient.wait_for_result()

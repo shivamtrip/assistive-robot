@@ -1,5 +1,10 @@
 #! /usr/bin/env python3
 
+""""
+This script contains methods for reading and processing ArUco detections
+"""
+
+
 import rospy
 from sensor_msgs.msg import CameraInfo
 import numpy as np
@@ -10,11 +15,6 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
 import time
 import tf
-from manip_basic_control import ManipulationMethods
-from control_msgs.msg import FollowJointTrajectoryAction
-from std_srvs.srv import Trigger
-import actionlib
-from helpers import move_to_pose
 from scipy.spatial.transform import Rotation as R
 
 def get_camera_params(camera_info_topic):
@@ -77,18 +77,8 @@ class ArUcoDetector:
         self.lastDetectedtime = time.time()
         self.ids = None
 
-        self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        rospy.loginfo("waiting for trajectory client")
-        self.trajectoryClient.wait_for_server()
-        self.manipulationMethods = ManipulationMethods()
         self.listener : tf.TransformListener = tf.TransformListener()
 
-        rospy.loginfo("waiting for stow robot service")
-        self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
-        self.stow_robot_service.wait_for_service()
-        self.stow_robot_service()
-        rospy.sleep(3)
-        rospy.loginfo("Every service is running\n")
 
     def image_callback(self, msg):
 
@@ -184,52 +174,7 @@ class ArUcoDetector:
         else:
             return None
         
-    def fetch(self):
-
-        move_to_pose(
-            self.trajectoryClient,
-            {
-                'head_tilt;to': -20 * np.pi/180,
-            }
-        )
-
-        if self.getArucoLocation() is not None:
-            [x, y, z] = self.getArucoLocation()
-
-            ee_x, ee_y, ee_z = self.manipulationMethods.getEndEffectorPose()
-            distToExtend = abs(y - ee_y) #+ self.offset_dict[self.label2name[goal.objectId]]
-            self.manipulationMethods.pick(
-            self.trajectoryClient, 
-            x, 
-            distToExtend, 
-            z, 
-            0,
-            moveUntilContact = False
-             ) 
-            self.stow_robot_service()
-            rospy.loginfo("Pick cycle completed")
-        else:
-            print("Grasp can't happen because Aruco not found.")
-        return True
-
-
-    def place(self):
-        if self.getArucoLocation() is not None:
-            [x, y, z] = self.getArucoLocation()
-        
-        
-        ee_x, ee_y, ee_z = self.manipulationMethods.getEndEffectorPose()
-        distToExtend = abs(y - ee_y) #+ self.offset_dict[self.label2name[goal.objectId]]
-        self.manipulationMethods.place(
-            self.trajectoryClient, 
-            x, 
-            distToExtend, 
-            z, 
-            0,
-            place = True
-        ) 
-        self.stow_robot_service()
-        return True
+ 
 
 if __name__ == '__main__':
     rospy.init_node('arucodetector')
