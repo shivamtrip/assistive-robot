@@ -192,7 +192,6 @@ class ManipulationFSM:
                     self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
 
                     self.scene_parser.set_point_cloud() #converts depth image into point cloud
-
                     grasp = self.scene_parser.get_grasp()
                     plane = self.scene_parser.get_plane()
                     
@@ -225,7 +224,7 @@ class ManipulationFSM:
 
                 elif self.state == States.PLACE:
                     self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                    # self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = False, getPlane = True)
+                    
                     self.state = States.PLACE
                     heightOfObject = goal.heightOfObject
                     move_to_pose(self.trajectoryClient, {
@@ -237,11 +236,22 @@ class ManipulationFSM:
                             'base_rotate;by': np.pi/2,
                         }
                     )
-                    # placingLocation = self.estimatePlacingLocation(self.planeOfGrasp, heightOfObject)
-                    placingLocation = np.array([0.0, 1.0, 1.1])
+                    rospy.sleep(5)
+                    self.scene_parser.set_point_cloud() #converts depth image into point cloud
                     
-                    self.manipulationMethods.place(self.trajectoryClient, placingLocation[0], placingLocation[1], placingLocation[2], 0)
-                    self.stow_robot_service()
+                    plane = self.scene_parser.get_plane()
+                    if plane:
+                        plane_height = plane[1]
+                        xmin, xmax, ymin, ymax = plane[2]
+                        
+                        if ymin * ymax < 0: # this means that it is safe to place without moving base
+                            placingLocation = np.array([0.0, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
+                            
+                        placingLocation = np.array([(ymin + ymax)/2, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
+
+                        self.manipulationMethods.place(self.trajectoryClient, placingLocation[0], placingLocation[1], placingLocation[2], 0)
+
+                        self.stow_robot_service()
                     self.state = States.COMPLETE
 
                 elif self.state == States.COMPLETE:

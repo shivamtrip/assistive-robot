@@ -278,22 +278,22 @@ class ManipulationMethods:
             theta (_type_): _description_
         """
 
+        if x != 0:
+            move_to_pose(trajectoryClient, {
+                'base_translate;by' : x
+                }
+            )
+            rospy.sleep(5)
+
         move_to_pose(trajectoryClient, {
             "lift;to": z,
         })
 
-        rospy.sleep(5)
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to": theta*(np.pi/180),
-        })
-
-        rospy.sleep(3)
-
-        move_to_pose(trajectoryClient, {
             "arm;to": y,
         })
-        
-        rospy.sleep(3)
+
 
         self.move_until_contact(
             trajectoryClient,
@@ -302,7 +302,7 @@ class ManipulationMethods:
             }
         )
         move_to_pose(trajectoryClient, {
-            "stretch_gripper;to": 50,
+            "stretch_gripper;to": 100,
         })
 
         rospy.sleep(3)

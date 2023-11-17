@@ -277,7 +277,7 @@ class SceneParser:
     def get_plane(self, height_filter = 0.5):
         points = self.scene_points
         if points is None:
-            return None, None
+            return None
         
         plane_bounds = []
         plane_height = np.nan
@@ -289,7 +289,7 @@ class SceneParser:
                                                         num_iterations=1000)
         inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
         plane_bounds = [
-            np.min(inlier_points[:, 0]),
+            np.min(inlier_points[:, 0]), 
             np.max(inlier_points[:, 0]),
             np.min(inlier_points[:, 1]),
             np.max(inlier_points[:, 1]),
@@ -299,12 +299,10 @@ class SceneParser:
         return plane_bounds, plane_height
     
     
-    def set_point_cloud(self):
+    def set_point_cloud(self, visualize = False):
         rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
         
         depthimg = self.depth_image.copy()
-        # apply median filter
-        
         rgbimg = self.color_image.copy()    
         detection = self.current_detection
         
@@ -321,8 +319,15 @@ class SceneParser:
         
         rospy.loginfo(f"[{rospy.get_name()}]: Point cloud generated.")
         
+        if visualize:
+            scene_pcd = o3d.geometry.PointCloud()
+            scene_pcd.points = o3d.utility.Vector3dVector(self.object_points)
+            scene_pcd.colors = o3d.utility.Vector3dVector(self.object_colors)
+            
+            o3d.visualization.draw_geometries([scene_pcd])
+        
     
-    def get_grasp(self):
+    def get_grasp(self, visualize = False):
         
         if self.object_points is None:
             return None
@@ -333,23 +338,6 @@ class SceneParser:
         
         # segment out the object and remove things that are not part of the object using depth information
         
-        # radii = np.linalg.norm(points[:, :2], axis = 1)
-        # mean_radius = np.median(radii)
-        # std_radius = np.std(radii)
-        # filt_radii = 1.5
-        
-        # print(mean_radius, std_radius, radii.max())
-        
-
-        # filt_indices = np.ones((len(points), ), dtype = bool)
-        # filt_indices = filt_indices & (radii > mean_radius - filt_radii * std_radius)
-        # filt_indices = filt_indices & (radii < mean_radius + filt_radii * std_radius)
-        
-        # points = points[filt_indices]        
-        # self.object_colors = self.object_colors[filt_indices]
-        
-        
-        # get o3d bounding box
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(points)
         o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors)
@@ -368,64 +356,83 @@ class SceneParser:
         o3dpcd.points = o3d.utility.Vector3dVector(points[labels == largest_cluster])
         o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors[labels == largest_cluster])
         
+        
+        points = np.array(o3dpcd.points)
+        
         ori_bbox = o3dpcd.get_oriented_bounding_box()
-        axis_aligned_bbox = o3dpcd.get_axis_aligned_bounding_box()
         
         h, w, l = ori_bbox.extent
-        
-        is_elongated = False
-        if h > max(w, l) * 2 :
-            is_elongated = True
-            rospy.loginfo("Object is elongated. Dimensions = " + str((h, w, l)))
-            
+        box_angles = np.array(ori_bbox.R)
+        unit_vecs_bbox = box_angles.T
+        prods_z = []
+        for i in range(3):
+            prods_z.append(abs(unit_vecs_bbox[i] @ np.array([-1, 0, 0])))
+
+        axis_ind = np.argmax(prods_z)
+        axis_vec = unit_vecs_bbox[axis_ind]
         
         
         grasp_center = np.array(ori_bbox.center)
-        box_angles = np.array(ori_bbox.R)
-        grasp_yaw = R.from_matrix(box_angles).as_euler('xyz', degrees=False)[0]
+        grasp_yaw = np.arctan2(axis_vec[1], axis_vec[0])
+        
+        
+        if visualize:
+            line_set = o3d.geometry.LineSet()
+            
+            lineLength = max(h, w, l) / 2
+            line_set.points = o3d.utility.Vector3dVector(np.array(
+                [
+                    grasp_center, 
+                    grasp_center - unit_vecs_bbox[axis_ind] * lineLength,
+                    
+                    grasp_center + unit_vecs_bbox[axis_ind - 2] * w/2 - unit_vecs_bbox[axis_ind] * lineLength,
+                    grasp_center + unit_vecs_bbox[axis_ind - 2] * w/2 + unit_vecs_bbox[axis_ind] * lineLength,
+                    
+                    grasp_center - unit_vecs_bbox[axis_ind - 2] * w/2 - unit_vecs_bbox[axis_ind] * lineLength,
+                    grasp_center - unit_vecs_bbox[axis_ind - 2] * w/2+ unit_vecs_bbox[axis_ind] * lineLength,
+                    
+                    grasp_center + unit_vecs_bbox[axis_ind - 1] * w/2 - unit_vecs_bbox[axis_ind] * lineLength,
+                    grasp_center + unit_vecs_bbox[axis_ind - 1] * w/2 + unit_vecs_bbox[axis_ind] * lineLength,
+                    
+                    grasp_center - unit_vecs_bbox[axis_ind - 1] * w/2 - unit_vecs_bbox[axis_ind] * lineLength,
+                    grasp_center - unit_vecs_bbox[axis_ind - 1] * w/2+ unit_vecs_bbox[axis_ind] * lineLength, 
 
-        
-        # arrow = o3d.geometry.TriangleMesh.create_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.1, cone_height=0.1)
-        # arrow.rotate(box_angles)
-        # arrow.translate(grasp_center)
-        
-        lcylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=l)
-        lcylinder.rotate(box_angles)
-        lcylinder.translate(grasp_center + box_angles @ np.array([0.0, -w/2, l/2]))
-        lcylinder.paint_uniform_color([1, 0, 0])
-        rcylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=l)
-        rcylinder.rotate(box_angles)
-        rcylinder.translate(grasp_center + box_angles @ np.array([0.0, w/2, l/2]))
-        rcylinder.paint_uniform_color([1, 0, 0])
-        
-        grasp_cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=0.05)
-        grasp_cylinder.rotate(box_angles)
-        grasp_cylinder.translate(grasp_center + box_angles @ np.array([0.0, 0.0, l]))
-        
-        grasp_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
-        grasp_sphere.translate(grasp_center)
-        
-        arrow1 = o3d.geometry.TriangleMesh.create_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.1, cone_height=0.1)
-        
-        box_angles = R.from_euler('xyz', [grasp_yaw + 90, 90, 0], degrees=False).as_matrix()
-        arrow1.rotate(box_angles)
-        arrow1.translate(grasp_center)
+                    
+                ])
+            )
+            
+            
+            theta = np.arccos(axis_vec @ np.array([1, 0, 0]))
+            rmat = o3d.geometry.get_rotation_matrix_from_xyz((0, theta, 0))
+            
+            lines = [
+                [0, 1], 
+                [2, 3],
+                [4, 5],
+                [6, 7],
+                [8, 9],
+            ]
+            line_set.lines = o3d.utility.Vector2iVector(lines)
+            line_set.paint_uniform_color([0, 1, 0])
+            
+            grasp_sphere = o3d.geometry.TriangleMesh.create_sphere(radius = 0.01)
+            grasp_sphere.compute_vertex_normals()
+            grasp_sphere.paint_uniform_color([1, 0, 0])
+            grasp_sphere.translate(grasp_center)
+                    
 
+            scene_pcd = o3d.geometry.PointCloud()
+            scene_pcd.points = o3d.utility.Vector3dVector(self.scene_points)
+            scene_pcd.colors = o3d.utility.Vector3dVector(self.scene_colors)
 
-        scene_pcd = o3d.geometry.PointCloud()
-        scene_pcd.points = o3d.utility.Vector3dVector(self.scene_points)
-        scene_pcd.colors = o3d.utility.Vector3dVector(self.scene_colors)
-
-        
-        o3d.visualization.draw_geometries([o3dpcd, 
-                                           scene_pcd,
-                                        #    axis_aligned_bbox,
-                                            lcylinder,
-                                            rcylinder,
-                                            grasp_cylinder,
+            
+            o3d.visualization.draw_geometries([o3dpcd, 
                                             grasp_sphere,
-                                            ori_bbox,
-                                           ])
+                                            scene_pcd,
+                                            #    axis_aligned_bbox,
+                                                line_set,
+                                                ori_bbox,
+                                            ])
         
         return [grasp_center, grasp_yaw]
     
@@ -434,13 +441,17 @@ if __name__ == "__main__":
     # rospy.init_node("scene_parser")
     import json
     parser = SceneParser()
-    rgb_image = cv2.imread('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/rgb/000012.png')
+    
+    idx = str(12).zfill(6)
+    
+    rgb_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/rgb/{idx}.png')
     rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
     
-    depth_image = cv2.imread('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/depth/000012.tif', cv2.IMREAD_UNCHANGED).astype(np.uint16)
+    depth_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/depth/{idx}.tif', cv2.IMREAD_UNCHANGED).astype(np.uint16)
     
-    with open('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/pose/000012.json', 'r') as f:
+    with open(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/pose/{idx}.json', 'r') as f:
         data = json.load(f)
+        
     intrinsics = data['intrinsics']
     transform = np.array(data['transform'])
     transform = np.vstack((transform, np.array([0, 0, 0, 1])))
@@ -459,13 +470,12 @@ if __name__ == "__main__":
         'intrinsics' : np.array(intrinsics).reshape(3,3),
         'focal_length' : intrinsics[0][0],
     }
-    
-    
+  
     num_detections = 1
-    
     parser.current_detection = {
         "boxes" : np.array([
-            [350,200, 660, 280]    
+            # [350,200, 660, 280]     # 12 - bottle
+            [531, 341, 625, 409] # 12 - crumple
         ]),
         "box_classes" : [8],
         'confidences' : [1.0],
