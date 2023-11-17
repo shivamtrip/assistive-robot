@@ -186,34 +186,42 @@ class ManipulationFSM:
                     self.send_feedback({'msg' : "moving to pregrasp pose"})
                     
                     
+                    # basic planning here
                     self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
                     ee_pose = self.manipulationMethods.getEndEffectorPose()
                     self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
 
+                    self.scene_parser.set_point_cloud() #converts depth image into point cloud
+
                     grasp = self.scene_parser.get_grasp()
-                    _, plane_height = self.scene_parser.get_plane()
+                    plane = self.scene_parser.get_plane()
                     
-                    self.heightOfObject = plane_height
-                    offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    self.manipulationMethods.pick(
-                        self.trajectoryClient, 
-                        grasp + np.array(offsets),
-                        moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
-                    ) 
-                    
-                    success = self.manipulationMethods.checkIfGraspSucceeded()
-                    if success:
-                        self.send_feedback({'msg' : "Pick succeeded! Starting to place."})
-                        self.state = States.COMPLETE
-                    else:
-                        self.send_feedback({'msg' : "Pick failed. Reattempting."})
-                        if nPickTriesAttempted >= nPickTriesAllowed:
-                            self.send_feedback({'msg' : "Pick failed. Cannot grasp successfully. Aborting."})
-                            self.reset()
-                            return TriggerResult(success = False)
+                    if grasp and plane:
+                        plane_height = plane[1]
                         
-                        self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(nPickTriesAttempted) + " of " + str(nPickTriesAllowed) + " allowed."})
-                        nPickTriesAttempted += 1
+                        self.heightOfObject = abs(grasp[2] - plane_height)
+                        
+                        
+                        offsets = self.offset_dict[self.label2name[goal.objectId]]
+                        self.manipulationMethods.pick(
+                            self.trajectoryClient, 
+                            grasp + np.array(offsets),
+                            moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
+                        ) 
+                        
+                        success = self.manipulationMethods.checkIfGraspSucceeded()
+                        if success:
+                            self.send_feedback({'msg' : "Pick succeeded! Starting to place."})
+                            self.state = States.COMPLETE
+                        else:
+                            self.send_feedback({'msg' : "Pick failed. Reattempting."})
+                            if nPickTriesAttempted >= nPickTriesAllowed:
+                                self.send_feedback({'msg' : "Pick failed. Cannot grasp successfully. Aborting."})
+                                self.reset()
+                                return TriggerResult(success = False)
+                            
+                            self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(nPickTriesAttempted) + " of " + str(nPickTriesAllowed) + " allowed."})
+                            nPickTriesAttempted += 1
 
                 elif self.state == States.PLACE:
                     self.state = States.WAITING_FOR_GRASP_AND_PLANE

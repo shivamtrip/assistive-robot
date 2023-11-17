@@ -8,48 +8,54 @@ import rospy
 import time
 import tf
 from geometry_msgs.msg import Vector3, Vector3Stamped, PoseStamped, Point, Pose, PointStamped
-from scipy.spatial import transform as R
-
+from scipy.spatial.transform import Rotation as R
+import open3d as o3d
+import matplotlib.pyplot as plt
 class SceneParser:
     def __init__(self):
-        self.bridge = CvBridge()
-        self.depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
-        self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
-        self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
-        
-        synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
-        synced_messages.registerCallback(self.parse_scene)
-        
-        self.obtained_initial_images = False
-        
-        self.request_clear_object = False
-        
-        self.listener = tf.TransformListener()
-        self.tf_ros = tf.TransformerROS()
-        self.tf_broadcaster = tf.TransformBroadcaster()
-        
-        
-        self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
-        self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
 
-        rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
-        msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
-        self.intrinsics = np.array(msg.K).reshape(3,3)
-        self.cameraParams = {
-            'width' : msg.width,
-            'height' : msg.height,
-            'intrinsics' : np.array(msg.K).reshape(3,3),
-            'focal_length' : self.intrinsics[0][0],
-        }
-        rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
+        # self.bridge = CvBridge()
+        # self.depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+        # self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
+        # self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
+        
+        # synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
+        # synced_messages.registerCallback(self.parse_scene)
+        
+        # rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
+        # msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
+        # self.intrinsics = np.array(msg.K).reshape(3,3)
+        # self.cameraParams = {
+        #     'width' : msg.width,
+        #     'height' : msg.height,
+        #     'intrinsics' : np.array(msg.K).reshape(3,3),
+        #     'focal_length' : self.intrinsics[0][0],
+        # }
+        # rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
         
+        # rospy.loginfo("Waiting for initial images")
+        # while not self.obtained_initial_images:
+        #     rospy.sleep(0.5)
+        
+        # self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
+        # self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
+        
+        # self.listener = tf.TransformListener()
+        # self.tf_ros = tf.TransformerROS()
+        # self.tf_broadcaster = tf.TransformBroadcaster()
+
         self.objectLocArr = []
         self.objectId = None
         
-        rospy.loginfo("Waiting for initial images")
-        while not self.obtained_initial_images:
-            rospy.sleep(0.5)
+        self.scene_points = None
+        self.object_points = None
+        
+        self.obtained_initial_images = False
+        self.request_clear_object = False
+
+        rospy.loginfo("Scene parser initialized")
+
             
             
     def set_object_id(self, object_id):
@@ -104,6 +110,8 @@ class SceneParser:
             'confidences' : np.array(detection.confidences).reshape(num_detections),
         }
         
+        self.current_detection = msg
+        
         # to ensure thread safe behavior, writing happens only in this function on a separate thread
         if self.request_clear_object:
             self.request_clear_object = False
@@ -133,9 +141,6 @@ class SceneParser:
             y_f = (y1 + y2)/2
             z_f = self.depth_image[int(y_f), int(x_f)]/1000.0
             
-            
-            
-           
             # TODO publish point cloud here instead of saving image like this.
              
             # if time.time() - self.prevtime > 1:
@@ -186,12 +191,12 @@ class SceneParser:
         point = self.listener.transformPoint(to_frame, camera_point).point
         return point
 
-    def get_transform(self, base_frame, camera_frame):
+    def get_transform(self, target_frame, source_frame):
         listener = self.listener
         while not rospy.is_shutdown():
             try:
-                t = listener.getLatestCommonTime(base_frame, camera_frame)
-                (trans,rot) = listener.lookupTransform(base_frame, camera_frame, t)
+                t = listener.getLatestCommonTime(target_frame, source_frame)
+                (trans,rot) = listener.lookupTransform(target_frame, source_frame, t)
 
                 trans_mat = np.array(trans).reshape(3, 1)
                 rot_mat = R.from_quat(rot).as_matrix()
@@ -217,13 +222,259 @@ class SceneParser:
         
         return (angleToGo, x, y, z, radius), True
     
+    def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask, transform = None):
+        """
+        workspace mask is a binary mask of the same size as depth image
+        """
+        dimg = depth_image.copy()
+        dimg *= workspace_mask
+        dimg = dimg.astype(np.float32)
+        
+        colors = rgb_image.copy()
+        colors = colors.astype(np.float32)
+        colors /= 255.0
+        
+        xs = np.arange(0, self.cameraParams['width']).astype(np.float32)
+        ys = np.arange(0, self.cameraParams['height']).astype(np.float32)
+        
+        xx, yy = np.meshgrid(xs, ys)
+        xx = xx.flatten()
+        yy = yy.flatten()
+        zz = dimg.flatten()
+        colors = colors.reshape(-1, 3)        
+
+        filt_indices = zz != 0
+        xx = xx[filt_indices]
+        yy = yy[filt_indices]
+        zz = zz[filt_indices]
+        colors = colors[filt_indices]
+        
+        
+        cx = self.intrinsics[0][2]
+        cy = self.intrinsics[1][2]
+        fx = self.intrinsics[0][0]
+        fy = self.intrinsics[1][1]
+        
+        zz = zz / 1000.0
+        xx = (xx - cx) * zz / fx
+        yy = (yy - cy) * zz / fy
+        
+        points_cam_frame = np.vstack((xx, yy, zz, np.ones_like(xx))).T
+        
+        if transform is None:
+            transform = self.transform
+        else:
+            transform = self.get_transform("base_link", "camera_color_optical_frame")
+
+        points_base_frame = np.matmul(transform, points_cam_frame.T).T
+        points_cam_frame = points_cam_frame[:, :3]
+        points_base_frame = points_base_frame[:, :3]
+        
+        return points_base_frame, colors
+        
+        
+    
+    def get_plane(self, height_filter = 0.5):
+        points = self.scene_points
+        if points is None:
+            return None, None
+        
+        plane_bounds = []
+        plane_height = np.nan
+        possible_plane_points = points[points[:, 2] > height_filter]
+        o3dpcd = o3d.geometry.PointCloud()
+        o3dpcd.points = o3d.utility.Vector3dVector(possible_plane_points)
+        plane_model, inliers = o3dpcd.segment_plane(distance_threshold=0.01,
+                                                        ransac_n=3,
+                                                        num_iterations=1000)
+        inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
+        plane_bounds = [
+            np.min(inlier_points[:, 0]),
+            np.max(inlier_points[:, 0]),
+            np.min(inlier_points[:, 1]),
+            np.max(inlier_points[:, 1]),
+        ]
+        plane_height = np.mean(inlier_points[:, 2])
+            
+        return plane_bounds, plane_height
+    
+    
+    def set_point_cloud(self):
+        rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
+        
+        depthimg = self.depth_image.copy()
+        # apply median filter
+        
+        rgbimg = self.color_image.copy()    
+        detection = self.current_detection
+        
+        loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
+        box = np.squeeze(detection['boxes'][loc]).astype(int)
+
+        x1, y1, x2, y2 =  box
+
+        self.ws_mask = np.zeros_like(self.depth_image)
+        self.ws_mask[y1 : y2, x1 : x2] = 1
+        
+        self.object_points, self.object_colors = self.get_point_cloud_from_image(depthimg, rgbimg, self.ws_mask)
+        self.scene_points, self.scene_colors = self.get_point_cloud_from_image(depthimg, rgbimg, np.ones_like(self.depth_image))
+        
+        rospy.loginfo(f"[{rospy.get_name()}]: Point cloud generated.")
+        
     
     def get_grasp(self):
-        pass
+        
+        if self.object_points is None:
+            return None
+        
+        # check if object is elongated on the table
+        
+        points = self.object_points
+        
+        # segment out the object and remove things that are not part of the object using depth information
+        
+        # radii = np.linalg.norm(points[:, :2], axis = 1)
+        # mean_radius = np.median(radii)
+        # std_radius = np.std(radii)
+        # filt_radii = 1.5
+        
+        # print(mean_radius, std_radius, radii.max())
+        
+
+        # filt_indices = np.ones((len(points), ), dtype = bool)
+        # filt_indices = filt_indices & (radii > mean_radius - filt_radii * std_radius)
+        # filt_indices = filt_indices & (radii < mean_radius + filt_radii * std_radius)
+        
+        # points = points[filt_indices]        
+        # self.object_colors = self.object_colors[filt_indices]
+        
+        
+        # get o3d bounding box
+        o3dpcd = o3d.geometry.PointCloud()
+        o3dpcd.points = o3d.utility.Vector3dVector(points)
+        o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors)
+        
+        labels = np.array(o3dpcd.cluster_dbscan(eps=0.01, min_points=50, print_progress=False))
+        max_label = labels.max()
+        print(f"point cloud has {max_label + 1} clusters")
+
+        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+        colors[labels < 0] = 0
+        
+        labels += 1
+        
+        cluster_sizes = np.bincount(labels)
+        largest_cluster = np.argmax(cluster_sizes[1:]) + 1
+        o3dpcd.points = o3d.utility.Vector3dVector(points[labels == largest_cluster])
+        o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors[labels == largest_cluster])
+        
+        ori_bbox = o3dpcd.get_oriented_bounding_box()
+        axis_aligned_bbox = o3dpcd.get_axis_aligned_bounding_box()
+        
+        h, w, l = ori_bbox.extent
+        
+        is_elongated = False
+        if h > max(w, l) * 2 :
+            is_elongated = True
+            rospy.loginfo("Object is elongated. Dimensions = " + str((h, w, l)))
+            
+        
+        
+        grasp_center = np.array(ori_bbox.center)
+        box_angles = np.array(ori_bbox.R)
+        grasp_yaw = R.from_matrix(box_angles).as_euler('xyz', degrees=False)[0]
+
+        
+        # arrow = o3d.geometry.TriangleMesh.create_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.1, cone_height=0.1)
+        # arrow.rotate(box_angles)
+        # arrow.translate(grasp_center)
+        
+        lcylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=l)
+        lcylinder.rotate(box_angles)
+        lcylinder.translate(grasp_center + box_angles @ np.array([0.0, -w/2, l/2]))
+        lcylinder.paint_uniform_color([1, 0, 0])
+        rcylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=l)
+        rcylinder.rotate(box_angles)
+        rcylinder.translate(grasp_center + box_angles @ np.array([0.0, w/2, l/2]))
+        rcylinder.paint_uniform_color([1, 0, 0])
+        
+        grasp_cylinder = o3d.geometry.TriangleMesh.create_cylinder(radius=0.01, height=0.05)
+        grasp_cylinder.rotate(box_angles)
+        grasp_cylinder.translate(grasp_center + box_angles @ np.array([0.0, 0.0, l]))
+        
+        grasp_sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
+        grasp_sphere.translate(grasp_center)
+        
+        arrow1 = o3d.geometry.TriangleMesh.create_arrow(cylinder_radius=0.01, cone_radius=0.02, cylinder_height=0.1, cone_height=0.1)
+        
+        box_angles = R.from_euler('xyz', [grasp_yaw + 90, 90, 0], degrees=False).as_matrix()
+        arrow1.rotate(box_angles)
+        arrow1.translate(grasp_center)
+
+
+        scene_pcd = o3d.geometry.PointCloud()
+        scene_pcd.points = o3d.utility.Vector3dVector(self.scene_points)
+        scene_pcd.colors = o3d.utility.Vector3dVector(self.scene_colors)
+
+        
+        o3d.visualization.draw_geometries([o3dpcd, 
+                                           scene_pcd,
+                                        #    axis_aligned_bbox,
+                                            lcylinder,
+                                            rcylinder,
+                                            grasp_cylinder,
+                                            grasp_sphere,
+                                            ori_bbox,
+                                           ])
+        
+        return [grasp_center, grasp_yaw]
     
-    def get_plane(self):
-        bounds = None
-        plane_height = None
-        return bounds, plane_height
+if __name__ == "__main__":
+    
+    # rospy.init_node("scene_parser")
+    import json
+    parser = SceneParser()
+    rgb_image = cv2.imread('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/rgb/000012.png')
+    rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+    
+    depth_image = cv2.imread('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/depth/000012.tif', cv2.IMREAD_UNCHANGED).astype(np.uint16)
+    
+    with open('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/pose/000012.json', 'r') as f:
+        data = json.load(f)
+    intrinsics = data['intrinsics']
+    transform = np.array(data['transform'])
+    transform = np.vstack((transform, np.array([0, 0, 0, 1])))
+    
+    parser.depth_image = depth_image
+    parser.color_image = rgb_image
+    parser.transform = transform 
+    parser.transform = np.linalg.inv(transform)
+    parser.intrinsics = np.array(intrinsics).reshape(3, 3)
+    
+    h, w = depth_image.shape[:2]
+    print(h, w)
+    parser.cameraParams = {
+        'width' : w,
+        'height' : h,
+        'intrinsics' : np.array(intrinsics).reshape(3,3),
+        'focal_length' : intrinsics[0][0],
+    }
     
     
+    num_detections = 1
+    
+    parser.current_detection = {
+        "boxes" : np.array([
+            [350,200, 660, 280]    
+        ]),
+        "box_classes" : [8],
+        'confidences' : [1.0],
+    }
+    
+    parser.set_object_id(8)
+    parser.set_point_cloud()
+    parser.get_grasp()
+    
+    
+    
+    # rospy.spin()
