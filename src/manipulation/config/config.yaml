@@ -4,7 +4,7 @@ vs_range : [-60, 60, 12] # [(left angle, right angle), n_steps]. Angles in degre
 
 pid_gains:
   kp : 0.7
-  kd : 0.1
+  kd : 0.2
 
 # move_towards_object
 forward_velocity: 0.1 #m/s
@@ -16,7 +16,7 @@ head_tilt_angle_grasp : 30 # degrees
 
 
 
-moving_average_n : 50 # for PID settling time
+moving_average_n : 25 # for PID settling time
 max_graspable_distance: 0.77
 mean_err_horiz_alignment : 0.008
 
@@ -24,7 +24,7 @@ recoveries:
   n_scan_attempts : 3
 
 # scene_parser:
-time_diff_for_realtime : 0.2 #seconds - for scene parser to determine whether the estimate is live or stale
+time_diff_for_realtime : 0.3 #seconds - for scene parser to determine whether the estimate is live or stale
 object_filter:
   height : 0.7
   radius : 2.5
@@ -34,14 +34,14 @@ offsets:
   apple: [0, 0.0, 0.0]
   remote: [0, 0.0, 0.0]
   banana : [0, 0.0, 0.0]
-  soda_can : [0, 0.0, -0.02]
-  tissue_paper: [-0.0, 0.02, 0.05]
+  soda_can : [0, 0.0, 0.0]
+  tissue_paper: [-0.0, 0.0, 0.05]
   toothbrush: [-0.0, 0.0, 0.0]
   tie: [-0.0, 0.0, 0.0]
   cell phone: [-0.0, 0.0, 0.0]
   orange: [-0.0, 0.0, 0.0]
-  cup: [-0.0, 0.05, -0.1]
-  teddy_bear: [-0.0, 0.0, 0.0]
+  cup: [-0.0, 0.0, -0.02]
+  teddy bear: [-0.0, 0.0, 0.0]
 
 contact: 
   bottle: false
@@ -55,7 +55,7 @@ contact:
   cell phone: true
   orange: false
   cup: false
-  teddy_bear: false
+  teddy bear: false
 
 
 # FSM params

@@ -60,7 +60,7 @@ class AlignToObject:
         self.vs_range[0] *= np.pi/180
         self.vs_range[1] *= np.pi/180
         
-        self.moving_avg_n = rospy.get_param('/manipulation/moving_avg_n')
+        self.moving_avg_n = rospy.get_param('/manipulation/moving_average_n')
         self.max_graspable_distance = rospy.get_param('/manipulation/max_graspable_distance')
         
         self.head_tilt_angle_search = rospy.get_param('/manipulation/head_tilt_angle_search')
@@ -88,18 +88,18 @@ class AlignToObject:
         
         move_to_pose(self.trajectoryClient, {
             'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
-            'head_pan;to' : self.vs_range[0][0],
+            'head_pan;to' : self.vs_range[0],
         })
         
         nRotates = 0
         while True:
-            for i, angle in enumerate(np.linspace(self.vs_range[0][0], self.vs_range[0][1], self.vs_range[1])):
+            for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
                 rospy.sleep(0.5) #settling time.
 
-            [angleToGo, x, y, z, radius, _], success = self.scene_parser.estimate_object_location()
+            [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
             self.scene_parser.clear_observations()
             if success:
                 self.objectLocation = [x, y, z]
@@ -111,9 +111,10 @@ class AlignToObject:
                 break
             else:
                 rospy.loginfo("Object not found, rotating base.")
+                self.scene_parser.clear_observations()
                 move_to_pose(self.trajectoryClient, {
                     'base_rotate;by' : -np.pi/2,
-                    'head_pan;to' : self.vs_range[0][0],
+                    'head_pan;to' : self.vs_range[0],
                 })
                 rospy.sleep(5)
                 nRotates += 1
@@ -149,9 +150,12 @@ class AlignToObject:
             return False
 
         maxGraspableDistance = self.max_graspable_distance
-
-        distanceToMove = self.scene_parser.estimate_object_location(self.scene_parser.objectLocArr)[3] - maxGraspableDistance
-        rospy.loginfo("Object distance = {}".format(self.scene_parser.estimate_object_location(self.scene_parser.objectLocArr)[4]))
+        result, success = self.scene_parser.estimate_object_location()
+        if success:
+            distanceToMove = result[3] - maxGraspableDistance
+        else:
+            return False
+        rospy.loginfo("distanceToMove = {}".format(distanceToMove))
         if distanceToMove < 0:
             rospy.loginfo("Object is close enough. Not moving.")
             return True
@@ -204,6 +208,7 @@ class AlignToObject:
         """
         Visual servoing to align gripper with the object of interest.
         """
+        
         self.requestClearObject = True
         if not self.scene_parser.clearAndWaitForNewObject(2):
             return False
@@ -218,18 +223,18 @@ class AlignToObject:
         
         kp = self.pid_gains['kp']
         kd = self.pid_gains['kd']
-        
+        curvel = 0.0
+        prevsettime = time.time()
         while len(moving_avg_err) <= moving_avg_n and  mean_err > self.mean_err_horiz_alignment:
             [x, y, z, conf, pred_time], isLive = self.scene_parser.get_latest_observation()
-            if isLive:
-                xerr = (x - ee_pose_x)
+            # if isLive:
+            rospy.loginfo("Time since last detection = {}".format(time.time() - pred_time))
+            xerr = (x - ee_pose_x)
+            
                 
             moving_avg_err.append(xerr)
             if len(moving_avg_err) > moving_avg_n:
                 moving_avg_err.pop(0)
-            else:
-                rospy.logwarn("Object not detected. Using open loop motions")
-                xerr = (x - curvel * (time.time() - prevsettime)) - ee_pose_x
                 
             dxerr = (xerr - prevxerr)
             vx = (kp * xerr + kd * dxerr)
@@ -245,9 +250,13 @@ class AlignToObject:
             move_to_pose(self.trajectoryClient, {
                     'base_translate;vel' : vx,
             }, asynchronous= True) 
-            
             curvel = vx
             prevsettime = time.time()
+            # else:
+            #     rospy.logwarn("Object not detected. Using open loop motions")
+            #     xerr = (x - curvel * (time.time() - prevsettime)) - ee_pose_x
+            
+            
             rospy.sleep(0.1)
         
         move_to_pose(self.trajectoryClient, {
@@ -263,7 +272,8 @@ class AlignToObject:
         # while not rospy.is_shutdown():
         #     rospy.sleep(0.5)
         # exit()
-        self.state = State.SEARCH
+        self.scene_parser.set_object_id(objectId)
+        
         while True:
             if self.state == State.SEARCH:
                 success = self.findAndOrientToObject()                

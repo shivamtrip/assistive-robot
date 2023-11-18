@@ -7,10 +7,14 @@ from yolo.msg import Detections
 import rospy
 import time
 import tf
-from geometry_msgs.msg import Vector3, Vector3Stamped, PoseStamped, Point, Pose, PointStamped
+from geometry_msgs.msg import Vector3, Vector3Stamped, PoseStamped, Point, Pose, PointStamped, Point32
+from sensor_msgs.msg import PointCloud2
 from scipy.spatial.transform import Rotation as R
+from std_msgs.msg import Header
 import open3d as o3d
 import matplotlib.pyplot as plt
+from sensor_msgs.msg import PointCloud
+import sensor_msgs.point_cloud2 as pcl2
 class SceneParser:
     def __init__(self):
 
@@ -19,7 +23,22 @@ class SceneParser:
         self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
         
-        synced_messages = message_filters.ApproximateTimeSynchronizer([self.depth_image_subscriber, self.rgb_image_subscriber, self.boundingBoxSub], 60, 0.5, allow_headerless=False)
+        self.point_cloud_publisher = rospy.Publisher('point_cloud_topic', PointCloud2, queue_size=10)
+        
+        self.obtained_initial_images = False
+        self.request_clear_object = False
+        
+        self.objectLocArr = []
+        self.objectId = None
+        
+        self.scene_points = None
+        self.object_points = None
+        self.prevtime = time.time()
+        
+        synced_messages = message_filters.ApproximateTimeSynchronizer([
+            self.depth_image_subscriber, self.rgb_image_subscriber,
+            self.boundingBoxSub
+        ], 100, 0.5, allow_headerless=False)
         synced_messages.registerCallback(self.parse_scene)
         
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
@@ -31,12 +50,17 @@ class SceneParser:
             'intrinsics' : np.array(msg.K).reshape(3,3),
             'focal_length' : self.intrinsics[0][0],
         }
+        
         rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
         
-        rospy.loginfo("Waiting for initial images")
+        
+        starttime = time.time()
         while not self.obtained_initial_images:
+            rospy.loginfo("Waiting for initial images")
             rospy.sleep(0.5)
+            if time.time() - starttime > 10:
+                exit()
         
         self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
         self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
@@ -44,15 +68,11 @@ class SceneParser:
         self.listener = tf.TransformListener()
         self.tf_ros = tf.TransformerROS()
         self.tf_broadcaster = tf.TransformBroadcaster()
+        
+        
 
-        self.objectLocArr = []
-        self.objectId = None
         
-        self.scene_points = None
-        self.object_points = None
         
-        self.obtained_initial_images = False
-        self.request_clear_object = False
 
         rospy.loginfo("Scene parser initialized")
 
@@ -66,6 +86,7 @@ class SceneParser:
     
     def clearAndWaitForNewObject(self, numberOfCopies = 10):
         rospy.loginfo("Clearing object location array")
+        self.request_clear_object = True
         while self.request_clear_object:
             rospy.sleep(0.1)
             
@@ -88,11 +109,14 @@ class SceneParser:
         if time.time() - pred_time < self.time_diff_for_realtime:
             isLive = True
         
-        return self.objectLocArr[-1], isLive
+        return object_properties, isLive
 
     
-    def parse_scene(self, rgb, depth, detection):
+    def parse_scene(self, depth, rgb , detection):
         self.obtained_initial_images = True
+        # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
+        
+        # self.prevtime = time.time()
         
         # convert images to numpy arrays
         depth_img = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
@@ -110,7 +134,6 @@ class SceneParser:
             'confidences' : np.array(detection.confidences).reshape(num_detections),
         }
         
-        self.current_detection = msg
         
         # to ensure thread safe behavior, writing happens only in this function on a separate thread
         if self.request_clear_object:
@@ -120,7 +143,6 @@ class SceneParser:
         
         if self.objectId is None:
             return False # no object id set
-
 
         loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
         
@@ -139,38 +161,41 @@ class SceneParser:
             
             x_f = (x1 + x2)/2
             y_f = (y1 + y2)/2
-            z_f = self.depth_image[int(y_f), int(x_f)]/1000.0
+            # z_f = self.depth_image[int(y_f), int(x_f)]/1000.0
             
             # TODO publish point cloud here instead of saving image like this.
              
-            # if time.time() - self.prevtime > 1:
-            #     viz = self.color_image.copy().astype(np.float32)
-            #     viz /= np.max(viz)
-            #     viz *= 255
-            #     viz = viz.astype(np.uint8)
-            #     cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            #     cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
-            #     viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
-            #     cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
-            #     self.prevtime = time.time()
-
+            if time.time() - self.prevtime > 1:
+                viz = self.color_image.copy().astype(np.float32)
+                viz /= np.max(viz)
+                viz *= 255
+                viz = viz.astype(np.uint8)
+                cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
+                viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
+                cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
+                self.prevtime = time.time()
+            
             point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
             x, y, z = point.x, point.y, point.z
-            
-            self.tf_broadcaster.sendTransform((x, y, z),
-                tf.transformations.quaternion_from_euler(0, 0, 0),
-                rospy.Time.now(),
-                "object_pose",
-                "base_link"
-            )
+            # print(x, y, z)
+            # self.tf_broadcaster.sendTransform((x, y, z),
+            #     tf.transformations.quaternion_from_euler(0, 0, 0),
+            #     rospy.Time.now(),
+            #     "object_pose",
+            #     "base_link"
+            # )
             
             
             radius = np.sqrt(x**2 + y**2)
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
+                # print(x, y, z, x_f, y_f, z_f)
                 self.objectLocArr.append((x, y, z, confidence, time.time()))
-    
+        
+                self.current_detection = [x1, y1, x2, y2]
+
         return True
             
     def convertPointToFrame(self, x_f, y_f, z, to_frame = "base_link"):
@@ -222,7 +247,7 @@ class SceneParser:
         
         return (angleToGo, x, y, z, radius), True
     
-    def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask, transform = None):
+    def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask):
         """
         workspace mask is a binary mask of the same size as depth image
         """
@@ -261,10 +286,10 @@ class SceneParser:
         
         points_cam_frame = np.vstack((xx, yy, zz, np.ones_like(xx))).T
         
-        if transform is None:
-            transform = self.transform
-        else:
-            transform = self.get_transform("base_link", "camera_color_optical_frame")
+        # if transform is None:
+        #     transform = self.transform
+        # else:
+        transform = self.get_transform("base_link", "camera_color_optical_frame")
 
         points_base_frame = np.matmul(transform, points_cam_frame.T).T
         points_cam_frame = points_cam_frame[:, :3]
@@ -274,7 +299,7 @@ class SceneParser:
         
         
     
-    def get_plane(self, height_filter = 0.5):
+    def get_plane(self, height_filter = 0.5, publish = False):
         points = self.scene_points
         if points is None:
             return None
@@ -288,6 +313,14 @@ class SceneParser:
                                                         ransac_n=3,
                                                         num_iterations=1000)
         inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
+        
+        if publish:
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, inlier_points)
+            self.point_cloud_publisher.publish(msg)
+            
         plane_bounds = [
             np.min(inlier_points[:, 0]), 
             np.max(inlier_points[:, 0]),
@@ -299,17 +332,15 @@ class SceneParser:
         return plane_bounds, plane_height
     
     
-    def set_point_cloud(self, visualize = False):
+    def set_point_cloud(self, visualize = False, publish = False):
         rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
         
         depthimg = self.depth_image.copy()
         rgbimg = self.color_image.copy()    
-        detection = self.current_detection
-        
-        loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
-        box = np.squeeze(detection['boxes'][loc]).astype(int)
-
-        x1, y1, x2, y2 =  box
+        # loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
+        # box = np.squeeze(detection['boxes'][loc]).astype(int)
+        # print(box)
+        x1, y1, x2, y2 =  self.current_detection
 
         self.ws_mask = np.zeros_like(self.depth_image)
         self.ws_mask[y1 : y2, x1 : x2] = 1
@@ -319,6 +350,15 @@ class SceneParser:
         
         rospy.loginfo(f"[{rospy.get_name()}]: Point cloud generated.")
         
+        if publish:
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, self.object_points)
+            self.point_cloud_publisher.publish(msg)
+        
+        
+        
         if visualize:
             scene_pcd = o3d.geometry.PointCloud()
             scene_pcd.points = o3d.utility.Vector3dVector(self.object_points)
@@ -327,7 +367,7 @@ class SceneParser:
             o3d.visualization.draw_geometries([scene_pcd])
         
     
-    def get_grasp(self, visualize = False):
+    def get_grasp(self, visualize = False, publish = False):
         
         if self.object_points is None:
             return None
@@ -360,6 +400,7 @@ class SceneParser:
         points = np.array(o3dpcd.points)
         
         ori_bbox = o3dpcd.get_oriented_bounding_box()
+        axi_bbox = o3dpcd.get_axis_aligned_bounding_box()
         
         h, w, l = ori_bbox.extent
         box_angles = np.array(ori_bbox.R)
@@ -374,6 +415,15 @@ class SceneParser:
         
         grasp_center = np.array(ori_bbox.center)
         grasp_yaw = np.arctan2(axis_vec[1], axis_vec[0])
+        
+        if publish:
+            rospy.loginfo("Publishing grasp pose")
+            self.tf_broadcaster.sendTransform((grasp_center),
+                tf.transformations.quaternion_from_euler(0, 0, 0),
+                rospy.Time.now(),
+                "grasp_pose",
+                "base_link"
+            )
         
         
         if visualize:
@@ -433,57 +483,60 @@ class SceneParser:
                                                 line_set,
                                                 ori_bbox,
                                             ])
+            
         
         return [grasp_center, grasp_yaw]
     
 if __name__ == "__main__":
     
-    # rospy.init_node("scene_parser")
+    rospy.init_node("scene_parser")
     import json
     parser = SceneParser()
+    parser.set_object_id(0)
     
-    idx = str(12).zfill(6)
+    rospy.spin()
+    # idx = str(12).zfill(6)
     
-    rgb_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/rgb/{idx}.png')
-    rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+    # rgb_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/rgb/{idx}.png')
+    # rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
     
-    depth_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/depth/{idx}.tif', cv2.IMREAD_UNCHANGED).astype(np.uint16)
+    # depth_image = cv2.imread(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/depth/{idx}.tif', cv2.IMREAD_UNCHANGED).astype(np.uint16)
     
-    with open(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/pose/{idx}.json', 'r') as f:
-        data = json.load(f)
+    # with open(f'/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/images/pose/{idx}.json', 'r') as f:
+    #     data = json.load(f)
         
-    intrinsics = data['intrinsics']
-    transform = np.array(data['transform'])
-    transform = np.vstack((transform, np.array([0, 0, 0, 1])))
+    # intrinsics = data['intrinsics']
+    # transform = np.array(data['transform'])
+    # transform = np.vstack((transform, np.array([0, 0, 0, 1])))
     
-    parser.depth_image = depth_image
-    parser.color_image = rgb_image
-    parser.transform = transform 
-    parser.transform = np.linalg.inv(transform)
-    parser.intrinsics = np.array(intrinsics).reshape(3, 3)
+    # parser.depth_image = depth_image
+    # parser.color_image = rgb_image
+    # parser.transform = transform 
+    # parser.transform = np.linalg.inv(transform)
+    # parser.intrinsics = np.array(intrinsics).reshape(3, 3)
     
-    h, w = depth_image.shape[:2]
-    print(h, w)
-    parser.cameraParams = {
-        'width' : w,
-        'height' : h,
-        'intrinsics' : np.array(intrinsics).reshape(3,3),
-        'focal_length' : intrinsics[0][0],
-    }
+    # h, w = depth_image.shape[:2]
+    # print(h, w)
+    # parser.cameraParams = {
+    #     'width' : w,
+    #     'height' : h,
+    #     'intrinsics' : np.array(intrinsics).reshape(3,3),
+    #     'focal_length' : intrinsics[0][0],
+    # }
   
-    num_detections = 1
-    parser.current_detection = {
-        "boxes" : np.array([
-            # [350,200, 660, 280]     # 12 - bottle
-            [531, 341, 625, 409] # 12 - crumple
-        ]),
-        "box_classes" : [8],
-        'confidences' : [1.0],
-    }
+    # num_detections = 1
+    # parser.current_detection = {
+    #     "boxes" : np.array([
+    #         # [350,200, 660, 280]     # 12 - bottle
+    #         [531, 341, 625, 409] # 12 - crumple
+    #     ]),
+    #     "box_classes" : [8],
+    #     'confidences' : [1.0],
+    # }
     
-    parser.set_object_id(8)
-    parser.set_point_cloud()
-    parser.get_grasp()
+    # parser.set_object_id(8)
+    # parser.set_point_cloud()
+    # parser.get_grasp()
     
     
     

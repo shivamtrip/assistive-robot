@@ -4,10 +4,10 @@
     "last_update" : 0.0,
     "operation_mode" : "AUTONOMOUS",
     "current_task" : {
-        "origin" : "KITCHEN",
-        "goal" : "BEDROOM",
-        "task_type" : "DELIVERY",
-        "object_of_interest" : "BOTTLE"
+        "origin" : "",
+        "goal" : "",
+        "task_type" : "",
+        "object_of_interest" : ""
     },
     "bot_joint_params": {
     },
@@ -21,7 +21,11 @@
         "speech_in" : {
             "text" : "Hello, I am your robot",
             "recognized_emotion" : "NONE"
-        }
+        },
+        "wakeword": "",
+        "ack": "",
+        "command": "",
+        "response": ""
     },
     "teleop_commands" : {
         "last_command_stamp" : 0.0,

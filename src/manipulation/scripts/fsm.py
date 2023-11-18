@@ -155,6 +155,21 @@ class ManipulationFSM:
         nPickTriesAttempted = 0
         nPickTriesAllowed = self.n_max_pick_attempts
 
+        # self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
+        # ee_pose = self.manipulationMethods.getEndEffectorPose()
+        self.visualServoing.scene_parser.set_object_id(goal.objectId)
+        # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        # grasp = self.scene_parser.get_grasp(publish = True)
+        # plane = self.scene_parser.get_plane()
+        # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
+        # # self.visualServoing.alignObjectHorizontal()
+        # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        # grasp = self.scene_parser.get_grasp(publish = True)
+        # plane = self.scene_parser.get_plane(publish = False)
+        # print(grasp)
+        # print(plane)
+        # exit() 
+        # self.state = States.PICK   
 
         try: 
             while True:
@@ -190,20 +205,21 @@ class ManipulationFSM:
                     ee_pose = self.manipulationMethods.getEndEffectorPose()
                     self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
 
-                    self.scene_parser.set_point_cloud() #converts depth image into point cloud
-                    grasp = self.scene_parser.get_grasp()
+                    self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+                    grasp = self.scene_parser.get_grasp(publish = True)
                     plane = self.scene_parser.get_plane()
+                    
                     
                     if grasp and plane:
                         plane_height = plane[1]
-                        
-                        self.heightOfObject = abs(grasp[2] - plane_height)
+                        grasp_center, grasp_yaw = grasp
+                        self.heightOfObject = abs(grasp_center[2] - plane_height)
                         
                         
                         offsets = self.offset_dict[self.label2name[goal.objectId]]
                         self.manipulationMethods.pick(
                             self.trajectoryClient, 
-                            grasp + np.array(offsets),
+                            grasp_center + np.array(offsets),
                             moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                         ) 
                         

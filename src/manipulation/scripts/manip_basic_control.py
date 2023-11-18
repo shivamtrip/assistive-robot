@@ -75,7 +75,8 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
             "head_pan;to" : -np.pi/2,
-            "head_tilt;to" : -30 * np.pi/180
+            "head_tilt;to" : -30 * np.pi/180,
+            'arm;to' : 0,
             # "head_tilt;to" : 0 * np.pi/180
         })
         move_to_pose(trajectoryClient, {
@@ -123,7 +124,7 @@ class ManipulationMethods:
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
 
         
-        if x_g - ee_x > 0.025:
+        if abs(x_g - ee_x) > 0.02:
             move_to_pose(trajectoryClient, {
                 'base_translate;by' : x_g - ee_x
             })
@@ -141,7 +142,7 @@ class ManipulationMethods:
             self.move_until_contact(
                 trajectoryClient,
                 {
-                    "lift;to": z - 0.2,
+                    "lift;to": z_g - 0.2,
                 }
             )
         
@@ -151,7 +152,7 @@ class ManipulationMethods:
         rospy.sleep(3)
 
         move_to_pose(trajectoryClient, {
-            "lift;to": z + 0.10,
+            "lift;by": 0.1,
             "arm;to" : 0,
             "wrist_yaw;to" : np.pi,
         })
