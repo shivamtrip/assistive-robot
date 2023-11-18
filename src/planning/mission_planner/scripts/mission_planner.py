@@ -125,13 +125,13 @@ class Mission_Planner():
         if self.current_task_type == TaskType.DELIVERY.name:
 
             
-            # # Navigate to Pick-up Location            
-            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
-            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
-            # if not navSuccess:
-            #     return
+            # Navigate to Pick-up Location            
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
+            if not navSuccess:
+                return
 
-            # print("Reached pick-up location")
+            print("Reached pick-up location")
 
             # Search for and pick-up object
             self.update_mission_status(GlobalStates.MANIPULATION_TO_PICK)

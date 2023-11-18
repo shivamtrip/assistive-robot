@@ -35,7 +35,7 @@ class NavigationManager():
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
         self.movebase_client.wait_for_server()
 
-        self.global_map_client = dynamic_reconfigure.client.Client("/move_base/local_costmap/rgbd_obstacle_layer", timeout = 10)
+        self.global_map_client = dynamic_reconfigure.client.Client("/move_base/global_costmap/rgbd_obstacle_layer", timeout = 10)
         self.local_map_client = dynamic_reconfigure.client.Client("/move_base/local_costmap/rgbd_obstacle_layer", timeout = 10)
 
         self.navman_server.start()

@@ -90,7 +90,7 @@ class AlignToObject:
                 rospy.sleep(5)
                 nRotates += 1
 
-            if nRotates >= 3:
+            if nRotates >= 5:
                 return False
         rospy.sleep(1)
 

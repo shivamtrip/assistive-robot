@@ -111,7 +111,7 @@
             }
         },
         "status": {
-            "battery_percent": 47,
+            "battery_percent": 0,
             "current_task": {
                 "object_type": "BOTTLE",
                 "relative_name": "Tony",
@@ -124,7 +124,7 @@
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1700279021.2038798,
+            "last_update": 1700282345.3174112,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {
