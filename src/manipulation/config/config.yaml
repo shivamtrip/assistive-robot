@@ -16,7 +16,7 @@ head_tilt_angle_grasp : 30 # degrees
 
 
 
-moving_average_n : 25 # for PID settling time
+moving_average_n : 10 # for PID settling time
 max_graspable_distance: 0.77
 mean_err_horiz_alignment : 0.08
 
@@ -30,7 +30,7 @@ object_filter:
   radius : 2.5
 
 offsets:
-  bottle: [0, -0.02, 0.0]
+  bottle: [0, 0.0, 0.0]
   apple: [0, 0.0, 0.0]
   remote: [0, 0.0, 0.0]
   banana : [0, 0.0, 0.0]

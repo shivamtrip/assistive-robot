@@ -76,7 +76,7 @@ class ManipulationMethods:
             "lift;to" : 0.85,
             "head_pan;to" : -np.pi/2,
             "head_tilt;to" : -30 * np.pi/180,
-            'arm;to' : 0,
+            'arm;to' : 0.1,
             # "head_tilt;to" : 0 * np.pi/180
         })
         move_to_pose(trajectoryClient, {
@@ -120,7 +120,15 @@ class ManipulationMethods:
     def pick(self, trajectoryClient, grasp, moveUntilContact = False):
         """ Called after the pregrasp pose is reached"""
 
-        x_g, y_g, z_g = grasp
+        (x_g, y_g, z_g), grasp_yaw = grasp
+        
+        print(grasp_yaw)
+        if moveUntilContact:
+            move_to_pose(trajectoryClient, {
+                'wrist_yaw;to' : grasp_yaw
+            })
+            rospy.sleep(3)
+        
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
 
         
@@ -130,10 +138,11 @@ class ManipulationMethods:
             })
             rospy.sleep(3)
         
-        move_to_pose(trajectoryClient, {
-            "lift;by": z_g - ee_z,
-        })
-        
+        if not moveUntilContact:
+            move_to_pose(trajectoryClient, {
+                "lift;by": z_g - ee_z,
+            })
+            
         move_to_pose(trajectoryClient, {
             "arm;to": abs(y_g - ee_y),
         })

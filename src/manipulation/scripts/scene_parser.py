@@ -439,11 +439,12 @@ class SceneParser:
         
         grasp_center = np.array(ori_bbox.center)
         grasp_yaw = np.arctan2(axis_vec[1], axis_vec[0])
+        grasp_yaw = np.mod(grasp_yaw + 2 * np.pi, 2 * np.pi) - np.pi
         
         if publish:
             rospy.loginfo("Publishing grasp pose")
             self.tf_broadcaster.sendTransform((grasp_center),
-                tf.transformations.quaternion_from_euler(0, 0, 0),
+                tf.transformations.quaternion_from_euler(0, 0, grasp_yaw),
                 rospy.Time.now(),
                 "grasp_pose",
                 "base_link"

@@ -26,9 +26,10 @@ if __name__ == '__main__':
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
+    class_list = rospy.get_param('/object_detection/class_list')
     node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 10
+    goal.objectId = class_list.index('remote')
     goal.isPick = True
     node.main(goal)
     rospy.sleep(5)

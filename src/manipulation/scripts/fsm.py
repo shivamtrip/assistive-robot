@@ -114,7 +114,7 @@ class ManipulationFSM:
         # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
         # grasp = self.scene_parser.get_grasp(publish = True)
         # plane = self.scene_parser.get_plane(publish = True)
-        
+        # print(grasp)
         # ee_pose = self.manipulationMethods.getEndEffectorPose()
         # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
         # self.visualServoing.alignObjectHorizontal()
@@ -162,7 +162,7 @@ class ManipulationFSM:
 
                     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                     grasp = self.scene_parser.get_grasp(publish = True)
-                    plane = self.scene_parser.get_plane(publish = True)
+                    # plane = self.scene_parser.get_plane(publish = True)
                     
                     
                     if grasp and plane:
@@ -170,11 +170,12 @@ class ManipulationFSM:
                         grasp_center, grasp_yaw = grasp
                         self.heightOfObject = abs(grasp_center[2] - plane_height)
                         
-                        
                         offsets = self.offset_dict[self.label2name[goal.objectId]]
+                        offsets[1] -= 0.02 #constant safety factor
+                        grasp = (grasp_center + np.array(offsets)), grasp_yaw
                         self.manipulationMethods.pick(
                             self.trajectoryClient, 
-                            grasp_center + np.array(offsets),
+                            grasp,
                             moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                         ) 
                         
