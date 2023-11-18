@@ -64,24 +64,29 @@ class InterfaceManager:
         while not rospy.is_shutdown():
             
             with open(self.firebase_schema_path) as f:
-                self.current_cloud_status = json.load(f)
+                try:
+                    self.current_cloud_status = json.load(f)
 
-            for system in self.system_list:
+                    for system in self.system_list:
 
-                if self.current_cloud_status[system]['id'] == self.system_id:
+                        if self.current_cloud_status[system]['id'] == self.system_id:
 
-                    for remote in self.remote_list:
-                        for button in self.button_list:
-                            
-                            if self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] == "1":
-                                
-                                print(f"{button} -- {remote} -- {system} is ON")
-                                
-                                self.inform_mission_planner(button, remote, system)
-                
-                self.server_updater.system_number = system
+                            for remote in self.remote_list:
+                                for button in self.button_list:
+                                    
+                                    if self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] == "1":
+                                        
+                                        print(f"{button} -- {remote} -- {system} is ON")
+                                        
+                                        self.inform_mission_planner(button, remote, system)
+                        
+                        self.server_updater.system_number = system
 
-                break
+                        break
+
+                except ValueError:
+                    print("JSON Decoding has failed.")
+                    
             rospy.sleep(self.update_delay)
                             
                             

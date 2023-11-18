@@ -8,8 +8,8 @@
      <!-- <arg name="rs_initial_reset"  default="true" doc="whether to reset camera before streaming, useful if the camera got into a bad state in the last session" /> -->
 
      <!-- REDUCE RATE AND USE NUC TIME -->
-     <node name="d435i_accel_correction" pkg="stretch_core" type="d435i_accel_correction" output="screen" />  
-     <!-- <include file="$(find image_shrink)/launch/image_shrinker.launch" /> -->
+     <!-- <node name="d435i_accel_correction" pkg="stretch_core" type="d435i_accel_correction" output="screen" />   -->
+     <include file="$(find image_shrink)/launch/image_shrinker.launch" />
           
 
           <!-- REALSENSE D435i -->

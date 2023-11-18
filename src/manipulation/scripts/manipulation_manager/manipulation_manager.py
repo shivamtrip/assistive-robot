@@ -32,7 +32,6 @@ class ManipulationManager:
 
     def __init__(self):
 
-        
         self.prev_state = None
         self.current_state = None
         self.manipulation_state = None
@@ -106,8 +105,9 @@ class ManipulationManager:
         self.current_state = State.SEARCH
         self.manipulation_state = State.PICK if goal.isPick else State.PLACE
 
+        self.num_retries = 0
 
-        while self.current_state != State.COMPLETE:
+        while self.current_state != State.COMPLETE and self.num_retries < 5:
 
             self.prev_state = self.current_state
 
@@ -151,8 +151,12 @@ class ManipulationManager:
                 print(f"Manipulation failed during the {self.prev_state.name} state.")
                 self.manip_man_result.success = False
                 self.manip_man_server.set_succeeded(self.manip_man_result)
-                return False
-        
+
+                if self.num_retries > 5:
+                    return False
+
+                self.num_retries += 1
+                self.current_state = State.SEARCH 
 
         # Stop ArUco detector
         print("Stopping Aruco Detections")

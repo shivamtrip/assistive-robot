@@ -35,7 +35,7 @@ class TaskExecutor:
 
 
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
-        
+        self.startNavService.wait_for_service()
 
         self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_manager', TriggerAction)
@@ -51,6 +51,9 @@ class TaskExecutor:
 
 
         self.stow_robot_service()
+
+        self.startNavService()
+        rospy.sleep(0.5)
 
 
         print("Task Executor Initialized")
