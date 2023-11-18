@@ -13,7 +13,7 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedb
 from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
 from moveback_recovery.msg import MovebackRecoveryAction, MovebackRecoveryGoal
 from utils import get_quaternion
-
+import dynamic_reconfigure.client
 
 class NavigationManager():
 
@@ -30,19 +30,27 @@ class NavigationManager():
         self.nav_result = None
 
         self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, self.update_goal, False)
-
         self.movebase_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-
-        # self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
         self.movebase_client.wait_for_server()
 
-        # self.moveback_client.wait_for_server()
+        self.global_map_client = dynamic_reconfigure.client.Client("/move_base/local_costmap/rgbd_obstacle_layer", timeout = 10)
+        self.local_map_client = dynamic_reconfigure.client.Client("/move_base/local_costmap/rgbd_obstacle_layer", timeout = 10)
 
         self.navman_server.start()
         print("NavMan Server has started..")
         
+
+
+    def navigation_dynamic_reconfigure(self, rgbd_layer_status):
+
+        self.global_reconfigure_params = { 'enabled' : rgbd_layer_status, 'publish_voxel_map' : rgbd_layer_status}
+        self.local_reconfigure_params = { 'enabled' : rgbd_layer_status, 'publish_voxel_map' : rgbd_layer_status}
+
+        global_map_config = self.global_map_client.update_configuration(self.global_reconfigure_params)
+        local_map_config = self.local_map_client.update_configuration(self.local_reconfigure_params)
+
 
     def update_goal(self, goal : NavManGoal):
         
@@ -52,7 +60,15 @@ class NavigationManager():
         self.nav_goal_y = goal.y
         self.nav_goal_theta = goal.theta
 
+        self.rgbd_layer_status = True
+        print("Navigation Manager will now ENABLE 3D Navigation")
+        self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
+        print("Navigation Manager has enabled 3D Navigation")
+
+        rospy.sleep(3)
+
         self.navigate_to_goal()
+
 
 
 
@@ -117,6 +133,12 @@ class NavigationManager():
         navman_result = NavManResult()
 
         if self.nav_result:
+            
+            self.rgbd_layer_status = False
+            print("Navigation Manager will now DISABLE 3D Navigation")
+            self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
+            print("Navigation Manager has disabled 3D Navigation")
+
             navman_result.success = True
             self.navman_server.set_succeeded(navman_result)
             print("We have successfully reached the goal!!")

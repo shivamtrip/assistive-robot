@@ -11,6 +11,7 @@ import os
 import json
 
 
+
 class TaskExecutor:
 
 
@@ -37,11 +38,13 @@ class TaskExecutor:
         
 
         self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
-        self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
-
+        self.manipulation_client = actionlib.SimpleActionClient('manipulation_manager', TriggerAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Manipulation Manager server...")
+        self.manipulation_client.wait_for_server()
 
 
         self.heightOfObject = 0.84 # change this to a local variable later on 
@@ -99,10 +102,13 @@ class TaskExecutor:
         if not isPick:
             goalObject = 60 #table
 
-        goal = TriggerGoal(isPick = isPick, heightOfObject = self.heightOfObject)
+        goal = TriggerGoal()
+        goal.isPick = isPick
         goal.objectId = goalObject
         self.manipulation_client.send_goal(goal, feedback_cb = self.dummy_cb)
+        print("Task Executor has sent goal to Manipulation Manager")
         self.manipulation_client.wait_for_result()
+        print("Task Executor received result from Manipulation Manager")
         result: TriggerResult = self.manipulation_client.get_result()
         if result.success:
             self.heightOfObject = result.heightOfObject

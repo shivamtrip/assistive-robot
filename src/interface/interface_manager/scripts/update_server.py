@@ -41,6 +41,9 @@ class ServerUpdater:
 
         self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] = "0"
 
+        with open(self.firebase_schema_path, "w") as f:
+            json.dump(self.current_cloud_status, f, indent = 4)
+
         self.update_server(self.current_cloud_status)
 
 

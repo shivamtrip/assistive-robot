@@ -57,7 +57,7 @@ class Mission_Planner():
         Task Allocator adds information regarding the newly added task to the task queue    
         """
         
-        print("Just received a new task from the Interface Manager!")
+        print("Mission Planner received a new task from the Interface Manager!")
         self.task_queue.append(msg)
 
 
@@ -115,23 +115,23 @@ class Mission_Planner():
         #     self.current_task_location_1 = # home base location
         #     self.current_task_location_2 = None
 
-        self.status_update_to_interface_manager()
+        # self.status_update_to_interface_manager()
 
 
     def execute_task(self):
 
-        print("Executing next task!", self.count)
+        print(f"Executing next task! Remaing queue size is {len(self.task_queue)}")
 
         if self.current_task_type == TaskType.DELIVERY.name:
 
             
-            # Navigate to Pick-up Location            
-            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
-            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
-            if not navSuccess:
-                return
+            # # Navigate to Pick-up Location            
+            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
+            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
+            # if not navSuccess:
+            #     return
 
-            print("Reached pick-up location")
+            # print("Reached pick-up location")
 
             # Search for and pick-up object
             self.update_mission_status(GlobalStates.MANIPULATION_TO_PICK)
@@ -140,11 +140,11 @@ class Mission_Planner():
                 rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
 
 
-            # Navigate to delivery location
-            self.update_mission_status(GlobalStates.NAVIGATION_TO_PLACE)
-            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
-            if not self.update_mission_status(navSuccess):
-                return 
+            # # Navigate to delivery location
+            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PLACE)
+            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
+            # if not self.update_mission_status(navSuccess):
+            #     return 
 
 
             # # Place object at delivery location
@@ -205,6 +205,8 @@ class Mission_Planner():
 
                 self.execute_task()
                 # self.system_state = States.TASK_MODE
+
+                print("TASK QUEUE SIZE", len(self.task_queue))
 
             rate.sleep()
 

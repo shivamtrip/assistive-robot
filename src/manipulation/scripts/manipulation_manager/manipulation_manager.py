@@ -10,7 +10,7 @@ from visual_servoing import AlignToObject
 from manipulation_methods import ManipulationMethods
 from control_msgs.msg import FollowJointTrajectoryAction
 import numpy as np
-
+# from manipulation.srv import ArUcoStatus, ArUcoStatusResponse
 
 class State(Enum):
     SEARCH = 1
@@ -44,17 +44,25 @@ class ManipulationManager:
         print("Waiting for trajectory server")
         self.trajectoryClient.wait_for_server()
 
-        self.server = actionlib.SimpleActionServer('manipulation_manager', TriggerAction, execute_cb=self.main, auto_start=False)
+        self.manip_man_server = actionlib.SimpleActionServer('manipulation_manager', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.aruco_detector = ArUcoDetector()
-        self.visual_servoing = AlignToObject(self.trajectoryClient)
+        self.visual_servoing = AlignToObject(self.trajectoryClient, self.aruco_detector)
         self.manipulation_methods = ManipulationMethods()
+
+        # self.aruco_status_service = rospy.ServiceProxy('/start_aruco_detection', ArUcoStatus)
+        # self.aruco_status_service.wait_for_service()
+        # self.aruco_status_message = ArUcoStatus()
 
         rospy.loginfo("waiting for stow robot service")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
         self.stow_robot_service()
 
+        self.manip_man_server.start()
+
+        self.manip_man_result = TriggerResult()
+        
         rospy.loginfo("Manipulation Manager is ready\n")
 
 
@@ -86,6 +94,15 @@ class ManipulationManager:
 
     def main(self,  goal: TriggerGoal):
         
+        print("Manipulation Manager received goal from Mission Planner")
+
+        # Start ArUco detector
+        print("Starting Aruco Detections")
+        self.aruco_detector.detect_aruco = True
+        # self.aruco_detector.first_print = False
+        # self.aruco_status_message.status = True
+        # self.aruco_status_service(self.aruco_status_message)
+
         self.current_state = State.SEARCH
         self.manipulation_state = State.PICK if goal.isPick else State.PLACE
 
@@ -123,11 +140,28 @@ class ManipulationManager:
             rospy.sleep(2)
       
 
-        if self.current_state == State.FAILED:
-            print(f"Manipulation failed during the {self.prev_state.name} state.")
-            return False
+            if self.current_state == State.FAILED:
+                # Stop ArUco detector
+                print("Stopping Aruco Detections")
+                self.aruco_detector.detect_aruco = False
+                # self.aruco_detector.first_print = False
+                # self.aruco_status_message.status = False
+                # self.aruco_status_service(self.aruco_status_message)
+
+                print(f"Manipulation failed during the {self.prev_state.name} state.")
+                self.manip_man_result.success = False
+                self.manip_man_server.set_succeeded(self.manip_man_result)
+                return False
         
 
+        # Stop ArUco detector
+        print("Stopping Aruco Detections")
+        self.aruco_detector.detect_aruco = False
+        # self.aruco_detector.first_print = False
+        # self.aruco_status_message.status = False
+        # self.aruco_status_service(self.aruco_status_message)
+        self.manip_man_result.success = True
+        self.manip_man_server.set_succeeded(self.manip_man_result)
         print("Successfully completed manipulation!")
         return True
         
@@ -138,10 +172,10 @@ if __name__ == '__main__':
     rospy.init_node('manipulation_manager')
     manipulation_manager = ManipulationManager()
 
-    goal= TriggerGoal()
-    goal.isPick= True
-    # goal.isPick = False
-    manipulation_manager.main(goal)
+    # goal= TriggerGoal()
+    # goal.isPick= True
+    # # goal.isPick = False
+    # manipulation_manager.main(goal)
     
     try:
         rospy.spin()

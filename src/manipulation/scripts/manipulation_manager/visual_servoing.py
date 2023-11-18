@@ -13,7 +13,7 @@ from aruco_detection import ArUcoDetector
     
 
 class AlignToObject:
-    def __init__(self, trajectoryClient):
+    def __init__(self, trajectoryClient, aruco_detector):
 
         self.rate = 10.0
         self.kp = {
@@ -38,7 +38,7 @@ class AlignToObject:
         self.trajectoryClient = trajectoryClient
 
 
-        self.aruco_detector = ArUcoDetector()
+        self.aruco_detector = aruco_detector
         self.manipulation_methods = ManipulationMethods()
         self.requestClearObject = False
         self.objectLocArr = []
@@ -107,11 +107,25 @@ class AlignToObject:
 
         maxGraspableDistance = 0.77
 
-        result = self.aruco_detector.getArucoLocation()
-        rospy.sleep(0.5)
-        if result is None:
-            print("Aruco not detected")
-            return False
+        result = None
+        first_print = False
+        detection_start_time = time.time()
+        detection_duration = 0
+
+        while not result:
+            result = self.aruco_detector.getArucoLocation()
+            if not result and not first_print:
+                print("Aruco not yet detected.")
+                first_print = True
+
+            detection_duration = time.time() - detection_start_time
+            # return False
+
+            if detection_duration > 10:
+                print("Did not detect an ArUco even after 10 seconds.")
+                return False
+
+        print("Aruco has been detected!")
         
         distanceToMove = result[0] - maxGraspableDistance
         print("\ndistance to move: ",distanceToMove)
@@ -142,6 +156,7 @@ class AlignToObject:
                 'base_translate;vel' : vel,
             })  
 
+        return True
 
 
     def alignObjectForManipulation(self):

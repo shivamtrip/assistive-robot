@@ -92,7 +92,7 @@
             "remote_2": {
                 "button": {
                     "button_1": {
-                        "object_type": "",
+                        "object_type": "BOTTLE",
                         "relative_name": "",
                         "state": "0",
                         "task_type": ""
@@ -106,25 +106,25 @@
                 },
                 "current_eta": "",
                 "current_task": "",
-                "resident_name": "",
-                "room_number": ""
+                "resident_name": "Blake",
+                "room_number": "202"
             }
         },
         "status": {
-            "battery_percent": 0,
+            "battery_percent": 47,
             "current_task": {
-                "object_type": "",
-                "relative_name": "",
-                "resident_name": "",
-                "room_number": "",
-                "task_type": ""
+                "object_type": "BOTTLE",
+                "relative_name": "Tony",
+                "resident_name": "Adam",
+                "room_number": "201",
+                "task_type": "DELIVERY"
             },
-            "global_state": "IDLE",
+            "global_state": "MANIPULATION_TO_PICK",
             "hri_params": {
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1699748044.1825154,
+            "last_update": 1700279021.2038798,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {

@@ -16,6 +16,15 @@ from geometry_msgs.msg import PoseStamped
 import time
 import tf
 from scipy.spatial.transform import Rotation as R
+from std_srvs.srv import Trigger
+# from manipulation.srv import ArUcoStatus, ArUcoStatusResponse
+from enum import Enum
+
+
+class State(Enum):
+    START = 1
+    STOP = 2
+
 
 def get_camera_params(camera_info_topic):
     """
@@ -39,11 +48,11 @@ def get_camera_params(camera_info_topic):
     # Subscribe to the camera info topic and wait for first message
     rospy.loginfo(f"Subscribing to camera info topic '{camera_info_topic}'...")
     sub = rospy.Subscriber(camera_info_topic, CameraInfo, camera_info_callback)
-    print("About to see camera matrix")
+    # print("About to see camera matrix")
     while camera_matrix is None or distortion_coefficients is None:
         rospy.sleep(0.1)
-        print("Seeing camera matrix")
-    print("Saw camera matrix")
+        # print("Seeing camera matrix")
+    # print("Saw camera matrix")
     sub.unregister()
     rospy.loginfo("Received camera parameters:")
     rospy.loginfo(f"Camera matrix: {camera_matrix}")
@@ -65,8 +74,15 @@ class ArUcoDetector:
 
         self.bridge = CvBridge()
 
-        # Subscribe to Image and Publish Aruco pose
-        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
+        self.detect_aruco = False
+        self.state = State.STOP
+        self.first_print = False
+
+        # self.aruco_status_sub = rospy.Subscriber('aruco_detector_status', bool, self.aruco_status_control)
+        # self.aruco_status_service = rospy.Service('/start_aruco_detection', ArUcoStatus, self.aruco_status_control)
+        
+        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.aruco_status_control)
+
         # self.image_sub = rospy.Subscriber("/camera/infra1/image_rect_raw", Image, self.image_callback)
 
         self.pose_pub = rospy.Publisher("/aruco/pose", PoseStamped, queue_size=1)
@@ -153,7 +169,6 @@ class ArUcoDetector:
         rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(to_frame_rel, from_frame_rel))
         return None
 
-
     def getArucoLocation(self, index = 0) -> PoseStamped:
        
         detections = self.detections
@@ -173,8 +188,22 @@ class ArUcoDetector:
             return [x_b, y_b, z_b]
         else:
             return None
-        
+
+    def aruco_status_control(self, msg):
+
+        if self.detect_aruco:
+            self.image_callback(msg)
+
+        # if msg.status == True:
+        #     # Subscribe to Image and Publish Aruco pose
+        #     print("Starting ArUco detector")
+        #     self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
+        #     return 
+        # else:
+        #     print("Stopping ArUco detector")
+        #     self.image_sub.unregister()
  
+
 
 if __name__ == '__main__':
     rospy.init_node('arucodetector')
