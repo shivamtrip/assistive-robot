@@ -37,6 +37,18 @@ class BotStateManager():
         self.last_update_time = time.time()
         self.updateCallback = updateCallback
 
+    def update_param(self, path, value):
+        child = self.firebaseNode.db
+        for key in path.split("/"):
+            child = child.child(key)
+        child.set(value)
+
+        # Update self.state_dict
+        keys = path.split("/")
+        current_dict = self.state_dict
+        for key in keys[:-1]:
+            current_dict = current_dict[key]
+        current_dict[keys[-1]] = value
 
     def isAutonomous(self):
         self.pollOperationState()

@@ -1,9 +1,11 @@
 <launch>
   <param name="/alfred_driver/broadcast_odom_tf" type="bool" value="true"/>
   <param name="/alfred_driver/mode" type="string" value="navigation" />
-  <param name="robot_description" textfile="$(find alfred_core)/config/stretch.urdf" />
-  <arg name="calibrated_controller_yaml_file" value="$(find alfred_core)/config/controller_calibration_head.yaml"/>
-
+  <!-- <param name="robot_description" textfile="$(find alfred_core)/config/stretch.urdf" />
+  <arg name="calibrated_controller_yaml_file" value="$(find alfred_core)/config/controller_calibration_head.yaml"/> -->
+  <param name="robot_description" textfile="$(find stretch_description)/urdf/stretch.urdf" />
+  <arg name="calibrated_controller_yaml_file" value="$(find stretch_core)/config/controller_calibration_head.yaml"/>
+  
   <node
       name="joint_state_publisher"
       pkg="joint_state_publisher"

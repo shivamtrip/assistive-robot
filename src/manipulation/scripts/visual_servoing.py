@@ -44,8 +44,7 @@ class State(Enum):
 
 
 class AlignToObject:
-    def __init__(self, objectId, scene_parser : SceneParser):
-        self.objectId = objectId
+    def __init__(self, scene_parser : SceneParser):
         self.node_name = 'visual_alignment'
         self.state = State.SEARCH
         
@@ -97,7 +96,7 @@ class AlignToObject:
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
-                rospy.sleep(0.5) #settling time.
+                rospy.sleep(self.vs_range[3]) #settling time.
 
             [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
             self.scene_parser.clear_observations()
@@ -265,14 +264,8 @@ class AlignToObject:
         
         return True
 
-    def main(self, objectId):
-        self.objectId = objectId
-        rospy.loginfo("Triggered Visual Servoing for object of interest:" + str(objectId))
-        # self.alignObjectHorizontal()
-        # while not rospy.is_shutdown():
-        #     rospy.sleep(0.5)
-        # exit()
-        self.scene_parser.set_object_id(objectId)
+    def main(self):
+        rospy.loginfo("Triggered Visual Servoing")
         
         while True:
             if self.state == State.SEARCH:

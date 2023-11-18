@@ -1,0 +1,5 @@
+# Update a param on firebase
+string path
+string value
+---
+bool success

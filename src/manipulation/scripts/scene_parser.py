@@ -23,7 +23,8 @@ class SceneParser:
         self.rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
         self.boundingBoxSub = message_filters.Subscriber("/object_bounding_boxes", Detections)
         
-        self.point_cloud_publisher = rospy.Publisher('point_cloud_topic', PointCloud2, queue_size=10)
+        self.obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
+        self.plane_cloud_pub = rospy.Publisher('/plane_cloud', PointCloud2, queue_size=10)
         
         self.obtained_initial_images = False
         self.request_clear_object = False
@@ -60,6 +61,7 @@ class SceneParser:
             rospy.loginfo("Waiting for initial images")
             rospy.sleep(0.5)
             if time.time() - starttime > 10:
+                rospy.loginfo("Failed to obtain images. Please check the camera node.")
                 exit()
         
         self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
@@ -68,11 +70,6 @@ class SceneParser:
         self.listener = tf.TransformListener()
         self.tf_ros = tf.TransformerROS()
         self.tf_broadcaster = tf.TransformBroadcaster()
-        
-        
-
-        
-        
 
         rospy.loginfo("Scene parser initialized")
 
@@ -209,7 +206,7 @@ class SceneParser:
         y_gb = (y_f - cy) * z/ fy
 
         camera_point = PointStamped()
-        camera_point.header.frame_id = '/camera_color_optical_frame'
+        camera_point.header.frame_id = 'camera_color_optical_frame'
         camera_point.point.x = x_gb
         camera_point.point.y = y_gb
         camera_point.point.z = z
@@ -328,12 +325,12 @@ class SceneParser:
                 PointField('g', 13, PointField.UINT8, 1),
                 PointField('b', 14, PointField.UINT8, 1),
             ]
-            cols = np.array(o3dpcd.select_by_index(inliers).colors) * 255
-            cols = cols.astype(np.uint8)
-            inlier_points = np.hstack((inlier_points, cols ))
-            msg = pcl2.create_cloud(header, fields, inlier_points)
-            
-            self.point_cloud_publisher.publish(msg)
+            # cols = np.array(o3dpcd.select_by_index(inliers).colors) * 255
+            # cols = cols.astype(np.uint8)
+            # inlier_points = np.hstack((inlier_points, cols ))
+            # msg = pcl2.create_cloud(header, fields, inlier_points)
+            msg = pcl2.create_cloud_xyz32(header, inlier_points)
+            self.plane_cloud_pub.publish(msg)
             
         plane_bounds = [
             np.min(inlier_points[:, 0]), 
@@ -379,10 +376,11 @@ class SceneParser:
             ]
             points = self.object_points
             cols = self.object_colors * 255
-            cols = cols.astype(np.uint8)
-            inlier_points = np.hstack((points, cols))
-            msg = pcl2.create_cloud(header, fields, inlier_points)
-            self.point_cloud_publisher.publish(msg)
+            # cols = cols.astype(np.uint8)
+            # inlier_points = np.hstack((points, cols))
+            # msg = pcl2.create_cloud(header, fields, inlier_points)
+            msg = pcl2.create_cloud_xyz32(header, points)
+            self.obj_cloud_pub.publish(msg)
         
         
         if visualize:

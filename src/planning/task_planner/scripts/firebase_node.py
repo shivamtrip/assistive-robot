@@ -17,7 +17,7 @@ class FirebaseNode:
             config = json.load(f)
 
         self.firebase = pyrebase.initialize_app(config)
-        self.db = self.firebase.database()
+        self.db = self.firebase.database().child("alfred_fvd")
         # self.db.remove("")
         # self.db.set(schema)
 

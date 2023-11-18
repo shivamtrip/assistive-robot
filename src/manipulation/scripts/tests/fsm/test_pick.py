@@ -28,7 +28,7 @@ if __name__ == '__main__':
     startManipService()
     node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 8
+    goal.objectId = 10
     goal.isPick = True
     node.main(goal)
     rospy.sleep(5)

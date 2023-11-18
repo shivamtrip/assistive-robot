@@ -26,7 +26,7 @@ from std_srvs.srv import Trigger, TriggerResponse
 from control_msgs.msg import FollowJointTrajectoryAction
 
 from alfred_msgs.msg import Speech, SpeechTrigger
-from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest
+from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest, UpdateParam, UpdateParamRequest, UpdateParamResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 from alfred_navigation.msg import NavManAction, NavManGoal
@@ -86,6 +86,8 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for driver..")
         self.trajectoryClient.wait_for_server()
 
+        # Create a service to update firebase params
+        self.updateParamService = rospy.Service('/updateParam', UpdateParam, self.updateParamServiceCallback)
 
         self.task_requested = False
         self.time_since_last_command = rospy.Time.now()
@@ -111,6 +113,10 @@ class TaskPlanner:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
+
+    def updateParamAction(self, msg):
+        self.bot_state.update_param(msg.path, msg.value)
+        return UpdateParamResponse()
 
     def idleCallback(self, event):
         if not self.bot_state.isAutonomous() and self.bot_state.isExtendedCommunicationLossTeleop():
@@ -210,6 +216,8 @@ class TaskPlanner:
         else:
             rospy.loginfo("Requesting verbal command.")
             self.process_verbal_response(VerbalResponseStates.SORRY)
+
+        self.bot_state.update_param("current_task/object_of_interest", "")
 
         self.bot_state.currentGlobalState = GlobalStates.IDLE
         self.task_requested = False

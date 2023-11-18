@@ -67,7 +67,7 @@ class ManipulationFSM:
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
 
-        self.visualServoing = AlignToObject(-1, self.scene_parser)
+        self.visualServoing = AlignToObject(self.scene_parser)
         self.manipulationMethods = ManipulationMethods()
         
         
@@ -81,53 +81,6 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
         self.server.publish_feedback(feedback)
 
-    def requestGraspAndPlaneFit(self, getGrasp = True, getPlane = True):
-        graspPoseGoal = GraspPoseGoal()
-        graspPoseGoal.request = self.goal.objectId
-        print("requesting grasp for object", self.goal.objectId)
-        self.send_feedback({"msg": "requesting grasp for object", "data": {"objectId": self.goal.objectId}})
-        graspSuccess = not getGrasp
-        planeSuccess = not getPlane
-
-        self.planeOfGrasp = None
-        self.grasp = None
-
-        planeFitGoal = PlaneDetectGoal()
-        while not (graspSuccess and planeSuccess):
-            if self.grasp is not None and self.grasp.success == True:
-                graspSuccess = True
-                self.state = States.WAITING_FOR_PLANE
-            elif getGrasp:
-                self.graspActionClient.send_goal(graspPoseGoal)
-                self.graspActionClient.wait_for_result()
-                self.grasp = self.graspActionClient.get_result()
-                rospy.loginfo(f"Received grasp = {self.grasp}", )
-
-            if self.planeOfGrasp is not None and self.planeOfGrasp.success == True:
-                planeSuccess = True
-                self.state = States.WAITING_FOR_GRASP
-            elif getPlane:
-                self.planeFitClient.send_goal(planeFitGoal)
-                self.planeFitClient.wait_for_result()
-                self.planeOfGrasp = self.planeFitClient.get_result()
-                rospy.loginfo(f"Received plane = {self.planeOfGrasp}", )
-
-        if getGrasp and getPlane:
-            self.heightOfObject = abs(self.grasp.z - self.planeOfGrasp.z)
-        
-        return self.grasp, self.planeOfGrasp
-
-    def estimatePlacingLocation(self, planeOfGrasp, heightOfObject):
-        x, y, z, a, b, c, d = planeOfGrasp.x, planeOfGrasp.y, planeOfGrasp.z, planeOfGrasp.a, planeOfGrasp.b, planeOfGrasp.c, planeOfGrasp.d
-        placingLocation = np.array([
-            x, 
-            abs(abs(y) - self.manipulationMethods.getEndEffectorPose()[0]), 
-            z
-        ])
-        placingLocation[2] += heightOfObject
-        
-        return placingLocation
-
     def reset(self):
         self.state = States.IDLE
         self.grasp = None
@@ -137,11 +90,12 @@ class ManipulationFSM:
         self.goal = goal
         self.state = States.IDLE
         objectManipulationState = States.PICK
-        self.visualServoing.objectId = goal.objectId
+
+        self.scene_parser.set_object_id(goal.objectId)
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
         
-        self.stow_robot_service()
+        # self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
@@ -156,20 +110,21 @@ class ManipulationFSM:
         nPickTriesAllowed = self.n_max_pick_attempts
 
         # self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-        # ee_pose = self.manipulationMethods.getEndEffectorPose()
-        self.visualServoing.scene_parser.set_object_id(goal.objectId)
+        
         # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
         # grasp = self.scene_parser.get_grasp(publish = True)
-        # plane = self.scene_parser.get_plane()
+        # plane = self.scene_parser.get_plane(publish = True)
+        
+        # ee_pose = self.manipulationMethods.getEndEffectorPose()
         # self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
-        # # self.visualServoing.alignObjectHorizontal()
+        # self.visualServoing.alignObjectHorizontal()
         # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
         # grasp = self.scene_parser.get_grasp(publish = True)
         # plane = self.scene_parser.get_plane(publish = False)
         # print(grasp)
         # print(plane)
         # exit() 
-        # self.state = States.PICK   
+        self.state = States.PICK   
 
         try: 
             while True:
@@ -203,11 +158,11 @@ class ManipulationFSM:
                     # basic planning here
                     self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
                     ee_pose = self.manipulationMethods.getEndEffectorPose()
-                    self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0] - 0.07, debug_print = {"ee_pose" : ee_pose})
+                    self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
 
                     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                     grasp = self.scene_parser.get_grasp(publish = True)
-                    plane = self.scene_parser.get_plane()
+                    plane = self.scene_parser.get_plane(publish = True)
                     
                     
                     if grasp and plane:
@@ -238,16 +193,11 @@ class ManipulationFSM:
                             nPickTriesAttempted += 1
 
                 elif self.state == States.PLACE:
-                    self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                    
-                    self.state = States.PLACE
                     heightOfObject = goal.heightOfObject
-                    move_to_pose(self.trajectoryClient, {
-                        'head_pan;to' : -np.pi/2,
-                    })
                     move_to_pose(
                         self.trajectoryClient,
                         {
+                            'head_pan;to' : -np.pi/2,
                             'base_rotate;by': np.pi/2,
                         }
                     )
