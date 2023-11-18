@@ -136,20 +136,37 @@ class AlignToObject:
         rospy.sleep(5)
 
 
+        detection_start_time = time.time()
+        detection_duration = 0
+        first_print = False
+
         while True:
             
             # detect aruco
             result = self.aruco_detector.getArucoLocation()
 
             if not result:
-                print("DID NOT detect Aruco")
                 vel = 0.0
+
+                if not first_print:
+                    print("DID NOT detect Aruco")
+                    first_print = True
+
+                detection_duration = time.time() - detection_start_time
+
+                if detection_duration > 5:
+                    print("Did not detect an ArUco even after 5 seconds.")
+                    return False
+
             else:
                 x, y, z = result
                 if x < maxGraspableDistance:
                     rospy.loginfo("Object is close enough now. Stopping the robot.")
                     break
                 vel = movement_vel
+                detection_start_time = time.time()
+                detection_duration = 0
+                first_print = False
 
 
             self.manipulation_methods.move_to_pose(self.trajectoryClient, {

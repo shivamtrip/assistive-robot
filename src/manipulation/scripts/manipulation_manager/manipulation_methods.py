@@ -130,7 +130,7 @@ class ManipulationMethods:
            "wrist_yaw;to" : np.pi,
         })
 
-        rospy.sleep(10)
+        rospy.sleep(3)      # previously 10
 
         if moveUntilContact:
             

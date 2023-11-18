@@ -60,12 +60,10 @@ class NavigationManager():
         self.nav_goal_y = goal.y
         self.nav_goal_theta = goal.theta
 
-        self.rgbd_layer_status = True
-        print("Navigation Manager will now ENABLE 3D Navigation")
-        self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
-        print("Navigation Manager has enabled 3D Navigation")
-
-        rospy.sleep(3)
+        # self.rgbd_layer_status = True
+        # print("Navigation Manager will now ENABLE 3D Navigation")
+        # self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
+        # print("Navigation Manager has enabled 3D Navigation")
 
         self.navigate_to_goal()
 
@@ -133,15 +131,17 @@ class NavigationManager():
         navman_result = NavManResult()
 
         if self.nav_result:
+
+            print("We have successfully reached the goal!!")
             
-            self.rgbd_layer_status = False
-            print("Navigation Manager will now DISABLE 3D Navigation")
-            self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
-            print("Navigation Manager has disabled 3D Navigation")
+            # self.rgbd_layer_status = False
+            # print("Navigation Manager will now DISABLE 3D Navigation")
+            # self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
+            # print("Navigation Manager has disabled 3D Navigation")
 
             navman_result.success = True
             self.navman_server.set_succeeded(navman_result)
-            print("We have successfully reached the goal!!")
+            
 
 
     def navigation_feedback(self, msg : MoveBaseFeedback):

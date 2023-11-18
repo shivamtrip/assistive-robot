@@ -84,7 +84,7 @@ class Mission_Planner():
         print("--- Updating Mission Status ---")
 
         self.bot_state.emotion = emotion
-        self.bot_state.global_state = state
+        self.bot_state.current_global_state = state
         self.bot_state.operation_mode = mode
 
         self.status_update_to_interface_manager()
@@ -137,21 +137,27 @@ class Mission_Planner():
             self.update_mission_status(GlobalStates.MANIPULATION_TO_PICK)
             manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], isPick = True)
             if not manipulationSuccess:
-                rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
+                rospy.loginfo("Manipulation failed. Cannot PICK object, returning to user")
+                return
 
+            print("Picked up object")
 
-            # # Navigate to delivery location
-            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PLACE)
-            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
-            # if not self.update_mission_status(navSuccess):
-            #     return 
+            # Navigate to delivery location
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PLACE)
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_2)
+            if not navSuccess:
+                return
 
+            print("Reached placing location")
 
-            # # Place object at delivery location
-            # manipulationSuccess = manipulate_object()
-            # if not self.update_mission_status(manipulationSuccess):
-            #     return 
+            # Place object at delivery location
+            self.update_mission_status(GlobalStates.MANIPULATION_TO_PLACE)
+            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], isPick = False)
+            if not manipulationSuccess:
+                rospy.loginfo("Manipulation failed. Cannot PLACE object, returning to user")
+                return
 
+            print("Placed object")
 
         # elif self.current_task_type == "videocall":
         #     navigate_to_location()      # In front of door
@@ -175,7 +181,7 @@ class Mission_Planner():
         status_message.last_update = time.time()
         status_message.battery_percent = self.bot_state.battery_percent
         status_message.operation_mode = self.bot_state.operation_mode.name
-        status_message.global_state = self.bot_state.global_state.name
+        status_message.global_state = self.bot_state.current_global_state.name
         status_message.emotion = self.bot_state.emotion.name
         status_message.music = self.bot_state.music
 

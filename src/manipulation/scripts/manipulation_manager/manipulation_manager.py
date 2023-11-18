@@ -143,7 +143,7 @@ class ManipulationManager:
             if self.current_state == State.FAILED:
                 # Stop ArUco detector
                 print("Stopping Aruco Detections")
-                self.aruco_detector.detect_aruco = False
+                
                 # self.aruco_detector.first_print = False
                 # self.aruco_status_message.status = False
                 # self.aruco_status_service(self.aruco_status_message)
@@ -153,6 +153,7 @@ class ManipulationManager:
                 self.manip_man_server.set_succeeded(self.manip_man_result)
 
                 if self.num_retries > 5:
+                    self.aruco_detector.detect_aruco = False
                     return False
 
                 self.num_retries += 1
