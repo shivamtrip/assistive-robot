@@ -13,7 +13,7 @@ from scipy.spatial.transform import Rotation as R
 from std_msgs.msg import Header
 import open3d as o3d
 import matplotlib.pyplot as plt
-from sensor_msgs.msg import PointCloud
+from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
 class SceneParser:
     def __init__(self):
@@ -318,7 +318,21 @@ class SceneParser:
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
-            msg = pcl2.create_cloud_xyz32(header, inlier_points)
+            
+            fields = [
+                PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1),
+                # rgb
+                PointField('r', 12, PointField.UINT8, 1),
+                PointField('g', 13, PointField.UINT8, 1),
+                PointField('b', 14, PointField.UINT8, 1),
+            ]
+            cols = np.array(o3dpcd.select_by_index(inliers).colors) * 255
+            cols = cols.astype(np.uint8)
+            inlier_points = np.hstack((inlier_points, cols ))
+            msg = pcl2.create_cloud(header, fields, inlier_points)
+            
             self.point_cloud_publisher.publish(msg)
             
         plane_bounds = [
@@ -354,9 +368,21 @@ class SceneParser:
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
-            msg = pcl2.create_cloud_xyz32(header, self.object_points)
+            fields = [
+                PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1),
+                # rgb
+                PointField('r', 12, PointField.UINT8, 1),
+                PointField('g', 13, PointField.UINT8, 1),
+                PointField('b', 14, PointField.UINT8, 1),
+            ]
+            points = self.object_points
+            cols = self.object_colors * 255
+            cols = cols.astype(np.uint8)
+            inlier_points = np.hstack((points, cols))
+            msg = pcl2.create_cloud(header, fields, inlier_points)
             self.point_cloud_publisher.publish(msg)
-        
         
         
         if visualize:
