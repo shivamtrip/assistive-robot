@@ -315,8 +315,8 @@ class SceneParser:
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(possible_plane_points)
         plane_model, inliers = o3dpcd.segment_plane(distance_threshold=0.02,
-                                                        ransac_n=3,
-                                                        num_iterations=1000)
+                                                        ransac_n=5,
+                                                        num_iterations=2000)
         inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
         
         if publish:

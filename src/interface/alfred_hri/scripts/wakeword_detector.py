@@ -95,7 +95,7 @@ class WakewordDetector():
             
 
     def run(self):
-        while True:
+        while not rospy.is_shutdown():
             if self.recorderStarted:
                 self.process_audio(self.recorder.read())
 

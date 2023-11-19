@@ -204,8 +204,7 @@ class TaskPlanner:
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
         # if not success:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
-        #     self.navigate_to_location(LocationOfInterest.TABLE)
-            # add waypoints
+        #     self.navigate_to_location_navman(LocationOfInterest.TABLE)
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         self.startManipService()

@@ -91,7 +91,7 @@ class AlignToObject:
         })
         
         nRotates = 0
-        while True:
+        while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
@@ -107,7 +107,7 @@ class AlignToObject:
                     'base_rotate;by' : angleToGo,
                     'head_pan;to' : 0,
                 })
-                break
+                return True
             else:
                 rospy.loginfo("Object not found, rotating base.")
                 self.scene_parser.clear_observations()
@@ -121,7 +121,7 @@ class AlignToObject:
             if nRotates >= self.recoveries['n_scan_attempts']:
                 return False
         
-        return True
+        return False
 
     def recoverFromFailure(self):
         rospy.loginfo("Attempting to recover from failure")        
@@ -159,7 +159,7 @@ class AlignToObject:
             rospy.loginfo("Object is close enough. Not moving.")
             return True
         
-        while True:
+        while not rospy.is_shutdown():
             motionTime = time.time() - startTime
             distanceMoved = motionTime * vel
             
@@ -174,7 +174,10 @@ class AlignToObject:
                 if object_location[0] < maxGraspableDistance:
                     rospy.loginfo("Object is close enough. Stopping.")
                     rospy.loginfo("Object location = {}".format(self.scene_parser.objectLocArr[-1]))
-                    break
+                    move_to_pose(self.trajectoryClient, {
+                        'base_translate;vel' : 0.0,
+                    })          
+                    return True
             if distanceMoved >= distanceToMove - 0.3:
                 if time.time() - lastDetectedTime > intervalBeforeRestart:
                     rospy.loginfo("Lost track of the object. Going back to search again.")
@@ -185,10 +188,8 @@ class AlignToObject:
 
             rospy.sleep(0.1)
 
-        move_to_pose(self.trajectoryClient, {
-            'base_translate;vel' : 0.0,
-        })          
-        return True
+        
+        return False
 
     def alignObjectForManipulation(self):
         """
@@ -267,7 +268,7 @@ class AlignToObject:
     def main(self):
         rospy.loginfo("Triggered Visual Servoing")
         
-        while True:
+        while not rospy.is_shutdown():
             if self.state == State.SEARCH:
                 success = self.findAndOrientToObject()                
                 if not success:

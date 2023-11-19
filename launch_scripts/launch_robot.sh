@@ -9,7 +9,7 @@
 # echo "set -g pane-border-format '[#[fg=white]#{?pane_active,#[bold],} #P #T #[fg=default,nobold]]'" >> ~/.tmux.conf
 
 SESSION_NAME="Alfred Autonomy Stack!"
-
+tmux source ~/alfred-autonomy/confs/.tmux-conf
 if tmux has-session -t "$SESSION_NAME" >/dev/null 2>&1; then
     # If session exists, attach to it
     tmux attach-session -t "$SESSION_NAME"
@@ -39,8 +39,8 @@ else
     tmux send-keys -t 2 "sleep 10 && roslaunch alfred_navigation navigation_no_driver.launch" C-m
     tmux send-keys -t 3 "sleep 10 && rosrun task_planner task_planner.py" C-m
     tmux send-keys -t 4 "sleep 10 && roslaunch manipulation robot_manipulation.launch" C-m
-    tmux send-keys -t 5 "sleep 15 && roslaunch alfred_hri hri.launch" C-m
-    tmux send-keys -t 6 "sleep 5 && ssh praveen@alfredbrain 'bash -s < /home/praveen/alfred-autonomy/launch_scripts/launch_brain.sh'" C-m
+    tmux send-keys -t 5 "sleep 10 && roslaunch alfred_hri hri.launch" C-m
+    tmux send-keys -t 6 "sleep 1 && ssh praveen@alfredbrain 'bash -s < /home/praveen/alfred-autonomy/launch_scripts/launch_brain.sh'" C-m
     tmux send-keys -t 7 "htop" C-m
 
     # Attach to tmux session
