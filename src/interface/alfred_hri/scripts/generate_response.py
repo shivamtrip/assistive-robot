@@ -97,8 +97,8 @@ class ResponseGenerator():
 
     def play_sound_file(self, file):
         # Play a sound file
-        # os.system(f"aplay {file}")
-        pass
+        os.system(f"aplay --nonblock {file}")
+        # pass
 
 
     def weather(self, city):

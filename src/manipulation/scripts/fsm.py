@@ -124,7 +124,9 @@ class ManipulationFSM:
         # print(grasp)
         # print(plane)
         # exit() 
-        # self.state = States.PICK   
+        # self.state = States.PICK 
+        
+        self.state = States.PLACE  
 
         try: 
             while True:
@@ -199,24 +201,16 @@ class ManipulationFSM:
                         self.trajectoryClient,
                         {
                             'head_pan;to' : -np.pi/2,
+                            'head_tilt;to' : - 30 * np.pi/180,
                             'base_rotate;by': np.pi/2,
                         }
                     )
-                    rospy.sleep(5)
-                    self.scene_parser.set_point_cloud() #converts depth image into point cloud
-                    
-                    plane = self.scene_parser.get_plane()
+                    rospy.sleep(2)
+                    self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+                    plane = self.scene_parser.get_plane(publish = True)
                     if plane:
-                        plane_height = plane[1]
-                        xmin, xmax, ymin, ymax = plane[0]
-                        
-                        if ymin * ymax < 0: # this means that it is safe to place without moving base
-                            placingLocation = np.array([0.0, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
-                        # rospy.loginfo
-                        placingLocation = np.array([(ymin + ymax)/2, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
-
-                        self.manipulationMethods.place(self.trajectoryClient, placingLocation[0], placingLocation[1], placingLocation[2], 0)
-
+                        placingLocation = self.scene_parser.get_placing_location(plane, heightOfObject, publish = True)
+                        self.manipulationMethods.place(self.trajectoryClient, placingLocation)
                         self.stow_robot_service()
                     self.state = States.COMPLETE
 
@@ -231,8 +225,7 @@ class ManipulationFSM:
         except KeyboardInterrupt:
             print("User Exited!!")
 
-        # self.heightOfObject = abs(self.grasp.z - self.planeOfGrasp.z) 
-        self.heightOfObject = 0
+        
         self.reset()
         self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
 

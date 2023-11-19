@@ -32,6 +32,7 @@ class SceneParser:
         self.objectLocArr = []
         self.objectId = None
         
+        self.current_detection = None
         self.scene_points = None
         self.object_points = None
         self.prevtime = time.time()
@@ -296,7 +297,7 @@ class SceneParser:
         
         
     
-    def get_plane(self, height_filter = 0.5, publish = False):
+    def get_plane(self, height_filter = 0.5, dist_filter = 1, publish = False):
         points = self.scene_points
         if points is None:
             return None
@@ -304,9 +305,13 @@ class SceneParser:
         plane_bounds = []
         plane_height = np.nan
         possible_plane_points = points[points[:, 2] > height_filter]
+        radii = np.linalg.norm(possible_plane_points[:, :2], axis = 1)
+        possible_plane_points = possible_plane_points[radii < dist_filter]
+        
+        
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(possible_plane_points)
-        plane_model, inliers = o3dpcd.segment_plane(distance_threshold=0.01,
+        plane_model, inliers = o3dpcd.segment_plane(distance_threshold=0.02,
                                                         ransac_n=3,
                                                         num_iterations=1000)
         inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
@@ -315,20 +320,6 @@ class SceneParser:
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
-            
-            fields = [
-                PointField('x', 0, PointField.FLOAT32, 1),
-                PointField('y', 4, PointField.FLOAT32, 1),
-                PointField('z', 8, PointField.FLOAT32, 1),
-                # rgb
-                PointField('r', 12, PointField.UINT8, 1),
-                PointField('g', 13, PointField.UINT8, 1),
-                PointField('b', 14, PointField.UINT8, 1),
-            ]
-            # cols = np.array(o3dpcd.select_by_index(inliers).colors) * 255
-            # cols = cols.astype(np.uint8)
-            # inlier_points = np.hstack((inlier_points, cols ))
-            # msg = pcl2.create_cloud(header, fields, inlier_points)
             msg = pcl2.create_cloud_xyz32(header, inlier_points)
             self.plane_cloud_pub.publish(msg)
             
@@ -342,6 +333,31 @@ class SceneParser:
             
         return plane_bounds, plane_height
     
+    def get_placing_location(self, plane, height_of_object, publish = False):
+        plane_bounds, plane_height = plane
+        xmin, xmax, ymin, ymax = plane_bounds
+        
+        if xmin * xmax < 0: # this means that it is safe to place without moving base
+            placingLocation = np.array([
+                0.0, 
+                (ymin + ymax)/2, 
+                plane_height + height_of_object + 0.1
+            ])
+        placingLocation = np.array([
+            (xmin + xmax)/2, 
+            (ymin + ymax)/2,
+            plane_height + height_of_object + 0.1
+        ])
+        rospy.loginfo("Placing point generated)")
+        if publish:
+            rospy.loginfo("Publishing placing location")
+            self.tf_broadcaster.sendTransform((placingLocation),
+                tf.transformations.quaternion_from_euler(0, 0, 0),
+                rospy.Time.now(),
+                "placing_location",
+                "base_link"
+            )
+        return placingLocation
     
     def set_point_cloud(self, visualize = False, publish = False):
         rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
@@ -351,7 +367,13 @@ class SceneParser:
         # loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
         # box = np.squeeze(detection['boxes'][loc]).astype(int)
         # print(box)
-        x1, y1, x2, y2 =  self.current_detection
+        if self.current_detection:
+            x1, y1, x2, y2 =  self.current_detection
+        else:
+            x1 = 0
+            y1 = 0
+            x2 = self.cameraParams['width']
+            y2 = self.cameraParams['height']
 
         self.ws_mask = np.zeros_like(self.depth_image)
         self.ws_mask[y1 : y2, x1 : x2] = 1

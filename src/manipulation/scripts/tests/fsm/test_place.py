@@ -24,13 +24,12 @@ if __name__ == '__main__':
     
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService()
-    node = ManipulationFSM(loglevel= rospy.DEBUG)
+    node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 41 # Table
+    goal.objectId = 100
     goal.isPick = False
-    node.heightOfObject = 0.1
+    
     node.main(goal)
-    rospy.sleep(5)
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 

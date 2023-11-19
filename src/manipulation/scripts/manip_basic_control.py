@@ -280,7 +280,7 @@ class ManipulationMethods:
         # returns true perenially for now since grasp success recognition is disabled.
         return True
             
-    def place(self, trajectoryClient, x, y, z, theta):
+    def place(self, trajectoryClient, placing_location):
         """Placing the object at the desired location
 
         Args:
@@ -290,23 +290,30 @@ class ManipulationMethods:
             z (float): z position of the location to place
             theta (_type_): _description_
         """
-
-        if x != 0:
-            move_to_pose(trajectoryClient, {
-                'base_translate;by' : x
-                }
-            )
-            rospy.sleep(5)
+        x, y, z = placing_location
+        
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+        
+        move_to_pose(trajectoryClient, {
+            "lift;by": z - ee_z,
+        })
+        
+        move_to_pose(trajectoryClient, {
+            "wrist_yaw;to": 0,
+        })
+        
+        rospy.sleep(2)
+        
+        move_to_pose(trajectoryClient, {
+            'base_translate;by' : (x - ee_x)
+            }
+        )
+        rospy.sleep(3)
 
         move_to_pose(trajectoryClient, {
-            "lift;to": z,
-        })
-
-        move_to_pose(trajectoryClient, {
-            "wrist_yaw;to": theta*(np.pi/180),
-            "arm;to": y,
-        })
-
+            "arm;by": abs(y - ee_y),
+            }
+        )
 
         self.move_until_contact(
             trajectoryClient,
@@ -317,10 +324,10 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "stretch_gripper;to": 100,
         })
-
         rospy.sleep(3)
         
         move_to_pose(trajectoryClient, {
+            'lift;by' : 0.1,
             "arm;to": 0,
         })
         
@@ -329,9 +336,9 @@ class ManipulationMethods:
         })
         rospy.sleep(2)
         
-        move_to_pose(trajectoryClient, {
-            "lift;to": 0.4,
-        })
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to": 0.4,
+        # })
         
     
 if __name__=='__main__':
