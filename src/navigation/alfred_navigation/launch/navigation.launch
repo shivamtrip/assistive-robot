@@ -13,8 +13,8 @@
   <!-- <include file="$(find stretch_rtabmap)/launch/robot/d435i_basic.launch" pass_all_args="true"/> -->
   <!-- <include file="$(find image_shrink)/launch/image_shrinker.launch" pass_all_args="true"/> -->
   <!-- <include file="$(find yolo)/launch/object_detection.launch" pass_all_args="true"/> -->
-  <include file="$(find alfred_core)/launch/deployment_perception.launch" pass_all_args="true"/>
-  <!-- <include file="$(find alfred_core)/launch/subsystems/real/perception_robot_tuned.launch" pass_all_args="true"/> -->
+  <!-- <include file="$(find alfred_core)/launch/deployment_perception.launch" pass_all_args="true"/> -->
+  <include file="$(find alfred_core)/launch/subsystems/real/perception_robot_tuned.launch" pass_all_args="true"/>
 
 
 
