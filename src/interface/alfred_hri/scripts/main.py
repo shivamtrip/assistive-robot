@@ -18,6 +18,7 @@ from wakeword_detector import WakewordDetector
 class HRI():
     def __init__(self):
         rospy.init_node("alfred_hri")
+        
         self.speech_recognition = SpeechRecognition()
         self.wakeword_detector = WakewordDetector(self.wakeword_triggered)
         self.responseGenerator = ResponseGenerator()
@@ -29,29 +30,22 @@ class HRI():
 
         self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
+        self.updateParamService = rospy.ServiceProxy('/update_param', UpdateParam)
         
-        rospy.loginfo("Waiting for services")
+        rospy.loginfo("Waiting for /startedListening service")
         self.startedListeningService.wait_for_service()
+        
+        rospy.loginfo("Waiting for /robot_task_command service")
         self.commandService.wait_for_service()
 
-        rospy.loginfo("Waiting for update_param service")
-        self.updateParamService = rospy.ServiceProxy('/update_param', UpdateParam)
+        rospy.loginfo("Waiting for /update_param service")
         self.updateParamService.wait_for_service()
 
-        self.attention_sounds = ["uh yes?", "yes?", "what's up?", "how's life?", "hey!", "hmm?"]
+        self.attention_sounds = ["Uh yes?", "Yes?", "What's up?", "How's life?", "Hey!", "Hmm?"]
 
-        rospy.loginfo("HRI Node ready")
-
-        firebase_secrets_path = os.path.expanduser("~/.alfred-auxilio-firebase-adminsdk.json")
-
-        if not os.path.isfile(firebase_secrets_path):
-            raise FileNotFoundError("Firebase secrets file not found")
+        self.root = ""
         
-        with open(firebase_secrets_path, 'r') as f:
-            config = json.load(f)
-
-        self.firebase = pyrebase.initialize_app(config)
-        self.db = self.firebase.database()
+        rospy.loginfo("HRI Node ready")
 
     def verbal_response_callback(self, req : VerbalResponseRequest):
         # call the response generator to generate a response
@@ -75,7 +69,9 @@ class HRI():
         return VerbalResponseResponse(status = "success")
 
     def triggerWakewordThread(self):
-        self.responseGenerator.run_tts(random.choice(self.attention_sounds))
+        attn_sound = random.choice(self.attention_sounds)
+        self.responseGenerator.run_tts(attn_sound)
+        return attn_sound
 
     def update_param(self, path, value):
         req = UpdateParamRequest()
@@ -83,42 +79,46 @@ class HRI():
         req.value = value
         self.updateParamService(req)
 
+    def clear_params(self):
+        self.update_param(self.root + "hri_params/wakeword", "")
+        self.update_param(self.root + "hri_params/command", "")
+        self.update_param(self.root + "hri_params/response", "")
+        self.update_param(self.root + "hri_params/ack", "")
+
     def wakeword_triggered(self):
+        self.clear_params()
         print("Wakeword triggered!")
-        root = ""
-        self.update_param("hri_params/wakeword", "1")
+        self.update_param(self.root + "hri_params/wakeword", "1")
 
         self.startedListeningService()
-        self.triggerWakewordThread()
-        self.update_param("hri_params/ack", "1")
+        self.speech_recognition.suppress_noise()
+        ack = self.triggerWakewordThread()
+        
+        self.update_param(self.root + "hri_params/ack", ack)
 
         text = self.speech_recognition.speech_to_text()
-        self.update_param("hri_params/command", text)
+        self.update_param(self.root + "hri_params/command", text)
 
         # send a trigger request to planning node saying that the wakeword has been triggered
         response, primitive = self.responseGenerator.processQuery(text)
-        self.update_param("hri_params/response", response)
+        self.update_param(self.root + "hri_params/response", response)
 
         if primitive == "engagement" or primitive == "<none>":
             self.responseGenerator.run_tts(response)
             self.wakeword_detector.startRecorder()
             return
+        
         print(text, primitive, response)
 
         task = GlobalTaskRequest(speech = text, type = primitive, primitive = primitive)
         self.wakeword_detector.startRecorder()
         self.commandService(task)
 
-        self.update_param("hri_params/wakeword", "")
-        self.update_param("hri_params/command", "")
-        self.update_param("hri_params/response", "")
-        self.update_param("hri_params/ack", "")
+        self.clear_params()
 
 
     def run(self):
         self.wakeword_detector.run()
-
-
 
 if __name__ == "__main__":
     hri = HRI()

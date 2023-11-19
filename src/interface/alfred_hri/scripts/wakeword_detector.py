@@ -97,7 +97,6 @@ class WakewordDetector():
     def run(self):
         while True:
             if self.recorderStarted:
-                print("Listening for wakeword...")
                 self.process_audio(self.recorder.read())
 
 

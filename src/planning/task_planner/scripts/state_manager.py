@@ -38,7 +38,7 @@ class BotStateManager():
         self.updateCallback = updateCallback
 
     def update_param(self, path, value):
-        child = self.firebaseNode.db
+        child = self.firebaseNode.db.child(self.firebaseNode.root)
         for key in path.split("/"):
             child = child.child(key)
         child.set(value)
@@ -77,7 +77,8 @@ class BotStateManager():
         self.emotion = emotion
         self.firebaseNode.update_node(self.state_dict)
     def pollOperationState(self):
-        mode = self.firebaseNode.db.get().val()['operation_mode']
+        root = self.firebaseNode.root
+        mode = self.firebaseNode.db.child(root).get().val()['operation_mode']
         if mode == "AUTONOMOUS":
             self.operationMode = OperationModes.AUTONOMOUS
         else:
@@ -93,9 +94,10 @@ class BotStateManager():
         self.updateCallback()
 
     def get_teleop_commands_from_firebase(self, msg, callback = True):
-        self.state_dict['teleop_commands'] = self.firebaseNode.db.get().val()['teleop_commands']
-        commands = self.firebaseNode.db.get().val()['teleop_commands']
-        mode = self.firebaseNode.db.get().val()['operation_mode']
+        root = self.firebaseNode.root
+        self.state_dict['teleop_commands'] = self.firebaseNode.db.child(root).get().val()['teleop_commands']
+        commands = self.firebaseNode.db.child(root).get().val()['teleop_commands']
+        mode = self.firebaseNode.db.child(root).get().val()['operation_mode']
         if mode == "AUTONOMOUS":
             self.operationMode = OperationModes.AUTONOMOUS
         else:

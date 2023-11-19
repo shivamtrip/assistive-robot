@@ -126,7 +126,6 @@ class ManipulationFSM:
         # exit() 
         # self.state = States.PICK 
         
-        self.state = States.PLACE  
 
         try: 
             while True:

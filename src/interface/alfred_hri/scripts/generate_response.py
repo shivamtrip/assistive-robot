@@ -69,7 +69,7 @@ class ResponseGenerator():
         
         self.sounds = {}
 
-        self.primitives_file = rospy.get_param("primitives_file_name", "primitives.json")
+        self.primitives_file = rospy.get_param("primitives_file_name", "resources/commands/primitives.json")
         self.primitives_file_path = os.path.join(rospkg.RosPack().get_path("alfred_hri"), self.primitives_file)
 
         self.primitives = json.load(open(self.primitives_file_path))

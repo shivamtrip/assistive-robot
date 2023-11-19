@@ -18,13 +18,14 @@ class FirebaseNode:
 
         self.firebase = pyrebase.initialize_app(config)
         self.db = self.firebase.database()
-        self.db.remove("")
-        self.db.set(schema)
+        self.root = "alfred_fvd"
+        
+        self.db.update({self.root: schema})
 
         self.last_update = time.time()
-        self.operation_stream = self.db.child("operation_mode").stream(operation_mode_callback)
-        self.teleoperation_stream = self.db.child("teleop_commands").stream(teleop_mode_callback)
-    
+        rospy.sleep(2)
+        self.operation_stream = self.db.child(self.root + "/operation_mode").stream(operation_mode_callback)
+        self.teleoperation_stream = self.db.child(self.root + "/teleop_commands").stream(teleop_mode_callback)
     # def update_operation_mode(self, mode):
     #     self.db.update(mode)
 
@@ -33,16 +34,26 @@ class FirebaseNode:
         dict['last_update'] = (time.time())
         
         if time.time() - self.last_update > 2:
-            keys_to_del = [
-                'operation_mode',
-                'teleop_commands'
-            ]
-            for key in keys_to_del:
-                if key in dict.keys():
-                    del dict[key]
-            self.db.update(dict)
+            # keys_to_del = [
+            #     'operation_mode',
+            #     'teleop_commands'
+            # ]
+            # for key in keys_to_del:
+            #     if key in dict.keys():
+            #         del dict[key]
+
+            for key in dict.keys():
+                if key != 'operation_mode' and key != 'teleop_commands':
+                    self.db.update({self.root + "/" + key : dict[key]})
+            # self.db.update({self.root : dict})
             self.last_update = time.time()
 
+if __name__ == "__main__":
+    with open(os.path.expanduser("~/alfred-autonomy/src/planning/task_planner/config/firebase_schema.json")) as f:
+        state_dict = json.load(f)
+    def noo(s):
+        pass
+    node = FirebaseNode(state_dict, noo, noo)
 
     
     

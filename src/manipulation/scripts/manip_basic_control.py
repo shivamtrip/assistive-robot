@@ -294,6 +294,8 @@ class ManipulationMethods:
         
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
         
+        
+        
         move_to_pose(trajectoryClient, {
             "lift;by": z - ee_z,
         })

@@ -33,7 +33,7 @@ from std_srvs.srv import Trigger, TriggerResponse
 class SpeechRecognition():
     def __init__(self):
         self.r = sr.Recognizer()
-        rospy.loginfo("Speech recognition adjusting for ambient noise")
+        # rospy.loginfo("Speech recognition adjusting for ambient noise")
 
         secrets_file = os.path.expanduser("~/.secrets.json")
         config = {}
@@ -49,19 +49,23 @@ class SpeechRecognition():
         self.openai_access_key = config["OPENAI_API_KEY"]
 
         # rospy.loginfo("Set minimum energy threshold to {}".format(self.r.energy_threshold))
-        
+
+    def suppress_noise(self):
+        m = sr.Microphone()
+
+        with m as source:
+            self.r.adjust_for_ambient_noise(source, duration=0.5)
+            rospy.loginfo("Set minimum energy threshold to {}".format(self.r.energy_threshold))
 
     def speech_to_text(self):
         # Record audio
-        self.m = sr.Microphone()
 
-        with self.m as source:
-            self.r.adjust_for_ambient_noise(source, duration=0.5)
-
-        with self.m as source:
+        m = sr.Microphone()
+        with m as source:
+            print("Listening...")
             audio = self.r.listen(source, timeout=5, phrase_time_limit=5)
-
-        # self.stream.close()
+        
+        rospy.loginfo("Recognized speech. Transcribing...")
 
         # Convert audio to text
         try:
