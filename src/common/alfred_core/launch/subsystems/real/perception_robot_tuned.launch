@@ -43,7 +43,7 @@
           <arg name="infra_fps" value="15"/>
 
           <!-- publish depth streams aligned to other streams -->
-          <arg name="align_depth" value="true"/>
+          <arg name="align_depth" value="false"/>
 
           <!-- publish an RGBD point cloud -->
 

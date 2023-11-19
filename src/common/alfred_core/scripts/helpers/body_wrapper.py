@@ -34,7 +34,9 @@ class JointTrajectoryAction:
         joints_to_wait = []
         for i, name in enumerate(goal.trajectory.joint_names):
             joint, motionType = name.split(';')
-            joints_to_wait.append(joint)
+            if '|' not in joint:
+                joints_to_wait.append(joint)
+                
             point = goal.trajectory.points[0]
             pos = point.positions[i]
             effort = point.effort[i]

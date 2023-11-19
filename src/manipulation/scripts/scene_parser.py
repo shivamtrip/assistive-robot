@@ -44,7 +44,7 @@ class SceneParser:
         synced_messages.registerCallback(self.parse_scene)
         
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
-        msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=10)
+        msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=30)
         self.intrinsics = np.array(msg.K).reshape(3,3)
         self.cameraParams = {
             'width' : msg.width,

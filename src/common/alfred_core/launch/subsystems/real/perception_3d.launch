@@ -1,25 +1,25 @@
 <launch>
 
      <!-- <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/HighAccuracyPreset.json" doc="filepath to json defining a visual preset for the depth image" /> -->
-     <!-- <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/DefaultPreset1.json" doc="filepath to json defining a visual preset for the depth image" /> -->
+     <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/DefaultPreset1.json" doc="filepath to json defining a visual preset for the depth image" />
      <!-- <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/DefaultPreset2.json" doc="filepath to json defining a visual preset for the depth image" /> -->
      <!-- <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/HighDensityPreset.json" doc="filepath to json defining a visual preset for the depth image" /> -->
      <!-- <arg name="rs_initial_preset" default="$(find alfred_core)/config/camera_configs/MidDensityPreset.json" doc="filepath to json defining a visual preset for the depth image" /> -->
-     <!-- <arg name="rs_initial_reset"  default="true" doc="whether to reset camera before streaming, useful if the camera got into a bad state in the last session" /> -->
+     <arg name="rs_initial_reset"  default="true" doc="whether to reset camera before streaming, useful if the camera got into a bad state in the last session" />
 
      <!-- REDUCE RATE AND USE NUC TIME -->
-     <!-- <node name="d435i_accel_correction" pkg="stretch_core" type="d435i_accel_correction" output="screen" />   -->
+     <!-- <node name="d435i_accel_correction" pkg="stretch_core" type="d435i_accel_correction" output="screen" /> -->  
      <include file="$(find image_shrink)/launch/image_shrinker.launch" />
           
 
           <!-- REALSENSE D435i -->
-          <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+          <include file="$(find realsense2_camera)/launch/rs_camera.launch">
           <arg name="infra_width" value="848"/>
           <arg name="infra_height" value="480"/>
           <arg name="depth_width" value="848"/>
           <arg name="depth_height" value="480"/>
-          <arg name="color_width" value="1280"/>
-          <arg name="color_height" value="720"/>
+          <arg name="color_width" value="424"/>
+          <arg name="color_height" value="240"/>
           <!-- "The D435i depth camera generates and transmits the gyro and
                accelerometer samples independently, as the inertial sensors
                exhibit different FPS rates (200/400Hz for gyro, 63/250Hz for
@@ -57,7 +57,7 @@
                pointcloud are enabled."
                https://github.com/intel-ros/realsense -->
           <arg name="enable_sync" value="true"/>
-          <arg name="filters" value="spatial,pointcloud"/>
+          <arg name="filters" value="spatial,pointcloud,decimation"/>
           
 
           <!-- "You can have a full depth to pointcloud, coloring the
@@ -67,17 +67,17 @@
                view associated with the narrower RGB camera. Note that
                points out of the RGB camera's field of view will have their
                colors set to 0,0,0. -->
-          <!-- <arg name="allow_no_texture_points" value="false"/> -->
+          <arg name="allow_no_texture_points" value="false"/>
 
           <!-- "initial_reset: On occasions the device was not closed
                properly and due to firmware issues needs to reset. If set to
                true, the device will reset prior to usage."
                https://github.com/intel-ros/realsense -->
-          <!-- <arg name="initial_reset" value="$(arg rs_initial_reset)"/> -->
+          <arg name="initial_reset" value="$(arg rs_initial_reset)"/>
 
           <!--<arg name="unite_imu_method" value="copy"/> linear_interpolation-->
 
-          <!-- <arg name="json_file_path" value="$(arg rs_initial_preset)" /> -->
+          <arg name="json_file_path" value="$(arg rs_initial_preset)" />
      </include>
 
 </launch>

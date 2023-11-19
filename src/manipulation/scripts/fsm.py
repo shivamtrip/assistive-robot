@@ -34,7 +34,7 @@ class ManipulationFSM:
         self.grasp = None
         self.planeOfGrasp = None
 
-        self.scene_parser = SceneParser()
+        
         self.class_list = rospy.get_param('/object_detection/class_list')
         self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
 
@@ -47,25 +47,16 @@ class ManipulationFSM:
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        # self.graspActionClient = actionlib.SimpleActionClient('grasp_detector', GraspPoseAction)
-        # self.planeFitClient = actionlib.SimpleActionClient('plane_detector', PlaneDetectAction)
-
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
         self.trajectoryClient.wait_for_server()
 
 
-        # DEPRECATED
-        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
-        # self.graspActionClient.wait_for_server()
-
-        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
-        # self.planeFitClient.wait_for_server()
-
-
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow_robot service...")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
+        
+        self.scene_parser = SceneParser()
 
         self.visualServoing = AlignToObject(self.scene_parser)
         self.manipulationMethods = ManipulationMethods()

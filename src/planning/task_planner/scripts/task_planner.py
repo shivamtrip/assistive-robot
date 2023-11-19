@@ -35,6 +35,8 @@ import os
 import json
 from enum import Enum
 
+import numpy as np
+
 from utils import get_quaternion
 
 class TaskPlanner:
@@ -115,8 +117,11 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
 
+    def updateParamImpl(self, path, value):
+        self.bot_state.update_param(path, value)
+
     def updateParamServiceCallback(self, msg):
-        self.bot_state.update_param(msg.path, msg.value)
+        self.updateParamImpl(msg.path, msg.value)
         return UpdateParamResponse()
 
     def idleCallback(self, event):
@@ -135,37 +140,36 @@ class TaskPlanner:
 
     def maintainvelocities(self):
         self.runningTeleop = True
-        while self.bot_state.isAutonomous() == False:
-            print(self.bot_state.isAutonomous())
+        while not rospy.is_shutdown() and self.bot_state.isAutonomous() == False:
             commands = self.bot_state.get_teleop_commands_from_firebase(None, callback = False)
-            # commands = self.bot_state.state_dict['teleop_commands']
+            rospy.loginfo(f"[{rospy.get_name()}]:" + "Received teleop commands: {}".format(commands))
             if commands['mobile_base']['velx'] == 0:
                 move_to_pose(self.trajectoryClient, 
-                    {'base_rotate;vel' : commands['mobile_base']['veltheta']},
+                    {'base_rotate|;vel' : commands['mobile_base']['veltheta']*2},
+                    asynchronous= True
                 )
             else:
                 move_to_pose(self.trajectoryClient, 
-                    {'base_translate;vel' : commands['mobile_base']['velx']},
+                    {'base_translate|;vel' : commands['mobile_base']['velx']/2},
+                    asynchronous= True
                 )
             gripperpos = -50
             if commands['manipulator']['gripper_open']:
                 gripperpos = 100
             move_to_pose(self.trajectoryClient, 
-                {'stretch_gripper;to' : gripperpos},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'wrist_yaw;to' : commands['manipulator']['yaw_position']},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'lift;vel' : commands['manipulator']['vel_lift']},
-            )
-            move_to_pose(self.trajectoryClient, 
-                {'arm;vel' : commands['manipulator']['vel_extend']},
+                {
+                    'stretch_gripper|;to' : gripperpos,
+                    'wrist_yaw|;to' : commands['manipulator']['yaw_position'] * np.pi/180,
+                    'lift|;vel' : commands['manipulator']['vel_lift'],
+                    'arm|;vel' : -commands['manipulator']['vel_extend']
+                },
+                asynchronous= True
             )
             
             rospy.sleep(0.1)
 
         self.runningTeleop = False
+        self.stow_robot_service()
         print("teleop stopped")
 
     def executeTask(self):
@@ -182,6 +186,10 @@ class TaskPlanner:
         self.startNavService()
         rospy.sleep(0.5)
         rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.objectOfInterest))
+
+        # self.upda
+        self.updateParamImpl("current_task/object_of_interest", self.objectOfInterest)
+        self.updateParamImpl("visualization/task_name", "go_to_object")
         
         navSuccess = self.navigate_to_location_navman(self.navigationGoal)
         # if not navSuccess:
@@ -193,6 +201,7 @@ class TaskPlanner:
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         rospy.loginfo("Attempting to find and manipulate objects.")
+        self.updateParamImpl("visualization/task_name", "pick_object")
         manipulationSuccess = self.manipulate_object(self.objectOfInterest, isPick = True)
         if not manipulationSuccess:
             rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
@@ -201,6 +210,7 @@ class TaskPlanner:
         self.startNavService()
         rospy.sleep(0.5)                                                        
         rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
+        self.updateParamImpl("visualization/task_name", "go_to_user")
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
         # if not success:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
@@ -211,10 +221,12 @@ class TaskPlanner:
 
         if manipulationSuccess:
             rospy.loginfo("Requesting to place the object")
+            self.updateParamImpl("visualization/task_name", "place_object")
             self.manipulate_object(self.objectOfInterest, isPick = False)
             self.process_verbal_response(VerbalResponseStates.HERE_YOU_GO)
         else:
             rospy.loginfo("Requesting verbal command.")
+            self.updateParamImpl("visualization/task_name", "verbal_command")
             self.process_verbal_response(VerbalResponseStates.SORRY)
 
         self.bot_state.update_param("current_task/object_of_interest", "")
@@ -328,10 +340,6 @@ class TaskPlanner:
 if __name__ == "__main__":
     task_planner = TaskPlanner()
 
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print("Shutting down")
-    
+    rospy.spin()
     
 
