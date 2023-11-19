@@ -22,7 +22,11 @@ void convertDepthImageToPointcloud(const sensor_msgs::ImageConstPtr &depth_msg, 
   cloud->height = (int) (depth_image.rows / scale_factor);
   cloud->is_dense = false;
   cloud->points.resize((cloud->width * cloud->height));
-  
+  if(!start_pub){
+    start_pub = true;
+    ROS_INFO("Started publishing point cloud...");
+    ROS_INFO("CLOUD SIZE: %d", cloud->points.size());
+  }
   int i = 0;
   for (int y = 0; y < depth_image.rows; y += scale_factor)
   {
@@ -31,6 +35,7 @@ void convertDepthImageToPointcloud(const sensor_msgs::ImageConstPtr &depth_msg, 
       // ROS_INFO("FIlling: %d", i);
       if(i >= cloud->width * cloud->height) {
         // ROS_INFO("i: %d, width: %d, height: %d", i, cloud->width, cloud->height);
+        
         break;
       }
       pcl::PointXYZ &point = cloud->points[i];
@@ -56,10 +61,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr &msg)
   try
   {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    if(!start_pub){
-      start_pub = true;
-      ROS_INFO("Started publishing point cloud...");
-    }
+    
 
     convertDepthImageToPointcloud(msg, cloud);
     sensor_msgs::PointCloud2 pc_msg;
