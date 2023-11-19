@@ -382,8 +382,8 @@ class AlfredBodyNode:
 
         pos_arm = self.robot.get_stow_pos('arm')
         self.robot.arm.move_to(pos_arm)
-        self.robot.end_of_arm.move_to('stretch_gripper', self.robot.get_stow_pos('stretch_gripper'))
-        self.robot.end_of_arm.move_to('wrist_yaw', self.robot.get_stow_pos('wrist_yaw'))
+        # self.robot.end_of_arm.move_to('stretch_gripper', self.robot.get_stow_pos('stretch_gripper'))
+        self.robot.end_of_arm.move_to('wrist_yaw', np.pi * 160/180)
         # self.robot.push_command()
         self.robot.lift.move_to(0.4)
         self.robot.push_command()

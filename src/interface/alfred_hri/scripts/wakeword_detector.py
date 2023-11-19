@@ -71,7 +71,9 @@ class WakewordDetector():
                 access_key=self.access_key,
                 keyword_paths=self.keyword_paths,
                 sensitivities=self.keyword_sensitivities)
-
+        tempRecorder = PvRecorder(5)
+        devices = tempRecorder.get_available_devices()
+        self.audio_device_index = devices.index("Anker PowerConf S330 Analog Stereo")
         self.recorder = PvRecorder(
                 device_index=self.audio_device_index,
                 frame_length=self.porcupine.frame_length,
@@ -95,6 +97,7 @@ class WakewordDetector():
     def run(self):
         while True:
             if self.recorderStarted:
+                print("Listening for wakeword...")
                 self.process_audio(self.recorder.read())
 
 

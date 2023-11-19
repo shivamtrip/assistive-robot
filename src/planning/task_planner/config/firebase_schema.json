@@ -11,6 +11,9 @@
     },
     "bot_joint_params": {
     },
+    "visualization": {
+        "task_name": ""
+    },
     "hri_params": {
         "listening" : false,
         "emotion" : {

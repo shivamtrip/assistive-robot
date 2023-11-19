@@ -132,19 +132,22 @@ class ManipulationMethods:
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
 
         
-        if abs(x_g - ee_x) > 0.02:
-            move_to_pose(trajectoryClient, {
-                'base_translate;by' : x_g - ee_x
-            })
-            rospy.sleep(3)
+        # if abs(x_g - ee_x) > 0.02:
+        move_to_pose(trajectoryClient, {
+            'base_translate;by' : x_g - ee_x
+        })
+        rospy.sleep(3)
         
         if not moveUntilContact:
             move_to_pose(trajectoryClient, {
                 "lift;by": z_g - ee_z,
             })
+
+        print("Extending to ", x_g, y_g, z_g, grasp_yaw)
+        print(" end effector pose ", ee_x, ee_y, ee_z)
             
         move_to_pose(trajectoryClient, {
-            "arm;to": abs(y_g - ee_y),
+            "arm;by": abs(y_g - ee_y),
         })
 
         if moveUntilContact:

@@ -47,8 +47,8 @@ class ManipulationFSM:
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        self.graspActionClient = actionlib.SimpleActionClient('grasp_detector', GraspPoseAction)
-        self.planeFitClient = actionlib.SimpleActionClient('plane_detector', PlaneDetectAction)
+        # self.graspActionClient = actionlib.SimpleActionClient('grasp_detector', GraspPoseAction)
+        # self.planeFitClient = actionlib.SimpleActionClient('plane_detector', PlaneDetectAction)
 
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
@@ -95,7 +95,7 @@ class ManipulationFSM:
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
         
-        # self.stow_robot_service()
+        self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
@@ -124,7 +124,7 @@ class ManipulationFSM:
         # print(grasp)
         # print(plane)
         # exit() 
-        self.state = States.PICK   
+        # self.state = States.PICK   
 
         try: 
             while True:
@@ -136,7 +136,7 @@ class ManipulationFSM:
                     else:
                         self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
                 elif self.state == States.VISUAL_SERVOING:
-                    success = self.visualServoing.main(goal.objectId,)
+                    success = self.visualServoing.main()
                     if success:
                         self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
                         self.state = objectManipulationState
@@ -162,7 +162,7 @@ class ManipulationFSM:
 
                     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                     grasp = self.scene_parser.get_grasp(publish = True)
-                    # plane = self.scene_parser.get_plane(publish = True)
+                    plane = self.scene_parser.get_plane(publish = True)
                     
                     
                     if grasp and plane:
@@ -208,11 +208,11 @@ class ManipulationFSM:
                     plane = self.scene_parser.get_plane()
                     if plane:
                         plane_height = plane[1]
-                        xmin, xmax, ymin, ymax = plane[2]
+                        xmin, xmax, ymin, ymax = plane[0]
                         
                         if ymin * ymax < 0: # this means that it is safe to place without moving base
                             placingLocation = np.array([0.0, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
-                            
+                        # rospy.loginfo
                         placingLocation = np.array([(ymin + ymax)/2, (xmin + xmax)/2, plane_height + heightOfObject + 0.1])
 
                         self.manipulationMethods.place(self.trajectoryClient, placingLocation[0], placingLocation[1], placingLocation[2], 0)

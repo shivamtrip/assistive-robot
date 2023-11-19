@@ -34,7 +34,8 @@ class HRI():
         self.startedListeningService.wait_for_service()
         self.commandService.wait_for_service()
 
-        self.updateParamService - rospy.ServiceProxy('/update_param', UpdateParam)
+        rospy.loginfo("Waiting for update_param service")
+        self.updateParamService = rospy.ServiceProxy('/update_param', UpdateParam)
         self.updateParamService.wait_for_service()
 
         self.attention_sounds = ["uh yes?", "yes?", "what's up?", "how's life?", "hey!", "hmm?"]
@@ -84,20 +85,19 @@ class HRI():
 
     def wakeword_triggered(self):
         print("Wakeword triggered!")
-        self.update_param("alfred_fvd/hri_params/wakeword", "1")
+        root = ""
+        self.update_param("hri_params/wakeword", "1")
 
         self.startedListeningService()
         self.triggerWakewordThread()
-        self.update_param("alfred_fvd/hri_params/ack", "1")
+        self.update_param("hri_params/ack", "1")
 
         text = self.speech_recognition.speech_to_text()
-        self.update_param("alfred_fvd/hri_params/command", text)
-        rospy.sleep(0.5)
-        self.wakeword_detector.startRecorder()
+        self.update_param("hri_params/command", text)
 
         # send a trigger request to planning node saying that the wakeword has been triggered
         response, primitive = self.responseGenerator.processQuery(text)
-        self.update_param("alfred_fvd/hri_params/response", response)
+        self.update_param("hri_params/response", response)
 
         if primitive == "engagement" or primitive == "<none>":
             self.responseGenerator.run_tts(response)
@@ -109,10 +109,10 @@ class HRI():
         self.wakeword_detector.startRecorder()
         self.commandService(task)
 
-        self.update_param("alfred_fvd/hri_params/wakeword", "")
-        self.update_param("alfred_fvd/hri_params/command", "")
-        self.update_param("alfred_fvd/hri_params/response", "")
-        self.update_param("alfred_fvd/hri_params/ack", "")
+        self.update_param("hri_params/wakeword", "")
+        self.update_param("hri_params/command", "")
+        self.update_param("hri_params/response", "")
+        self.update_param("hri_params/ack", "")
 
 
     def run(self):

@@ -40,7 +40,7 @@ else
     tmux send-keys -t 3 "sleep 10 && rosrun task_planner task_planner.py" C-m
     tmux send-keys -t 4 "sleep 10 && roslaunch manipulation robot_manipulation.launch" C-m
     tmux send-keys -t 5 "sleep 15 && roslaunch alfred_hri hri.launch" C-m
-    tmux send-keys -t 6 "sleep 23 && ssh praveen@alfredbrain 'bash -s < /home/praveen/ws1/launch_scripts/launch_brain.sh'" C-m
+    tmux send-keys -t 6 "sleep 5 && ssh praveen@alfredbrain 'bash -s < /home/praveen/alfred-autonomy/launch_scripts/launch_brain.sh'" C-m
     tmux send-keys -t 7 "htop" C-m
 
     # Attach to tmux session

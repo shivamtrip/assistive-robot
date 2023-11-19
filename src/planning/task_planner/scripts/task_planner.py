@@ -30,7 +30,7 @@ from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, Verb
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 from alfred_navigation.msg import NavManAction, NavManGoal
-from state_manager import BotStateManager, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
+from state_manager import BotStateManager, Emotions, LocationOfInterest, GlobalStates, VerbalResponseStates, OperationModes
 import os
 import json
 from enum import Enum
@@ -87,7 +87,7 @@ class TaskPlanner:
         self.trajectoryClient.wait_for_server()
 
         # Create a service to update firebase params
-        self.updateParamService = rospy.Service('/updateParam', UpdateParam, self.updateParamServiceCallback)
+        self.updateParamService = rospy.Service('/update_param', UpdateParam, self.updateParamServiceCallback)
 
         self.task_requested = False
         self.time_since_last_command = rospy.Time.now()
@@ -97,7 +97,8 @@ class TaskPlanner:
         self.runningTeleop = False
 
         self.class_list = rospy.get_param("/object_detection/class_list")
-        
+
+        self.mappings = {}
         for i, cls in enumerate(self.class_list):
             self.mappings[cls] = [LocationOfInterest.LIVING_ROOM, i]
             
@@ -114,7 +115,7 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
 
-    def updateParamAction(self, msg):
+    def updateParamServiceCallback(self, msg):
         self.bot_state.update_param(msg.path, msg.value)
         return UpdateParamResponse()
 
@@ -180,12 +181,12 @@ class TaskPlanner:
         self.stow_robot_service()
         self.startNavService()
         rospy.sleep(0.5)
-        rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.objectOfInterest.name))
+        rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.objectOfInterest))
         
-        navSuccess = self.navigate_to_location(self.navigationGoal)
-        if not navSuccess:
-            rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
-            navSuccess = self.navigate_to_location(self.navigationGoal)
+        navSuccess = self.navigate_to_location_navman(self.navigationGoal)
+        # if not navSuccess:
+        #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
+        #     navSuccess = self.navigate_to_location(self.navigationGoal)
         
         self.startManipService()
         rospy.sleep(0.5)
@@ -200,10 +201,10 @@ class TaskPlanner:
         self.startNavService()
         rospy.sleep(0.5)                                                        
         rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
-        success = self.navigate_to_location(LocationOfInterest.TABLE)
-        if not success:
-            rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
-            self.navigate_to_location(LocationOfInterest.TABLE)
+        success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
+        # if not success:
+        #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
+        #     self.navigate_to_location(LocationOfInterest.TABLE)
             # add waypoints
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
@@ -224,14 +225,14 @@ class TaskPlanner:
         self.time_since_last_command = rospy.Time.now()
 
 
-    def manipulate_object(self, object : Enum, isPick = True):
+    def manipulate_object(self, object : int, isPick = True):
         rospy.loginfo("Starting manipulation, going to perform object" + (" picking" if isPick else " placing"))
-        rospy.loginfo("Manipulating {}".format(object.name))
+        rospy.loginfo("Manipulating {}".format(object))
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         # send goal
-        goalObject = object.value
-        if not isPick:
-            goalObject = 60 #table
+        goalObject = object
+        # if not isPick:
+        #     goalObject = 60 #table
 
         goal = TriggerGoal(isPick = isPick, heightOfObject = self.heightOfObject)
         goal.objectId = goalObject

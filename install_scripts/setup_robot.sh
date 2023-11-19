@@ -14,4 +14,5 @@ sudo /usr/local/lib/robot_env/bin/pip3 install wheel firebase pvrecorder google-
 sudo /usr/local/lib/robot_env/bin/pip3 install pvporcupine==3.0.0
 sudo /usr/local/lib/robot_env/bin/pip3 install pyrebase4
 sudo /usr/local/lib/robot_env/bin/pip3 install -r ~/ws/src/interface/interface_meta/config/requirements.txt
-sudo /usr/local/lib/robot_env/bin/pip3 install rospkg
+sudo /usr/local/lib/robot_env/bin/pip3 install rospkg -y
+sudo apt-get install ros-noetic-spatio-temporal-voxel-layer -y
