@@ -22,7 +22,7 @@
             "sound" : "NONE"
         },
         "speech_in" : {
-            "text" : "Hello, I am your robot",
+            "text" : "",
             "recognized_emotion" : "NONE"
         },
         "wakeword": "",

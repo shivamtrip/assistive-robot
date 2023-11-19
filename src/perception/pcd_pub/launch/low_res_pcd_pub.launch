@@ -1,0 +1,6 @@
+<launch>
+    <node name="low_res_pcd_pub" pkg="pcd_pub" type="my_subscriber" output="screen" />  
+    <group ns="pcd_pub">
+        <rosparam file="$(find pcd_pub)/config/params.yaml" />
+    </group>
+</launch>
