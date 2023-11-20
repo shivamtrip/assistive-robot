@@ -168,7 +168,7 @@ class ManipulationMethods:
         rospy.sleep(3)
 
         self.move_to_pose(trajectoryClient, {
-            "arm;to": y + 0.04, # + 0.08 for cm offset from aruco with center of bottle
+            "arm;to": y + 0.025, # + 0.08 for cm offset from aruco with center of bottle
         })
         
         rospy.sleep(4)
