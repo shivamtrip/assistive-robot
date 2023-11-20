@@ -104,6 +104,8 @@ class TaskPlanner:
         self.runningTeleop = False
 
         self.class_list = rospy.get_param("/object_detection/class_list")
+
+        self.objectName = "Null"
 # class_list:
 #   # - 'drawer'
 #   - 'soda_can' # 0
@@ -120,20 +122,21 @@ class TaskPlanner:
 #   - 'remote' #11
         self.mappings = {}
         self.location_object_map = {
+
             "teddy bear" : LocationOfInterest.LIVING_ROOM,
-            "tie" : LocationOfInterest.LIVING_ROOM,
-            "cell phone" : LocationOfInterest.LIVING_ROOM,
-            "toothbrush" : LocationOfInterest.LIVING_ROOM,
-
-            "tissue_paper" : LocationOfInterest.ROBOTS,
-            "remote" : LocationOfInterest.ROBOTS,
-
-            "cup" : LocationOfInterest.KITCHEN,
-            "soda_can" : LocationOfInterest.KITCHEN,
+            "remote" : LocationOfInterest.LIVING_ROOM,
+            "soda_can" : LocationOfInterest.SINK,
+            "tissue_paper" : LocationOfInterest.LIVING_ROOM,            
             "apple" : LocationOfInterest.SINK,
-            "bottle" : LocationOfInterest.KITCHEN,
-            "orange" : LocationOfInterest.KITCHEN,
-            "banana" : LocationOfInterest.KITCHEN,
+            "cup" : LocationOfInterest.SINK,
+            
+            
+            "cell phone" : LocationOfInterest.LIVING_ROOM,
+            "orange" : LocationOfInterest.SINK,
+            "tie" : LocationOfInterest.LIVING_ROOM,
+            "toothbrush" : LocationOfInterest.LIVING_ROOM,
+            "bottle" : LocationOfInterest.LIVING_ROOM,
+            "banana" : LocationOfInterest.SINK,
         }
         
         for i, cls in enumerate(self.class_list):
@@ -225,7 +228,7 @@ class TaskPlanner:
         rospy.loginfo("Going to {}, to manipulate {}".format(self.navigationGoal.name, self.objectOfInterest))
 
         # self.upda
-        self.updateParamImpl("current_task/object_of_interest", self.objectOfInterest)
+        self.updateParamImpl("current_task/object_of_interest", self.objectName)
         self.updateParamImpl("visualization/task_name", "go_to_object")
         
         navSuccess = self.navigate_to_location_navman(self.navigationGoal)
@@ -328,6 +331,11 @@ class TaskPlanner:
             rospy.loginfo("Updating operation mode to autonomous")
             self.bot_state.update_operation_mode(OperationModes.AUTONOMOUS)
         elif msg.primitive != 'do_nothing':
+            self.objectName = msg.primitive
+            # Replace _ with space
+            self.objectName.replace("_", " ")
+            # Capitalize first letter
+            self.objectName = self.objectName[0].upper() + self.objectName[1:].lower()
             self.navigationGoal, self.objectOfInterest = self.mappings[msg.primitive]
             self.executeTask()
 

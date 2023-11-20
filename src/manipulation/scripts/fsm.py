@@ -160,9 +160,13 @@ class ManipulationFSM:
                 ee_pose = self.manipulationMethods.getEndEffectorPose()
                 self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
 
+                
+                
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 grasp = self.scene_parser.get_grasp(publish = True)
                 plane = self.scene_parser.get_plane(publish = True)
+                
+                
                 
                 
                 if grasp:
