@@ -124,7 +124,7 @@ class AlfredBodyNode:
         pose_time_s = base_status['pose_time_s']
 
         if self.robot_mode == 'manipulation':
-            x = self.mobile_base_manipulation_origin['x']
+            # x = self.mobile_base_manipulation_origin['x']
             x_vel = 0.0
             x_effort = 0.0
 

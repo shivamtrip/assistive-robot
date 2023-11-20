@@ -52,12 +52,14 @@ class HRI():
         if (req.response == "on_it"):
             phrases = [
                 "On it",
-                "I'll get right on it", 
-                "I'll do it right away", 
+                "I'll get right on it",
+                "I'll do it right away",
                 "I'll do it right now",
                 "Let me get that for you"
             ]
-            self.responseGenerator.run_tts(random.choice(phrases))
+            phrase = random.choice(phrases)
+            self.update_param(self.root + "hri_params/response", phrase)
+            self.responseGenerator.run_tts(phrase)
         elif (req.response == "ok"):
             phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
             self.responseGenerator.run_tts(random.choice(phrases))
@@ -101,11 +103,18 @@ class HRI():
 
         # send a trigger request to planning node saying that the wakeword has been triggered
         response, primitive = self.responseGenerator.processQuery(text)
-        self.update_param(self.root + "hri_params/response", response)
 
         if primitive == "engagement" or primitive == "<none>":
             self.responseGenerator.run_tts(response)
             self.wakeword_detector.startRecorder()
+            return
+        elif primitive == "video_call_start":
+            self.responseGenerator.run_tts("Starting a video call")
+            self.update_param(self.root + "hri_params/response", "Starting a video call")
+            self.update_param(self.root + "hri_params/operation_mode", "TELEOPERATION")
+            return
+        elif primitive == "video_call_stop":
+            self.update_param(self.root + "hri_params/operation_mode", "AUTONOMOUS")
             return
         
         print(text, primitive, response)

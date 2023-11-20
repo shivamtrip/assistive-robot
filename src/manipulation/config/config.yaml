@@ -8,7 +8,7 @@ pid_gains:
 
 # move_towards_object
 forward_velocity: 0.1 #m/s
-interval_till_restart : 10 # seconds
+interval_till_restart : 3 # seconds
 
 # head_tilt
 head_tilt_angle_search : 10 # degrees
@@ -16,9 +16,9 @@ head_tilt_angle_grasp : 30 # degrees
 
 
 
-moving_average_n : 10 # for PID settling time
+moving_average_n : 25 # for PID settling time
 max_graspable_distance: 0.7
-mean_err_horiz_alignment : 0.08
+mean_err_horiz_alignment : 0.01
 
 recoveries:
   n_scan_attempts : 3
@@ -30,7 +30,7 @@ object_filter:
   radius : 2.5
 
 offsets:
-  bottle: [0, 0.0, 0.0]
+  bottle: [0, -0.01, 0.0]
   apple: [0, 0.0, 0.0]
   remote: [0, 0.0, 0.0]
   banana : [0, 0.0, 0.0]
@@ -38,7 +38,7 @@ offsets:
   tissue_paper: [-0.0, 0.0, 0.05]
   toothbrush: [-0.0, 0.0, 0.0]
   tie: [-0.0, 0.0, 0.0]
-  cell phone: [-0.0, 0.0, 0.0]
+  cell phone: [-0.0, 0.01, 0.0]
   orange: [-0.0, 0.0, 0.0]
   cup: [-0.0, -0.01, 0.0]
   teddy bear: [-0.0, -0.02, 0.0]

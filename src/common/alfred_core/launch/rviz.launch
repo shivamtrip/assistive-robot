@@ -1,0 +1,3 @@
+<launch>
+  <node type="rviz" name="rviz" pkg="rviz" args="-d /home/hello-robot/alfred-autonomy/confs/viz/robot_nav.rviz" />
+</launch>

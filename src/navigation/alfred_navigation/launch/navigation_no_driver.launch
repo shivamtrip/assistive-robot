@@ -20,11 +20,13 @@
 
   <!-- LASER RANGE FINDER -->
   <include file="$(find alfred_core)/launch/subsystems/driver/rplidar.launch" />
+  <!-- <include file="$(find pcd_pub)/launch/low_res_pcd_pub.launch" /> -->
 
   <!-- MAP SERVER -->
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_yaml)" />
 
   <!-- LOCALIZATION -->
+  
   <include file="$(find alfred_navigation)/launch/localization/amcl.launch" />
   <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
 

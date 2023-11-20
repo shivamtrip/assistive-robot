@@ -24,7 +24,7 @@ import rospkg
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from control_msgs.msg import FollowJointTrajectoryAction
-
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from alfred_msgs.msg import Speech, SpeechTrigger
 from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest, UpdateParam, UpdateParamRequest, UpdateParamResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
@@ -55,7 +55,8 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.trigger_initial_pose_pub = False
+        self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
 
         self.verbal_response_service_name = rospy.get_param("verbal_response_service_name",
@@ -74,7 +75,11 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for verbal response service...")
         self.verbal_response_service.wait_for_service()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
+        # self.navigation_client_old.wait_for_server()
+        
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for manipulation_fsm server...")
@@ -99,21 +104,53 @@ class TaskPlanner:
         self.runningTeleop = False
 
         self.class_list = rospy.get_param("/object_detection/class_list")
-
+# class_list:
+#   # - 'drawer'
+#   - 'soda_can' # 0
+#   - 'tissue_paper' #1
+#   - 'toothbrush' #2
+#   - 'tie' #3
+#   - 'cell phone' #4
+#   - 'banana' #5
+#   - 'apple' #6
+#   - 'orange' #7
+#   - 'bottle' #8
+#   - 'cup' #9
+#   - 'teddy bear' #10
+#   - 'remote' #11
         self.mappings = {}
+        self.location_object_map = {
+            "teddy bear" : LocationOfInterest.LIVING_ROOM,
+            "tie" : LocationOfInterest.LIVING_ROOM,
+            "cell phone" : LocationOfInterest.LIVING_ROOM,
+            "toothbrush" : LocationOfInterest.LIVING_ROOM,
+
+            "tissue_paper" : LocationOfInterest.ROBOTS,
+            "remote" : LocationOfInterest.ROBOTS,
+
+            "cup" : LocationOfInterest.KITCHEN,
+            "soda_can" : LocationOfInterest.KITCHEN,
+            "apple" : LocationOfInterest.KITCHEN,
+            "bottle" : LocationOfInterest.KITCHEN,
+            "orange" : LocationOfInterest.KITCHEN,
+            "banana" : LocationOfInterest.KITCHEN,
+        }
+        
         for i, cls in enumerate(self.class_list):
-            self.mappings[cls] = [LocationOfInterest.LIVING_ROOM, i]
+            self.mappings[cls] = [self.location_object_map[cls], i]    
+           
+        
             
         self.mappings['do_nothing'] = [LocationOfInterest.LIVING_ROOM, -1]
         
         self.navigationGoal = LocationOfInterest.HOME
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
 
-        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
-        self.navigation_client.wait_for_server()
-
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Subscribing to the amcl pose topic...")
+        self.amcl_initial_pose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10, )
+        # self.amcl_pose_sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.amcl_pose_callback)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
 
@@ -192,6 +229,7 @@ class TaskPlanner:
         self.updateParamImpl("visualization/task_name", "go_to_object")
         
         navSuccess = self.navigate_to_location_navman(self.navigationGoal)
+        # navSuccess = self.navigate_to_location(self.navigationGoal)
         # if not navSuccess:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
         #     navSuccess = self.navigate_to_location(self.navigationGoal)
@@ -203,22 +241,27 @@ class TaskPlanner:
         rospy.loginfo("Attempting to find and manipulate objects.")
         self.updateParamImpl("visualization/task_name", "pick_object")
         manipulationSuccess = self.manipulate_object(self.objectOfInterest, isPick = True)
-        if not manipulationSuccess:
-            rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
+        # if not manipulationSuccess:
+        #     rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
         
         self.stow_robot_service()
+        rospy.sleep(2)
+        self.trigger_initial_pose_pub = True
+        rospy.sleep(2)
+
         self.startNavService()
         rospy.sleep(0.5)                                                        
-        rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
+        # rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
         self.updateParamImpl("visualization/task_name", "go_to_user")
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
+        # success = self.navigate_to_location(self.navigationGoal)
         # if not success:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
         #     self.navigate_to_location_navman(LocationOfInterest.TABLE)
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         self.startManipService()
-
+        manipulationSuccess = False
         if manipulationSuccess:
             rospy.loginfo("Requesting to place the object")
             self.updateParamImpl("visualization/task_name", "place_object")
@@ -291,6 +334,29 @@ class TaskPlanner:
 
         return GlobalTaskResponse(success = True)
     
+    def amcl_pose_callback(self, msg : PoseWithCovarianceStamped):
+        """ takes the amcl pose and republishes it to /initialpose whenever required."""
+
+        if(self.trigger_initial_pose_pub):
+
+            # Get the covariance matrix and set the covariance of x and y to 0.06
+            pose = msg.pose.pose
+            cov = np.array(msg.pose.covariance).reshape(6,6)
+            rospy.loginfo("Received amcl pose: {}".format(pose))
+            rospy.loginfo("Received amcl covariance: {}".format(cov))
+            cov[0:2, 0:2] = np.eye(2)*0.06
+            cov_flat = cov.flatten()
+
+            # Generate pub msg
+            pub_msg = PoseWithCovarianceStamped()
+            pub_msg.header = msg.header
+            pub_msg.pose.pose = pose
+            pub_msg.pose.covariance = cov_flat.tolist()
+
+            self.amcl_initial_pose_pub.publish(pub_msg)
+            self.trigger_initial_pose_pub = False
+            rospy.loginfo("Published initial pose after the manipulation ends!!")
+            # rospy.loginfo("Published (pose, cov)=", (pub_msg.pose.pose,pub_msg.pose.covariance))
     
     def navigate_to_location_navman(self, location : Enum):
         locationName = location.name
@@ -320,13 +386,13 @@ class TaskPlanner:
         goal.target_pose.pose.position.y = self.goal_locations[locationName]['y']
         quaternion = get_quaternion(self.goal_locations[locationName]['theta'])
         goal.target_pose.pose.orientation = quaternion
-        self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
-        wait = self.navigation_client.wait_for_result()
+        self.navigation_client_old.send_goal(goal)
+        wait = self.navigation_client_old.wait_for_result()
 
-        if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
+        if self.navigation_client_old.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach {}".format(locationName))
             # cancel navigation
-            self.navigation_client.cancel_goal()
+            self.navigation_client_old.cancel_goal()
             return False
         
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))

@@ -85,7 +85,7 @@ class ManipulationFSM:
         self.scene_parser.set_object_id(goal.objectId)
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        self.stow_robot_service()
+        # self.stow_robot_service()
         
         if goal.isPick:
             rospy.loginfo("Received pick request.")
@@ -99,6 +99,34 @@ class ManipulationFSM:
 
         nPickTriesAttempted = 0
         nPickTriesAllowed = self.n_max_pick_attempts
+        # move_to_pose(
+        #     self.trajectoryClient,
+        #     {
+        #         'head_pan;to' : -np.pi/2,
+        #         'head_tilt;to' : - 30 * np.pi/180,
+        #         # 'base_rotate;by': np.pi/2,
+        #     }
+        # )
+        # while not rospy.is_shutdown():
+        #     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        #     grasp = self.scene_parser.get_grasp(publish = True)
+        #     print(grasp[1] * 180 / np.pi)
+        #     move_to_pose(
+        #         self.trajectoryClient,
+        #         {
+        #             'wrist_yaw;to': grasp[1],
+        #         }
+        #     )
+        #     rospy.sleep(2)
+        # exit()
+
+        # move_to_pose(trajectoryClient = self.trajectoryClient, pose = {
+        #     "head_tilt;to" : -10*np.pi/180,   
+        # }
+        # )
+        # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        # plane = self.scene_parser.get_plane(publish = True)
+        # exit()
 
         while not rospy.is_shutdown():
             if self.state == States.IDLE:
@@ -128,9 +156,9 @@ class ManipulationFSM:
                 self.send_feedback({'msg' : "moving to pregrasp pose"})
                 
                 # basic planning here
+                self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
                 ee_pose = self.manipulationMethods.getEndEffectorPose()
                 self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-                self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
 
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 grasp = self.scene_parser.get_grasp(publish = True)
@@ -147,7 +175,7 @@ class ManipulationFSM:
                         self.heightOfObject = 0.2 #default height of object if plane is not detected
                     
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    offsets[1] -= 0.02 #constant safety factor
+                    offsets[1] -= 0.01 #constant safety factor
                     grasp = (grasp_center + np.array(offsets)), grasp_yaw
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
@@ -168,9 +196,11 @@ class ManipulationFSM:
                         
                         self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(nPickTriesAttempted) + " of " + str(nPickTriesAllowed) + " allowed."})
                         nPickTriesAttempted += 1
+                        self.stow_robot_service()
+                        self.state = States.VISUAL_SERVOING
 
             elif self.state == States.PLACE:
-                heightOfObject = goal.heightOfObject
+                self.heightOfObject = goal.heightOfObject
                 move_to_pose(
                     self.trajectoryClient,
                     {
@@ -179,11 +209,11 @@ class ManipulationFSM:
                         'base_rotate;by': np.pi/2,
                     }
                 )
-                rospy.sleep(2)
+                rospy.sleep(5)
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 plane = self.scene_parser.get_plane(publish = True)
                 if plane:
-                    placingLocation = self.scene_parser.get_placing_location(plane, heightOfObject, publish = True)
+                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
                     self.manipulationMethods.place(self.trajectoryClient, placingLocation)
                     self.stow_robot_service()
                 self.state = States.COMPLETE

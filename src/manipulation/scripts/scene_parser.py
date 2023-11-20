@@ -451,20 +451,26 @@ class SceneParser:
         ori_bbox = o3dpcd.get_oriented_bounding_box()
         axi_bbox = o3dpcd.get_axis_aligned_bounding_box()
         
-        h, w, l = ori_bbox.extent
         box_angles = np.array(ori_bbox.R)
+        extents = np.array(ori_bbox.extent)
+        
+        long_axis = np.argmax(extents)
         unit_vecs_bbox = box_angles.T
-        prods_z = []
-        for i in range(3):
-            prods_z.append(abs(unit_vecs_bbox[i] @ np.array([-1, 0, 0])))
-
-        axis_ind = np.argmax(prods_z)
-        axis_vec = unit_vecs_bbox[axis_ind]
+        axis_vec = unit_vecs_bbox[long_axis]
+        
+        print(extents)
+        
         
         
         grasp_center = np.array(ori_bbox.center)
         grasp_yaw = np.arctan2(axis_vec[1], axis_vec[0])
-        grasp_yaw = np.mod(grasp_yaw + 2 * np.pi, 2 * np.pi) - np.pi
+        # grasp_yaw = np.mod(grasp_yaw + 2 * np.pi, 2 * np.pi) - np.pi
+        if grasp_yaw < 0:
+            grasp_yaw += np.pi/2
+        else:
+            grasp_yaw -= np.pi/2    
+        
+        quat = R.from_matrix(box_angles).as_quat()
         
         if publish:
             rospy.loginfo("Publishing grasp pose")
@@ -474,6 +480,33 @@ class SceneParser:
                 "grasp_pose",
                 "base_link"
             )
+            # rospy.loginfo("Publishing grasp pose")
+            # self.tf_broadcaster.sendTransform((grasp_center),
+            #     quat,
+            #     rospy.Time.now(),
+            #     "grasp_pose",
+            #     "base_link"
+            # )
+            
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            fields = [
+                PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1),
+                # rgb
+                PointField('r', 12, PointField.UINT8, 1),
+                PointField('g', 13, PointField.UINT8, 1),
+                PointField('b', 14, PointField.UINT8, 1),
+            ]
+            points = np.array(o3dpcd.points)
+            # cols = self.object_colors * 255
+            # cols = cols.astype(np.uint8)
+            # inlier_points = np.hstack((points, cols))
+            # msg = pcl2.create_cloud(header, fields, inlier_points)
+            msg = pcl2.create_cloud_xyz32(header, points)
+            self.obj_cloud_pub.publish(msg)
         
         
         if visualize:
