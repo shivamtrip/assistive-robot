@@ -24,7 +24,7 @@ import rospkg
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from control_msgs.msg import FollowJointTrajectoryAction
-
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from alfred_msgs.msg import Speech, SpeechTrigger
 from alfred_msgs.srv import GlobalTask, GlobalTaskResponse, VerbalResponse, VerbalResponseRequest, GlobalTaskRequest, UpdateParam, UpdateParamRequest, UpdateParamResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult
@@ -55,6 +55,8 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
+        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.trigger_initial_pose_pub = False
         self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
 
@@ -146,6 +148,9 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
 
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Subscribing to the amcl pose topic...")
+        self.amcl_initial_pose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
+
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
 
@@ -236,14 +241,18 @@ class TaskPlanner:
         rospy.loginfo("Attempting to find and manipulate objects.")
         self.updateParamImpl("visualization/task_name", "pick_object")
         manipulationSuccess = self.manipulate_object(self.objectOfInterest, isPick = True)
-        if not manipulationSuccess:
-            rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
+        # if not manipulationSuccess:
+        #     rospy.loginfo("Manipulation failed. Cannot find object, returning to user")
         
         self.stow_robot_service()
+        rospy.sleep(2)
+        self.trigger_initial_pose_pub = True
+        rospy.sleep(2)
+
         self.startNavService()
         rospy.sleep(0.5)                                                        
-        rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
-        self.updateParamImpl("visualization/task_name", "go_to_user")
+        # rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
+        # self.updateParamImpl("visualization/task_name", "go_to_user")
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
         # success = self.navigate_to_location(self.navigationGoal)
         # if not success:
@@ -252,7 +261,7 @@ class TaskPlanner:
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         self.startManipService()
-
+        manipulationSuccess = False
         if manipulationSuccess:
             rospy.loginfo("Requesting to place the object")
             self.updateParamImpl("visualization/task_name", "place_object")
@@ -325,6 +334,29 @@ class TaskPlanner:
 
         return GlobalTaskResponse(success = True)
     
+    def amcl_pose_callback(self, msg : PoseWithCovarianceStamped):
+        """ takes the amcl pose and republishes it to /initialpose whenever required."""
+
+        if(self.trigger_initial_pose_pub):
+
+            # Get the covariance matrix and set the covariance of x and y to 0.06
+            pose = msg.pose.pose
+            cov = np.array(msg.pose.covariance).reshape(6,6)
+            rospy.loginfo("Received amcl pose: {}".format(pose))
+            rospy.loginfo("Received amcl covariance: {}".format(cov))
+            cov[0:2, 0:2] = np.eye(2)*0.06
+            cov_flat = cov.flatten()
+
+            # Generate pub msg
+            pub_msg = PoseWithCovarianceStamped()
+            pub_msg.header = msg.header
+            pub_msg.pose.pose = pose
+            pub_msg.pose.covariance = cov_flat.tolist()
+
+            self.amcl_initial_pose_pub.publish(pub_msg)
+            self.trigger_initial_pose_pub = False
+            rospy.loginfo("Published initial pose after the manipulation ends!!")
+            # rospy.loginfo("Published (pose, cov)=", (pub_msg.pose.pose,pub_msg.pose.covariance))
     
     def navigate_to_location_navman(self, location : Enum):
         locationName = location.name

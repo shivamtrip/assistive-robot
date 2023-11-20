@@ -89,7 +89,7 @@ class AlignToObject:
             'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
             'head_pan;to' : self.vs_range[0],
         })
-        
+        rospy.sleep(2)
         nRotates = 0
         while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
@@ -107,6 +107,7 @@ class AlignToObject:
                     'base_rotate;by' : angleToGo,
                     'head_pan;to' : 0,
                 })
+                
                 return True
             else:
                 rospy.loginfo("Object not found, rotating base.")
@@ -144,7 +145,7 @@ class AlignToObject:
         move_to_pose(self.trajectoryClient, {
             'head_tilt;to' : - self.head_tilt_angle_grasp * np.pi/180,
         })
-       
+        rospy.sleep(1)
         if not self.scene_parser.clearAndWaitForNewObject():
             return False
 

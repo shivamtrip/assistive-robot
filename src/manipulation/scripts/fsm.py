@@ -85,7 +85,7 @@ class ManipulationFSM:
         self.scene_parser.set_object_id(goal.objectId)
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        self.stow_robot_service()
+        # self.stow_robot_service()
         
         if goal.isPick:
             rospy.loginfo("Received pick request.")
@@ -120,6 +120,14 @@ class ManipulationFSM:
         #     rospy.sleep(2)
         # exit()
 
+        # move_to_pose(trajectoryClient = self.trajectoryClient, pose = {
+        #     "head_tilt;to" : -10*np.pi/180,   
+        # }
+        # )
+        # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        # plane = self.scene_parser.get_plane(publish = True)
+        # exit()
+
         while not rospy.is_shutdown():
             if self.state == States.IDLE:
                 self.state = States.VISUAL_SERVOING
@@ -148,9 +156,9 @@ class ManipulationFSM:
                 self.send_feedback({'msg' : "moving to pregrasp pose"})
                 
                 # basic planning here
+                self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
                 ee_pose = self.manipulationMethods.getEndEffectorPose()
                 self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-                self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
 
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 grasp = self.scene_parser.get_grasp(publish = True)
@@ -188,9 +196,11 @@ class ManipulationFSM:
                         
                         self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(nPickTriesAttempted) + " of " + str(nPickTriesAllowed) + " allowed."})
                         nPickTriesAttempted += 1
+                        self.stow_robot_service()
+                        self.state = States.VISUAL_SERVOING
 
             elif self.state == States.PLACE:
-                heightOfObject = goal.heightOfObject
+                self.heightOfObject = goal.heightOfObject
                 move_to_pose(
                     self.trajectoryClient,
                     {
@@ -199,11 +209,11 @@ class ManipulationFSM:
                         'base_rotate;by': np.pi/2,
                     }
                 )
-                rospy.sleep(2)
+                rospy.sleep(5)
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 plane = self.scene_parser.get_plane(publish = True)
                 if plane:
-                    placingLocation = self.scene_parser.get_placing_location(plane, heightOfObject, publish = True)
+                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
                     self.manipulationMethods.place(self.trajectoryClient, placingLocation)
                     self.stow_robot_service()
                 self.state = States.COMPLETE

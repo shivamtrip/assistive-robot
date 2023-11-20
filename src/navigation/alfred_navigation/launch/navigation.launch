@@ -9,7 +9,7 @@
   <include file="$(find alfred_core)/launch/driver.launch" pass_all_args="true"/>
   <!-- <include file="$(find stretch_core)/launch/stretch_driver.launch" pass_all_args="true"/> -->
 
-  <include file="$(find stretch_rtabmap)/launch/robot/d435i_basic.launch" pass_all_args="true"/>
+  <!-- <include file="$(find stretch_rtabmap)/launch/robot/d435i_basic.launch" pass_all_args="true"/> -->
 
   <!-- CENTERED BASE LINK -->
   <node name="centered_base_link_tf_publisher" pkg="tf" type="static_transform_publisher" args="-0.1 0 0 0 0 0 1 /base_link /centered_base_link 100" />

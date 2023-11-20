@@ -1347,8 +1347,16 @@
         "Get me a soda can"
     ],
     "tissue_paper": [
+        "a tissue",
+        "tissue",
+        "me a tissue",
         "Bring me a tissue.",
         "Get me a tissue.",
+        "a tissue paper",
+        "tissue paper",
+        "me a tissue paper",
+        "Bring me a tissue paper.",
+        "Get me a tissue paper.",
         "Fetch me a tissue.",
         "Hand me a tissue.",
         "May I have a tissue?",
