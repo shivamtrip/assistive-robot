@@ -143,6 +143,7 @@
         "I'm parched. Can you get me a bottle of water?",
         "I need to hydrate. Can you bring me a bottle of water?",
         "Water bottle, please.",
+        "Can you get me a bottle?",
         "Can you please get me a bottle of water?",
         "I want some water. Can you get me a bottle?",
         "Can you help me get a bottle of water?",
@@ -507,9 +508,8 @@
         "Stop video chat please",
         "Stop video calling please",
         "Stop video chatting please",
-        "Stop video call now"
-    ],
-    "stop_video": [
+        "Stop video call now",
+        "Stop the video call",
         "Stop video",
         "Stop video call",
         "Stop video chat",
@@ -541,6 +541,7 @@
         "Can you stop video call now"
     ],
     "glasses": [
+        "Can you get me glasses?",
         "Hand me my glasses",
         "Hand me my reading glasses",
         "Can you hand me my glasses",
@@ -1037,6 +1038,7 @@
         "I'd appreciate it if you could get me an apple.",
         "Can you please procure me an apple?",
         "Can you please fetch me an apple?",
+        "Can you get me an apple?",
         "Can you get me an apple, pretty please?",
         "Would you mind getting me an apple, please?",
         "Can you please grab me an apple?",
@@ -1113,6 +1115,8 @@
         "Can you bring me a Fuji apple, please?"
     ],
     "remote": [
+        "Can you get me a remote?",
+        "Can you get me the remote?",
         "Bring me the remote.",
         "Get me the remote.",
         "Fetch me the remote.",
@@ -1250,6 +1254,9 @@
         "I need the remote, please fetch it."
     ],
     "soda_can": [
+        "Can you get me soda?",
+        "Can you get me some soda?",
+        "Can you get me the soda can?",
         "Fetch me a soda.",
         "Bring me a cola.",
         "Could you grab me a pop?",
@@ -1347,6 +1354,10 @@
         "Get me a soda can"
     ],
     "tissue_paper": [
+        "Can you get me a tissue?",
+        "Can you get me some tissue?",
+        "Can you get me a tissue paper?",
+        "Can you get me some tissue paper?",
         "a tissue",
         "tissue",
         "me a tissue",
@@ -1488,7 +1499,13 @@
         "Can you bring me tissue paper, please?",
         "I need tissue paper, please fetch it."
     ],
-    "cell_phone": [
+    "cell phone": [
+        "Can you get me the phone?",
+        "Can you get me my phone?",
+        "Can you get me my phone, please?",
+        "Can you bring me my phone?",
+        "Can you bring me my phone, please?",
+        "Can you get me the phone?",
         "Bring me my phone.",
         "Get me my phone.",
         "Fetch me my phone.",
@@ -1624,6 +1641,8 @@
         "I need my phone, please fetch it."
     ],
     "teddy bear": [
+        "Can you get me my teddy bear?",
+        "Please bring me my teddy bear",
         "Bring me my teddy bear.",
         "Get me my teddy bear.",
         "Fetch me my teddy bear.",
@@ -1757,6 +1776,12 @@
         "I need my teddy bear, please fetch it."
     ],
     "orange": [
+        "Can you get me an orange?",
+        "Can you bring me an orange?",
+        "Can you get me an orange, please?",
+        "Can you bring me an orange, please?",
+        "Can you please get me an orange?",
+        "Can you please bring me an orange?",
         "Orange, please",
         "Bring me an orange.",
         "Bring me orange",
@@ -1893,6 +1918,13 @@
         "I need an orange, please fetch it."
     ],
     "cup": [
+        "Can you please get me a cup?",
+        "Can you please bring me a cup?",
+        "Can you please hand me a cup?",
+        "Can you bring me a cup?",
+        "Can you get me a cup, please?",
+        "Can you bring me a cup, please?",
+        "Can you get me a cup?",
         "Bring me a cup.",
         "Get me a cup.",
         "Fetch me a cup.",

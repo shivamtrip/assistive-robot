@@ -164,7 +164,7 @@ class ResponseGenerator():
         if text is not None:
             rospy.loginfo("Heard: " + text)
             
-            closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.75)
+            closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.85)
             if len(closest_command) > 0:
                 rospy.loginfo("Closest command: " + closest_command[0])
                 cmd = closest_command[0]

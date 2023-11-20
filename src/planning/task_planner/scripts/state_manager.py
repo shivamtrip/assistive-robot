@@ -191,7 +191,8 @@ class LocationOfInterest(Enum):
     KITCHEN = 1
     TABLE = 2
     NET = 3
-    ROBOTS = 4    
+    ROBOTS = 4   
+    SINK = 5 
 #     {
 #     "HOME": {"x" : -2.38, "y":-7.66, "theta":180},
 #     "TABLE" : {"x" : -3.32, "y":-9.54, "theta":270},

@@ -130,7 +130,7 @@ class TaskPlanner:
 
             "cup" : LocationOfInterest.KITCHEN,
             "soda_can" : LocationOfInterest.KITCHEN,
-            "apple" : LocationOfInterest.KITCHEN,
+            "apple" : LocationOfInterest.SINK,
             "bottle" : LocationOfInterest.KITCHEN,
             "orange" : LocationOfInterest.KITCHEN,
             "banana" : LocationOfInterest.KITCHEN,
@@ -261,7 +261,6 @@ class TaskPlanner:
 
         self.bot_state.currentGlobalState = GlobalStates.MANIPULATION
         self.startManipService()
-        manipulationSuccess = False
         if manipulationSuccess:
             rospy.loginfo("Requesting to place the object")
             self.updateParamImpl("visualization/task_name", "place_object")
@@ -405,6 +404,7 @@ class TaskPlanner:
 
 if __name__ == "__main__":
     task_planner = TaskPlanner()
+    
 
     rospy.spin()
     

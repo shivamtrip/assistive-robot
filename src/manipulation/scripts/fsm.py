@@ -213,7 +213,10 @@ class ManipulationFSM:
                 self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
                 plane = self.scene_parser.get_plane(publish = True)
                 if plane:
-                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                    # placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                    placingLocation = np.array([
+                        0.0, 0.7, 0.9
+                    ])
                     self.manipulationMethods.place(self.trajectoryClient, placingLocation)
                     self.stow_robot_service()
                 self.state = States.COMPLETE

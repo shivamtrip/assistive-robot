@@ -142,7 +142,12 @@ class ManipulationMethods:
             move_to_pose(trajectoryClient, {
                 "lift;by": z_g - ee_z,
             })
-            rospy.sleep(5)
+        else:
+            move_to_pose(trajectoryClient, {
+                "lift;to": z_g + 0.1,
+            }
+            )
+            # rospy.sleep(5)
 
         print("Extending to ", x_g, y_g, z_g, grasp_yaw)
         print(" end effector pose ", ee_x, ee_y, ee_z)
@@ -150,7 +155,7 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "arm;by": abs(y_g - ee_y),
         })
-        rospy.sleep(5)
+        # rospy.sleep(5)
 
         if moveUntilContact:
             self.move_until_contact(
@@ -171,13 +176,13 @@ class ManipulationMethods:
             "wrist_yaw;to" : np.pi,
         })
         
-        rospy.sleep(5)
+        # rospy.sleep(5)
 
         move_to_pose(trajectoryClient, {
             "lift;to": 0.4,
             "head_pan;to": 0,
         })
-        rospy.sleep(5)
+        # rospy.sleep(5)
 
         
     def pick_with_feedback(self, trajectoryClient, x, y, z, theta):
@@ -304,7 +309,7 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "lift;by": z - ee_z,
         })
-        rospy.sleep(3)
+        # rospy.sleep(3)
         
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to": 0,
@@ -322,7 +327,7 @@ class ManipulationMethods:
             "arm;by": abs(y - ee_y),
             }
         )
-        rospy.sleep(5)
+        # rospy.sleep(5)
         self.move_until_contact(
             trajectoryClient,
             {
@@ -338,7 +343,7 @@ class ManipulationMethods:
             'lift;by' : 0.1,
             "arm;to": 0,
         })
-        rospy.sleep(5)
+        # rospy.sleep(5)
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to": np.pi,
         })

@@ -61,8 +61,8 @@ def move_to_pose(trajectoryClient, pose, asynchronous=False):
 
     trajectory_goal.trajectory.header.stamp = rospy.Time.now()
     trajectoryClient.send_goal(trajectory_goal)
-    # if not asynchronous: 
-    #     trajectoryClient.wait_for_result()
+    if not asynchronous: 
+        trajectoryClient.wait_for_result()
 
 # def move_to_pose(trajectoryClient, pose, asynchronous=False, custom_contact_thresholds=False):
 #     joint_names = [key for key in pose]
