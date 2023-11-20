@@ -120,6 +120,7 @@ class NavigationManager():
 
         if success:
             navman_result.success = True
+            self.n_attempts = 0
             self.navman_server.set_succeeded(navman_result)
             rospy.loginfo(f"[{self.node_name}]:" + f"Goal reached successfully.")
         else:

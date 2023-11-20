@@ -77,7 +77,6 @@ class ManipulationMethods:
             "head_pan;to" : -np.pi/2,
             "head_tilt;to" : -30 * np.pi/180,
             'arm;to' : 0.02,
-            'arm;to' : 0.03,
             # "head_tilt;to" : 0 * np.pi/180
         })
         move_to_pose(trajectoryClient, {

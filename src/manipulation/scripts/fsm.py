@@ -175,7 +175,7 @@ class ManipulationFSM:
                         self.heightOfObject = 0.2 #default height of object if plane is not detected
                     
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    offsets[1] -= 0.02 #constant safety factor
+                    offsets[1] -= 0.01 #constant safety factor
                     grasp = (grasp_center + np.array(offsets)), grasp_yaw
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 

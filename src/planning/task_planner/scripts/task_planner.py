@@ -55,7 +55,6 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.trigger_initial_pose_pub = False
         self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
@@ -76,8 +75,12 @@ class TaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for verbal response service...")
         self.verbal_response_service.wait_for_service()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
-        self.navigation_client_old.wait_for_server()
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
+        # self.navigation_client_old.wait_for_server()
+        
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        self.navigation_client.wait_for_server()
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for manipulation_fsm server...")
         self.manipulation_client.wait_for_server()
@@ -143,14 +146,11 @@ class TaskPlanner:
         self.navigationGoal = LocationOfInterest.HOME
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
 
-        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
-
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
-        self.navigation_client.wait_for_server()
+        
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Subscribing to the amcl pose topic...")
-        self.amcl_initial_pose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10)
-
+        self.amcl_initial_pose_pub = rospy.Publisher('/initialpose', PoseWithCovarianceStamped, queue_size=10, )
+        # self.amcl_pose_sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.amcl_pose_callback)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
         # create a timed callback to check if we have, Obj been idle for too long
 
@@ -252,7 +252,7 @@ class TaskPlanner:
         self.startNavService()
         rospy.sleep(0.5)                                                        
         # rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
-        # self.updateParamImpl("visualization/task_name", "go_to_user")
+        self.updateParamImpl("visualization/task_name", "go_to_user")
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
         # success = self.navigate_to_location(self.navigationGoal)
         # if not success:
