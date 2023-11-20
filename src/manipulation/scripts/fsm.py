@@ -99,6 +99,26 @@ class ManipulationFSM:
 
         nPickTriesAttempted = 0
         nPickTriesAllowed = self.n_max_pick_attempts
+        # move_to_pose(
+        #     self.trajectoryClient,
+        #     {
+        #         'head_pan;to' : -np.pi/2,
+        #         'head_tilt;to' : - 30 * np.pi/180,
+        #         # 'base_rotate;by': np.pi/2,
+        #     }
+        # )
+        # while not rospy.is_shutdown():
+        #     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        #     grasp = self.scene_parser.get_grasp(publish = True)
+        #     print(grasp[1] * 180 / np.pi)
+        #     move_to_pose(
+        #         self.trajectoryClient,
+        #         {
+        #             'wrist_yaw;to': grasp[1],
+        #         }
+        #     )
+        #     rospy.sleep(2)
+        # exit()
 
         while not rospy.is_shutdown():
             if self.state == States.IDLE:

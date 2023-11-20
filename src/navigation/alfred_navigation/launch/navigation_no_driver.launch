@@ -25,6 +25,7 @@
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_yaml)" />
 
   <!-- LOCALIZATION -->
+  
   <include file="$(find alfred_navigation)/launch/localization/amcl.launch" />
   <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
 

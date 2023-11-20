@@ -55,7 +55,7 @@ class TaskPlanner:
         self.startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_fsm', TriggerAction)
 
         self.verbal_response_service_name = rospy.get_param("verbal_response_service_name",
@@ -75,7 +75,7 @@ class TaskPlanner:
         self.verbal_response_service.wait_for_service()
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
-        self.navigation_client.wait_for_server()
+        self.navigation_client_old.wait_for_server()
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for manipulation_fsm server...")
         self.manipulation_client.wait_for_server()
@@ -99,10 +99,42 @@ class TaskPlanner:
         self.runningTeleop = False
 
         self.class_list = rospy.get_param("/object_detection/class_list")
-
+# class_list:
+#   # - 'drawer'
+#   - 'soda_can' # 0
+#   - 'tissue_paper' #1
+#   - 'toothbrush' #2
+#   - 'tie' #3
+#   - 'cell phone' #4
+#   - 'banana' #5
+#   - 'apple' #6
+#   - 'orange' #7
+#   - 'bottle' #8
+#   - 'cup' #9
+#   - 'teddy bear' #10
+#   - 'remote' #11
         self.mappings = {}
+        self.location_object_map = {
+            "teddy bear" : LocationOfInterest.LIVING_ROOM,
+            "tie" : LocationOfInterest.LIVING_ROOM,
+            "cell phone" : LocationOfInterest.LIVING_ROOM,
+            "toothbrush" : LocationOfInterest.LIVING_ROOM,
+
+            "tissue_paper" : LocationOfInterest.ROBOTS,
+            "remote" : LocationOfInterest.ROBOTS,
+
+            "cup" : LocationOfInterest.KITCHEN,
+            "soda_can" : LocationOfInterest.KITCHEN,
+            "apple" : LocationOfInterest.KITCHEN,
+            "bottle" : LocationOfInterest.KITCHEN,
+            "orange" : LocationOfInterest.KITCHEN,
+            "banana" : LocationOfInterest.KITCHEN,
+        }
+        
         for i, cls in enumerate(self.class_list):
-            self.mappings[cls] = [LocationOfInterest.LIVING_ROOM, i]
+            self.mappings[cls] = [self.location_object_map[cls], i]    
+           
+        
             
         self.mappings['do_nothing'] = [LocationOfInterest.LIVING_ROOM, -1]
         
@@ -192,6 +224,7 @@ class TaskPlanner:
         self.updateParamImpl("visualization/task_name", "go_to_object")
         
         navSuccess = self.navigate_to_location_navman(self.navigationGoal)
+        # navSuccess = self.navigate_to_location(self.navigationGoal)
         # if not navSuccess:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
         #     navSuccess = self.navigate_to_location(self.navigationGoal)
@@ -212,6 +245,7 @@ class TaskPlanner:
         rospy.loginfo(f"Going to table. Manipulation success = {manipulationSuccess}")
         self.updateParamImpl("visualization/task_name", "go_to_user")
         success = self.navigate_to_location_navman(LocationOfInterest.TABLE)
+        # success = self.navigate_to_location(self.navigationGoal)
         # if not success:
         #     rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
         #     self.navigate_to_location_navman(LocationOfInterest.TABLE)
@@ -320,13 +354,13 @@ class TaskPlanner:
         goal.target_pose.pose.position.y = self.goal_locations[locationName]['y']
         quaternion = get_quaternion(self.goal_locations[locationName]['theta'])
         goal.target_pose.pose.orientation = quaternion
-        self.navigation_client.send_goal(goal, feedback_cb = self.bot_state.navigation_feedback)
-        wait = self.navigation_client.wait_for_result()
+        self.navigation_client_old.send_goal(goal)
+        wait = self.navigation_client_old.wait_for_result()
 
-        if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
+        if self.navigation_client_old.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach {}".format(locationName))
             # cancel navigation
-            self.navigation_client.cancel_goal()
+            self.navigation_client_old.cancel_goal()
             return False
         
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached {}".format(locationName))

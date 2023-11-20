@@ -178,7 +178,8 @@ class AlignToObject:
                         'base_translate;vel' : 0.0,
                     })          
                     return True
-            if distanceMoved >= distanceToMove - 0.3:
+            # if distanceMoved >= distanceToMove - 0.3:
+            else:
                 if time.time() - lastDetectedTime > intervalBeforeRestart:
                     rospy.loginfo("Lost track of the object. Going back to search again.")
                     move_to_pose(self.trajectoryClient, {

@@ -191,6 +191,16 @@ class LocationOfInterest(Enum):
     KITCHEN = 1
     TABLE = 2
     NET = 3
+    ROBOTS = 4    
+#     {
+#     "HOME": {"x" : -2.38, "y":-7.66, "theta":180},
+#     "TABLE" : {"x" : -3.32, "y":-9.54, "theta":270},
+#     "LIVING_ROOM" : {"x" : -3.69, "y":-3.83, "theta":0},
+#     "NET" : {"x" : -4.311476783752441, "y" : -1.6926142692565918, "theta" : 90},
+#     "KITCHEN" : {"x" : -5.8, "y" : -1.65, "theta" : 180},
+#     "ROBOTS" : {"x" : -3.82, "y" : -2.42, "theta" : 0}
+# }
+
 
 class VerbalResponseStates(Enum):
     # FILL WITH VERBAL RESPONSES
