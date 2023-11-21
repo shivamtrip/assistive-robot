@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-<!-- TODO(@atharva-18): import yaml: no module named -->
-  <include file="$(find alfred_navigation)/launch/navigation.launch" />
-</launch>

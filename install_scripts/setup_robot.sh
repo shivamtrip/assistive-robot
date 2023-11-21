@@ -15,4 +15,7 @@ sudo /usr/local/lib/robot_env/bin/pip3 install pvporcupine==3.0.0
 sudo /usr/local/lib/robot_env/bin/pip3 install pyrebase4
 sudo /usr/local/lib/robot_env/bin/pip3 install -r ~/alfred-autonomy/src/interface/alfred_hri/config/requirements.txt
 sudo /usr/local/lib/robot_env/bin/pip3 install rospkg -y
-sudo apt-get install ros-noetic-spatio-temporal-voxel-layer -y
+sudo apt-get install ros-noetic-spatio-temporal-voxel-layer  ros-noetic-nav-core -y
+sudo apt-get install ros-noetic-nav-core -y
+sudo apt-get install ros-noetic-move-base -y
+sudo apt-get install ros-noetic-base-local-planner -y

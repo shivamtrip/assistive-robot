@@ -84,7 +84,7 @@ void infoCallback(const sensor_msgs::CameraInfoConstPtr &info_msg)
     fy = info_msg->K[4]; // Focal length y
     cx = info_msg->K[2]; // Principal point x
     cy = info_msg->K[5]; // Principal point y
-    ROS_INFO("fx: %d, fy: %d, cx: %d, cy: %d", fx, fy, cx, cy);
+    ROS_INFO("fx: %0.2f, fy: %0.2f, cx: %0.2f, cy: %0.2f", fx, fy, cx, cy);
     intrinsics_set = true;
   }
 }

@@ -16,7 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   costmap_2d
   geometry_msgs
-  nav_core
   pluginlib
   roscpp
   tf2
@@ -26,15 +25,6 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   actionlib
 )
-
-
-# pluginlib_export_plugin_description_file(moveback_recovery moveback_plugin.xml)
-# it works if you uncomment, fail the build and recomment
-
-add_library(moveback_recovery src/moveback_recovery.cpp)
-add_dependencies(moveback_recovery ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(moveback_recovery ${catkin_LIBRARIES})
-
 
 
 
@@ -197,6 +187,11 @@ include_directories(
 ## Install ##
 #############
 
+add_library(moveback_recovery src/moveback_recovery.cpp)
+add_dependencies(moveback_recovery ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(moveback_recovery ${catkin_LIBRARIES})
+
+
 
 install(TARGETS moveback_recovery
        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -262,3 +257,9 @@ install(FILES moveback_plugin.xml
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+
+
+# pluginlib_export_plugin_description_file(moveback_recovery moveback_plugin.xml)
+# it works if you uncomment, fail the build and recomment
+
