@@ -29,7 +29,8 @@ if __name__ == '__main__':
     goal.objectId = 100
     goal.isPick = False
     
-    node.main(goal)
+    node.goal = goal
+    node.place(goal)
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 

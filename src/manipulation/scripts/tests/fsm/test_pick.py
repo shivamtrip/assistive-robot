@@ -44,12 +44,13 @@ if __name__ == '__main__':
     startManipService.wait_for_service()
     startManipService()
     class_list = rospy.get_param('/object_detection/class_list')
+    
     node = ManipulationFSM()
     goal = TriggerGoal()
     goal.objectId = 3
     goal.isPick = True
-    node.main(goal)
-    rospy.sleep(5)
+    node.goal = goal
+    node.pick()
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 

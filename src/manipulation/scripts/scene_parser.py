@@ -110,6 +110,15 @@ class SceneParser:
         return object_properties, isLive
 
     
+    def is_grasp_success(self):
+        """Checks if the grasp was successful or not
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # returns true perenially for now since grasp success recognition is disabled.
+        return True
+    
     def parse_scene(self, depth, rgb , detection):
         self.obtained_initial_images = True
         # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
