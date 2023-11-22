@@ -45,27 +45,27 @@ class TestTaskPlanner:
 
         # Initialize all paths and directories
         self.bridge = CvBridge()
-        self.root_dir = rospy.get_param('/vlmaps/root_dir')
-        self.data_dir = rospy.get_param('/vlmaps/data_dir')
-        self.cs =   rospy.get_param('/vlmaps/cs')
-        self.gs =  rospy.get_param('/vlmaps/gs')
-        self.camera_height = rospy.get_param('/vlmaps/camera_height')
-        self.max_depth_value = rospy.get_param('/vlmaps/max_depth_value')
-        self.depth_sample_rate = rospy.get_param('/vlmaps/depth_sample_rate')
-        self.use_self_built_map = rospy.get_param('/vlmaps/use_self_built_map')
-        self.inference = rospy.get_param('/vlmaps/inference')
-        self.cuda_device = rospy.get_param('/vlmaps/cuda_device')
-        self.show_vis = rospy.get_param('/vlmaps/show_vis')
+        self.root_dir = rospy.get_param('/vlmaps_robot/root_dir')
+        self.data_dir = rospy.get_param('/vlmaps_robot/data_dir')
+        self.cs =   rospy.get_param('/vlmaps_robot/cs')
+        self.gs =  rospy.get_param('/vlmaps_robot/gs')
+        self.camera_height = rospy.get_param('/vlmaps_robot/camera_height')
+        self.max_depth_value = rospy.get_param('/vlmaps_robot/max_depth_value')
+        self.depth_sample_rate = rospy.get_param('/vlmaps_robot/depth_sample_rate')
+        self.use_self_built_map = rospy.get_param('/vlmaps_robot/use_self_built_map')
+        self.inference = rospy.get_param('/vlmaps_robot/inference')
+        self.cuda_device = rospy.get_param('/vlmaps_robot/cuda_device')
+        self.show_vis = rospy.get_param('/vlmaps_robot/show_vis')
         self.data_config_dir = os.path.join(self.data_dir, "config/data_configs")
 
-        map_save_dir = os.path.join(self.data_dir, "map_correct")
-        if self.use_self_built_map:
-            map_save_dir = os.path.join(self.data_dir, "map")
-        os.makedirs(map_save_dir, exist_ok=True)
+        # map_save_dir = os.path.join(self.data_dir, "map_correct")
+        # if self.use_self_built_map:
+        #     map_save_dir = os.path.join(self.data_dir, "map")
+        # os.makedirs(map_save_dir, exist_ok=True)
 
-        self.color_top_down_save_path = os.path.join(map_save_dir, f"color_top_down_1.npy")
-        self.grid_save_path = os.path.join(map_save_dir, f"grid_lseg_1.npy")
-        self.obstacles_save_path = os.path.join(map_save_dir, "obstacles.npy")
+        # self.color_top_down_save_path = os.path.join(map_save_dir, f"color_top_down_1.npy")
+        # self.grid_save_path = os.path.join(map_save_dir, f"grid_lseg_1.npy")
+        # self.obstacles_save_path = os.path.join(map_save_dir, "obstacles.npy")
 
         # Stores update time
         self.last_update_time = time.time()
@@ -84,6 +84,8 @@ class TestTaskPlanner:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing costmap processor node...")
         self.costmap_processor = ProcessCostmap()
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
 
         self.labels= "table, chair, floor, sofa, bed, other"
         self.labels = self.labels.split(",")
@@ -119,15 +121,16 @@ class TestTaskPlanner:
         mask_list = self.vlmaps_caller.results
         masks = np.array(mask_list)
 
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Received {} masks from vlmaps".format(masks.shape[0]))
+
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
-        # movebase_goal = self.get_movebase_goals_rtabmap(outputs,label=' '+'sofa')
+        safe_movebase_goal = self.get_movebase_goals_rtabmap(outputs,label=' '+'sofa')
 
-        # TODO: ag6 - Write a function here to ensure safe goals are sent to movebase
-        # safe_goal = self.costmap_processor.get_safe_goal(movebase_goal)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         # Send goal to movebase
-        # self.navigate_to_location(safe_goal)
+        self.navigate_to_location(safe_movebase_goal)
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)
@@ -209,6 +212,8 @@ class TestTaskPlanner:
         # find centroid of the bbox
         x,y  = (max_bbox[0] + max_bbox[2])/2, (max_bbox[1] + max_bbox[3])/2
 
+        print("x,y: ", x,y)
+
         # Vlmap to rtabmap world coordinate
         YY =0 # 2d navigation
         XX,ZZ = grid_id2pos(self.gs,self.cs,x,y)
@@ -236,6 +241,7 @@ class TestTaskPlanner:
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.pose.position.x = X
         goal.target_pose.pose.position.y = Y
+        theta = 0
         quaternion = Quaternion(*tf.transformations.quaternion_from_euler(0.0, 0.0, math.radians(theta)))
         goal.target_pose.pose.orientation = quaternion
 

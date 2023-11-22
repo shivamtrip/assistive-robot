@@ -18,7 +18,6 @@ class ProcessCostmap():
 
     def __init__(self,):
 
-        rospy.init_node('Costmap_processor', anonymous=True)
         self.costmap_topic = '/move_base/global_costmap/costmap'
         self.costmap_sub = rospy.Subscriber(self.costmap_topic, OccupancyGrid, self.costmap_callback)
         self.costmap = None
@@ -29,6 +28,8 @@ class ProcessCostmap():
         self.des_obs_thresh = 10
         self.big_obs_thresh = 50
 
+        rospy.loginfo("Costmap processor initialized!!")
+
     def costmap_callback(self, data):
 
         rospy.loginfo("Costmap callback!!")
@@ -38,6 +39,7 @@ class ProcessCostmap():
             self.costmap = np.array(data.data).reshape((data.info.height, data.info.width))
             self.costmap_info = data.info
             self.LOADED_COSTMAP = True
+            rospy.loginfo("Costmap loaded!!")
 
         if(self.LOADED_COSTMAP):
             self.costmap_sub.unregister()
@@ -300,6 +302,7 @@ class ProcessCostmap():
 
 
 if __name__ == '__main__':
+    rospy.init_node('Costmap_processor', anonymous=True)
 
     costmap_processor = ProcessCostmap()
     try:

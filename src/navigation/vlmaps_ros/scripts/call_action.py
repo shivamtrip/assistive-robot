@@ -25,6 +25,7 @@ class vlmaps_fsm():
         # wait for server
         rospy.loginfo("Waiting for VLMAPS server...")
         self.vlmaps_client.wait_for_server()
+        rospy.loginfo("Connected to VLMAPS server")
 
         # Initialize results
         self.results = None

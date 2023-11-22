@@ -11,8 +11,8 @@ depth_image_topic: '/camera/aligned_depth_to_color/image_raw'
 color_image_topic: "/camera/color/image_raw"
 
 # Directory paths
-root_dir: '/home/hello-robot/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros'
-data_dir: '/home/hello-robot/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros/rosbag_data'
+root_dir: '/home/hello-robot/FVD/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros'
+data_dir: '/home/hello-robot/FVD/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros/rosbag_data'
 map_save_dir: 'map_correct'
 
 # Map parameters
