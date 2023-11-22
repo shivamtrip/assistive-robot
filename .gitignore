@@ -61,3 +61,12 @@ latest
 *.ply
 *.json
 *.cmake
+
+# vlmaps data files
+src/navigation/vlmaps_ros/data/*
+*checkpoints
+*.ckpt
+*.bag
+*logs
+rgb.mp4
+depth.mp4

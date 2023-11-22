@@ -1,0 +1,7 @@
+string[] labels
+---
+Header header
+sensor_msgs/Image[] masks
+bool success
+---
+int32 status

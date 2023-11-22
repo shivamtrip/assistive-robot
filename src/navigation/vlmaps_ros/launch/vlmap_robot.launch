@@ -1,0 +1,6 @@
+<launch>
+    <node name="test_navigation" pkg="vlmaps_ros" type="test_navigation.py" output="screen"></node>
+    <group ns="vlmaps_robot">
+        <rosparam file="$(find vlmaps_ros)/config/vlmaps_robot.yaml" />
+    </group>
+</launch>
