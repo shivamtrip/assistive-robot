@@ -159,6 +159,8 @@ def callback(msg):
         "joint_wrist_yaw",
     ]
     
+    
+    
     final_state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     # x, y, theta, z, phi, ext
     for i, k in enumerate(msg.name):
@@ -171,7 +173,10 @@ def callback(msg):
             final_state[3] += msg.position[i]
         # if k == "joint_head_pan":
         #     final_state[2] -= msg.position[i]
-            
+    
+    transform = get_transform(listener, 'link_arm_l4', 'link_arm_l0')
+    final_state[5] = np.linalg.norm(transform[:3, 3])
+    
     debug_state = {
         "x" : final_state[0],
         "y" : final_state[1],
@@ -248,43 +253,39 @@ def parse_scene(depth, rgb ):
         prevtime = time.time()
         print("publishing ")
     
-def execute_plan(plan, sleep_between_waypoints = 0.7):
-    
+def execute_plan(plan):
+    waypoint = None
+    # x, y, theta, z, phi, ext
+    waits = [0.5, 0.1, 0.5, 0.5, 0.1, 0.5]
     for i, waypoint in enumerate(plan):
         boxes, centers = planner.get_collision_boxes(waypoint)
         visualize_boxes_rviz(boxes, centers)     
         rospy.loginfo("Sending waypoint")
-        rospy.sleep(sleep_between_waypoints)
-        base_translate_by = 0
-        if i != 0 and abs(waypoint[0] - plan[i - 1][0]) > 0:
-            base_translate_by = waypoint[0] - plan[i - 1][0]
-            
-        if i > len(plan) // 2:
-            break
+        idx_to_move = 0
+        for j in range(len(waypoint)):
+            if waypoint[j] != plan[i-1][j]:
+                idx_to_move = j
+                break
         move_to_pose(trajectory_client, {
-            "base_translate;by" : base_translate_by,
+            "base_translate;by" : waypoint[0],
             "lift|;to" : waypoint[3],
             "arm|;to" : waypoint[5],
             "wrist_yaw|;to": waypoint[4],
         })
+        rospy.sleep(waits[idx_to_move])
         
-        if base_translate_by > 0:
-            rospy.sleep(0.1)
-        # rospy.sleep(0.1)
-        # rospy.sleep(0.1)
-        # if i != 0 and abs(waypoint[4] - plan[i-1][4]) > 0:
-        #     rospy.sleep(1)
-    # move_to_pose(trajectory_client, {
-    #     "lift|;to" : waypoint[3],
-    #     "arm|;to" : waypoint[5],
-    #     "wrist_yaw|;to": waypoint[4],
-    # })
+    if waypoint is None:
+        return
+    move_to_pose(trajectory_client, {
+        "lift|;to" : waypoint[3],
+        "arm|;to" : waypoint[5],
+        "wrist_yaw|;to": waypoint[4],
+    })
         
 
 
 if __name__ == '__main__':
     rospy.init_node('test')
-    rospy.Subscriber('/alfred/joint_states', JointState, callback)
     marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
     from helpers import move_to_pose
     from std_srvs.srv import Trigger, TriggerResponse
@@ -316,6 +317,7 @@ if __name__ == '__main__':
     trajectory_client.wait_for_server()
     stow_robot_service()
     
+    rospy.Subscriber('/alfred/joint_states', JointState, callback)
     move_to_pose(trajectory_client, {
         "head_pan;to" : -np.pi/2,
         "head_tilt;to" : -30 * np.pi/180,
@@ -341,9 +343,13 @@ if __name__ == '__main__':
     while curstate is None or scene_cloud is None:
         rospy.loginfo("Waiting for populating vars")
         rospy.sleep(0.1)
+        
+    rospy.sleep(2)
     
     curstate[2] = 0
     curstate[4] = 1 #stowed
+    print("START", curstate)
+    # exit()
     goalstate = [0, 0.0, 0, 0.8, 0, 0.6]
     planner = AStarPlanner(curstate, goalstate, scene_cloud)
     
@@ -355,9 +361,8 @@ if __name__ == '__main__':
     
     execute_plan(plan)
     rospy.sleep(2)
-    # plan = plan[::-1]
-    
-    # execute_plan(plan)
+    plan = plan[::-1]
+    execute_plan(plan)
     
     # stow_robot_service()
         

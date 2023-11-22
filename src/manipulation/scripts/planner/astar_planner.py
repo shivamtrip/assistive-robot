@@ -23,8 +23,8 @@ class AStarPlanner(BasePlanner):
         x, z, phi, ext = current
         tx, tz, tphi, text = goal
         dist = 0
-        dist += abs(x - tx)
-        dist += abs(z - tz)
+        dist += abs(x - tx) * 1.5
+        dist += abs(z - tz) * 1.5
         dist += abs(phi - tphi) * 0.8
         dist += abs(ext - text) * 0.8
         return dist
@@ -112,6 +112,14 @@ class AStarPlanner(BasePlanner):
             goal[4],
             goal[5]
         ])
+        
+        if not self.check_valid_config(self.convert_to_full_state(start)):
+            print("Start not valid")
+            return [], False
+        if not self.check_valid_config(self.convert_to_full_state(goal)):
+            print("Goal not valid")
+            return [], False
+        
         resolutions = self.resolutions
         start = tuple(np.round(start, 2).tolist())
         goal = tuple(np.round(goal, 2).tolist())
@@ -123,12 +131,12 @@ class AStarPlanner(BasePlanner):
         heapq.heappush(open_list, (f_score[start], start))
         minerr = [np.inf, None]
         its = 0
-        while open_list and its < 2000 and minerr[0] > 0.04:
+        while open_list and its < 2000 and minerr[0] > 0.08:
             its += 1
             _, current = heapq.heappop(open_list)
             current = tuple(np.round(np.array(current), 2))
             err = np.linalg.norm(np.array(self.config_to_workspace(current)) - np.array(self.config_to_workspace(goal)))
-            print(its, err, current)
+            print(its, err, minerr[0], current)
             if err < minerr[0]:
                 minerr = [err, current]
                 print(err)

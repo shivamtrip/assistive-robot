@@ -41,9 +41,9 @@ class BasePlanner():
         # return True
         tx, ty, ttheta, tz, tphi, text = state
         
-        if tz > 1.5 or tz < 0.1:
+        if tz > 1.5 or tz < 0.3:
             return False    
-        if text > 0.8 or text < 0:
+        if text > 0.7 or text < 0:
             return False
         if ttheta > 2 * np.pi or ttheta < 0:
             return False
@@ -62,13 +62,13 @@ class BasePlanner():
         x, y, theta, z, phi, ext = state
         boxes = []
         dist_baselink_to_center = 0.11587
-        l1 = 0.25
+        l1 = 0.22
 
         arm_min_extension = 0.3
         arm_dims = [0.1, ext + arm_min_extension, 0.1]
         
-        gripper_length = 0.17
-        gripper_dims = [0.17, 0.17, 0.18] # slightly recessed to allow grasp center to reach object.
+        gripper_length = 0.23
+        gripper_dims = [0.23, 0.22, 0.18] # slightly recessed to allow grasp center to reach object.
         gripper_offset = [
             0.22, #distance from arm start to gripper start.
             0.09, # baseframe x offset to gripper hinge.
@@ -94,7 +94,7 @@ class BasePlanner():
 
         arm_center = base_center + np.array(
             [
-                (- l1 * np.sin(theta) + (arm_min_extension + ext)* np.sin(theta))/2,
+                (-l1 * np.sin(theta) + (arm_min_extension + ext)* np.sin(theta))/2,
                 (l1 * np.cos(theta)  - (arm_min_extension + ext) * np.cos(theta))/2,
                 z + base_center[2][0]
             ]
