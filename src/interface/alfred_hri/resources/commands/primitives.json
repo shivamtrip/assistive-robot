@@ -1260,6 +1260,7 @@
     "cell phone": [
         "Can you get me the phone?",
         "Can you get me my phone?",
+        "Can you get me a phone?",
         "Can you get me my phone, please?",
         "Can you bring me my phone?",
         "Can you bring me my phone, please?",
@@ -1399,6 +1400,7 @@
         "I need my phone, please fetch it."
     ],
     "teddy bear": [
+        "Can you get me a teddy bear?",
         "Can you get me my teddy bear?",
         "Please bring me my teddy bear",
         "Bring me my teddy bear.",
