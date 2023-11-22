@@ -74,11 +74,20 @@ class ManipulationMethods:
         
         move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
-            "head_pan;to" : -np.pi/2,
+            "head_pan;to" : 0,
             "head_tilt;to" : -30 * np.pi/180,
             'arm;to' : 0.02,
             # "head_tilt;to" : 0 * np.pi/180
         })
+
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to" : 0.85,
+        #     "head_pan;to" : -np.pi/2,
+        #     "head_tilt;to" : -30 * np.pi/180,
+        #     'arm;to' : 0.02,
+        #     # "head_tilt;to" : 0 * np.pi/180
+        # })
+
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to" : 0,
             "stretch_gripper;to" : 100,
@@ -180,6 +189,14 @@ class ManipulationMethods:
 
         move_to_pose(trajectoryClient, {
             "lift;to": 0.4,
+            # "head_pan;to": 0,
+        })
+        # # rospy.sleep(5)
+
+    def reset_cam_and_lift_after_pick(self, trajectoryClient):
+        """Resets the camera and lift after pick is complete"""
+
+        move_to_pose(trajectoryClient, {
             "head_pan;to": 0,
         })
         # rospy.sleep(5)

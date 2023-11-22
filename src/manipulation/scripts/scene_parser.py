@@ -195,6 +195,15 @@ class SceneParser:
                 self.current_detection = [x1, y1, x2, y2]
 
         return True
+    
+    def checkIfGraspSucceeded(self,):
+        """ Check if the object has been grasped and not in field of view anymore!"""
+        object_properties, isLive = self.get_latest_observation()
+        if not isLive:
+            return True
+        else:
+            return False
+            
             
     def convertPointToFrame(self, x_f, y_f, z, to_frame = "base_link"):
         intrinsic = self.intrinsics

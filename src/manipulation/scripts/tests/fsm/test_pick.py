@@ -46,7 +46,7 @@ if __name__ == '__main__':
     class_list = rospy.get_param('/object_detection/class_list')
     node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 3
+    goal.objectId = 9
     goal.isPick = True
     node.main(goal)
     rospy.sleep(5)

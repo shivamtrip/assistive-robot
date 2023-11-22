@@ -33,6 +33,7 @@ class ManipulationFSM:
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
+        self.real_time_diff = 0.5 ## Running on robot's wifi adapter
 
         
         self.class_list = rospy.get_param('/object_detection/class_list')
@@ -79,7 +80,7 @@ class ManipulationFSM:
 
     def main(self, goal : TriggerGoal):
         self.goal = goal
-        self.state = States.IDLE
+        self.state = States.PICK
         objectManipulationState = States.PICK
 
         self.scene_parser.set_object_id(goal.objectId)
@@ -152,6 +153,8 @@ class ManipulationFSM:
                     self.visualServoing.recoverFromFailure()
 
             elif self.state == States.PICK:
+               
+                self.scene_parser.time_diff_for_realtime = self.real_time_diff ## Not using wifi adapter for testing. Increased realtime threshold
                 self.state = States.WAITING_FOR_GRASP_AND_PLANE
                 self.send_feedback({'msg' : "moving to pregrasp pose"})
                 
@@ -182,9 +185,12 @@ class ManipulationFSM:
                         grasp,
                         moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                     ) 
+
+                    rospy.loginfo(f"{rospy.get_name()} : Checking if grasp succeeded.")
                     
-                    success = self.manipulationMethods.checkIfGraspSucceeded()
+                    success = self.scene_parser.checkIfGraspSucceeded()
                     if success:
+                        self.manipulationMethods.reset_cam_and_lift_after_pick()
                         self.send_feedback({'msg' : "Pick succeeded! "})
                         self.state = States.COMPLETE
                     else:
