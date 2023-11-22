@@ -6,7 +6,14 @@ from sensor_msgs.msg import JointState
 import open3d as o3d
 from visualization_msgs.msg import Marker
 from scipy.spatial.transform import Rotation as R
+import actionlib
+from control_msgs.msg import FollowJointTrajectoryAction
+import tf
+import time
+from std_msgs.msg import Header
 
+import sensor_msgs.point_cloud2 as pcl2
+from sensor_msgs.msg import PointCloud2, PointField
 
 def get_rotation_mat(theta):
         return np.array([[np.cos(theta), -np.sin(theta), 0],
@@ -175,14 +182,109 @@ def callback(msg):
     }
     boxes, centers = get_collision_boxes(final_state)
     visualize_boxes_rviz(boxes, centers)
-    # print(msg.name)
-    # print(msg.position)
     print(debug_state)
+
+def get_transform(listener, base_frame, camera_frame):
+
+    while not rospy.is_shutdown():
+        try:
+            t = listener.getLatestCommonTime(base_frame, camera_frame)
+            (trans,rot) = listener.lookupTransform(base_frame, camera_frame, t)
+
+            trans_mat = np.array(trans).reshape(3, 1)
+            rot_mat = R.from_quat(rot).as_matrix()
+            transform_mat = np.hstack((rot_mat, trans_mat))
+
+            return transform_mat
+            
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            continue
+
+
+def parse_scene(depth, rgb ):
+    global prevtime
+    depth_img = bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
+    depth_image = np.array(depth_img, dtype=np.float32)
+
+    color_img = bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
+    color_image = np.array(color_img, dtype=np.uint8)
+    
+    depth = depth_image.astype(np.uint16)
+    depth[depth < 150] = 0
+    depth[depth > 3000] = 0
+    
+    depth = o3d.geometry.Image(depth)
+    color = o3d.geometry.Image(color_image.astype(np.uint8))
+    
+    extrinsics = get_transform(listener, 'camera_color_optical_frame', 'base_link')
+    extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+    
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        color, depth, depth_scale=1000, convert_rgb_to_intensity=False
+    )
+    cam = o3d.camera.PinholeCameraIntrinsic()
+    cam.intrinsic_matrix = intrinsics
+    cam.width = color_image.shape[1]
+    cam.height = color_image.shape[0]
+    
+    cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
+        rgbd, cam, extrinsics
+    )
+    
+    points = np.array(cloud.points)
+    if time.time() - prevtime > 2:
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "base_link"  # Set your desired frame_id
+        msg = pcl2.create_cloud_xyz32(header, points)
+        obj_cloud_pub.publish(msg)
+        prevtime = time.time()
+        print("publishing ")
+    
+    
 
 if __name__ == '__main__':
     rospy.init_node('test')
     rospy.Subscriber('/alfred/joint_states', JointState, callback)
     marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
+    from helpers import move_to_pose
+    from std_srvs.srv import Trigger, TriggerResponse
+    import message_filters
+    from sensor_msgs.msg import Image
+    from sensor_msgs.msg import CameraInfo
+    from sensor_msgs.msg import PointCloud2
+    startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+    startManipService.wait_for_service()
+    startManipService()
+    prevtime = time.time()
+    import cv_bridge
+    bridge = cv_bridge.CvBridge()
+    
+    listener = tf.TransformListener()
+    
+    trajectory_client = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+    trajectory_client.wait_for_server()
+    
+    depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
+    rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
+    
+    obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
+
+    synced_messages = message_filters.ApproximateTimeSynchronizer([
+            depth_image_subscriber, rgb_image_subscriber,
+    ], 100, 0.5, allow_headerless=False)
+    synced_messages.registerCallback(parse_scene)
+    
+    
+    msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=30)
+    intrinsics = np.array(msg.K).reshape(3,3)
+    
+    
+    move_to_pose(trajectory_client, {
+        "head_pan;to" : -np.pi/2,
+        "head_tilt;to" : -30 * np.pi/180,
+    })
+    
     try:
         rospy.spin()
     except KeyboardInterrupt:

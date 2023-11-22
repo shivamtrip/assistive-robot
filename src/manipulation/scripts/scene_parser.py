@@ -15,6 +15,7 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
+
 class SceneParser:
     def __init__(self):
 
