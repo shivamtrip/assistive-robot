@@ -89,10 +89,10 @@ class ManipulationMethods:
         # })
 
         move_to_pose(trajectoryClient, {
-            "wrist_yaw;to" : 0,
+            # "wrist_yaw;to" : 0,
             "stretch_gripper;to" : 100,
         })
-        rospy.sleep(5)
+        # rospy.sleep(5)
 
         
     def getEndEffectorPose(self):
@@ -131,21 +131,7 @@ class ManipulationMethods:
 
         (x_g, y_g, z_g), grasp_yaw = grasp
         
-        print(grasp_yaw)
-        if moveUntilContact:
-            move_to_pose(trajectoryClient, {
-                'wrist_yaw;to' : grasp_yaw
-            })
-            rospy.sleep(3)
-        
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
-
-        
-        # if abs(x_g - ee_x) > 0.02:
-        move_to_pose(trajectoryClient, {
-            'base_translate;by' : x_g - ee_x
-        })
-        rospy.sleep(3)
         
         if not moveUntilContact:
             move_to_pose(trajectoryClient, {
@@ -157,6 +143,28 @@ class ManipulationMethods:
             }
             )
             # rospy.sleep(5)
+        
+        print(grasp_yaw)
+        if moveUntilContact:
+            move_to_pose(trajectoryClient, {
+                'wrist_yaw;to' : grasp_yaw
+            })
+        else:
+            move_to_pose(trajectoryClient, {
+                    'wrist_yaw;to': 0
+                })
+        rospy.sleep(5)
+        
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+
+        
+        # if abs(x_g - ee_x) > 0.02:
+        move_to_pose(trajectoryClient, {
+            'base_translate;by' : x_g - ee_x
+        })
+        rospy.sleep(3)
+        
+        
 
         print("Extending to ", x_g, y_g, z_g, grasp_yaw)
         print(" end effector pose ", ee_x, ee_y, ee_z)
