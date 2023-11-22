@@ -128,10 +128,10 @@ class Planner:
         
         state_target = self.get_state_from_ee_target(ee_target)
         
-        path, success = NaivePlanner(curstate, state_target, point_cloud).plan()
+        # path, success = NaivePlanner(curstate, state_target, point_cloud).plan()
 
-        if success:
-            return path, True
+        # if success:
+        #     return path, True
         
         path, success = AStarPlanner(curstate, state_target, point_cloud).plan()
         

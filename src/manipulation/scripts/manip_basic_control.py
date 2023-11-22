@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-# TODO:
-# Add feedbacks (debug)
-# placing plane detection.
-# Is grasp complete?
 
 import time
 import numpy as np
 from tf import TransformerROS
 from tf import TransformListener, TransformBroadcaster
+
+from visualization_msgs.msg import Marker
+from scipy.spatial.transform import Rotation as R
+
+
+
 # ROS action finite state machine
 import std_msgs
 import rospy
@@ -38,8 +40,26 @@ class ManipulationMethods:
         self.efforts = [0 for i in range(self.av_effort_window_size)]
 
         rospy.Subscriber('/alfred/joint_states', JointState, self.callback)
-        
-    def callback(self, msg):
+        self.cur_robot_state = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    
+    
+    def get_transform(self, base_frame, camera_frame):
+
+        while not rospy.is_shutdown():
+            try:
+                t = self.listener.getLatestCommonTime(base_frame, camera_frame)
+                (trans,rot) = self.listener.lookupTransform(base_frame, camera_frame, t)
+
+                trans_mat = np.array(trans).reshape(3, 1)
+                rot_mat = R.from_quat(rot).as_matrix()
+                transform_mat = np.hstack((rot_mat, trans_mat))
+
+                return transform_mat
+                
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                continue
+    
+    def callback(self, msg, verbose = False):
         for i in range(len(msg.name)):
             if msg.name[i] == 'joint_lift':
                 effort = msg.effort[i]
@@ -54,6 +74,32 @@ class ManipulationMethods:
                     print("Lift effort is too low: {}, there is contact".format(av_effort))
                 else:
                     self.isContact = False
+                    
+        for i, k in enumerate(msg.name):
+            
+            if 'arm' in k:
+                self.cur_robot_state[5] += msg.position[i]
+            if 'wrist' in k:
+                self.cur_robot_state[4] += msg.position[i]
+            if k == 'joint_lift':
+                self.cur_robot_state[3] += msg.position[i]
+            # if k == "joint_head_pan":
+            #     final_state[2] -= msg.position[i]
+        
+        transform = self.get_transform('link_arm_l4', 'link_arm_l0')
+        self.cur_robot_state[5] = np.linalg.norm(transform[:3, 3])
+        if verbose:
+            debug_state = {
+                "x" : self.cur_robot_state[0],
+                "y" : self.cur_robot_state[1],
+                "theta" : self.cur_robot_state[2],
+                "lift" : self.cur_robot_state[3],
+                "wrist_yaw" : self.cur_robot_state[4],
+                "extension" : self.cur_robot_state[5],
+            }
+            print(debug_state)
+        
+        
     
     def move_to_pregrasp(self, trajectoryClient):
         
@@ -226,8 +272,6 @@ class ManipulationMethods:
         })
         rospy.sleep(3)
         
-        
-
         print("Extending to ", x_g, y_g, z_g, grasp_yaw)
         print(" end effector pose ", ee_x, ee_y, ee_z)
             
@@ -328,12 +372,87 @@ class ManipulationMethods:
             "lift;to": 0.4,
         })
         
-    def execute_trajectory(self, waypoints):
+    def visualize_boxes_rviz(self, boxes, centers):
+        colors = [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+        ]
+        for i, box in enumerate(boxes):
+            center = np.array(box.center)
+            extent = np.array(box.extent)
+            marker = Marker()
+            marker.header.frame_id = "base_link"
+            marker.header.stamp = rospy.Time.now()
+
+            # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+            marker.type = 1
+            marker.id = i
+
+            # Set the scale of the marker
+            marker.scale.x = extent[0] 
+            marker.scale.y = extent[1]
+            marker.scale.z = extent[2]
+
+            # Set the color
+            color = colors[i % len(colors)]
+            marker.color.r = color[0]
+            marker.color.g = color[1]
+            marker.color.b = color[2]
+            marker.color.a = 0.5
+
+            # Set the pose of the marker
+            marker.pose.position.x = center[0]
+            marker.pose.position.y = center[1]
+            marker.pose.position.z = center[2]
+            
+            ori = np.array(box.R)
+            
+            quat = R.from_matrix(ori).as_quat()
+            
+            
+            
+            marker.pose.orientation.x = quat[0]
+            marker.pose.orientation.y = quat[1]
+            marker.pose.orientation.z = quat[2]
+            marker.pose.orientation.w = quat[3]
+            marker_pub.publish(marker)    
+    
+    def execute_trajectory(self, plan, visualize = False, planner = None):
         """
         takes in a series of waypoints and executes it one by one as the target is reached.
         """
         
-        pass
+        # x, y, theta, z, phi, ext
+        waits = [0.5, 0.1, 0.5, 0.5, 0.1, 0.5]
+        for i, waypoint in enumerate(plan):
+            if visualize:
+                if planner is None:
+                    return 
+                boxes, centers = planner.get_collision_boxes(waypoint)
+                visualize_boxes_rviz(boxes, centers)     
+            rospy.loginfo("Sending waypoint")
+            idx_to_move = 0
+            for j in range(len(waypoint)):
+                if waypoint[j] != plan[i-1][j]:
+                    idx_to_move = j
+                    break
+            move_to_pose(trajectory_client, {
+                "base_translate;by" : waypoint[0],
+                "lift|;to" : waypoint[3],
+                "arm|;to" : waypoint[5],
+                "wrist_yaw|;to": waypoint[4],
+            })
+            rospy.sleep(waits[idx_to_move])
+            
+        if len(plan) == 0:
+            return
+        move_to_pose(trajectory_client, {
+            "lift|;to" : waypoint[3],
+            "arm|;to" : waypoint[5],
+            "wrist_yaw|;to": waypoint[4],
+        })
+            
         
     
 if __name__=='__main__':

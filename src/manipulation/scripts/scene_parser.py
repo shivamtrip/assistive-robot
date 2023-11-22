@@ -372,6 +372,45 @@ class SceneParser:
             )
         return placingLocation
     
+    def get_point_cloud_for_planning(self, publish = False):
+        depth = self.depth_image.copy()
+        color_image = self.color_image.copy() 
+        
+        depth[depth < 150] = 0
+        depth[depth > 3000] = 0
+        
+        depth = o3d.geometry.Image(depth)
+        color = o3d.geometry.Image(color_image.astype(np.uint8))
+        
+        extrinsics = self.get_transform('camera_color_optical_frame', 'base_link')
+        extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+        
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            color, depth, depth_scale=1000, convert_rgb_to_intensity=False
+        )
+        cam = o3d.camera.PinholeCameraIntrinsic()
+        cam.intrinsic_matrix = self.intrinsics
+        cam.width = color_image.shape[1]
+        cam.height = color_image.shape[0]
+        
+        cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
+            rgbd, cam, extrinsics
+        )
+        
+        cloud = cloud.voxel_down_sample(voxel_size=0.05)
+        points = np.array(cloud.points)
+        self.scene_o3d_cloud = cloud
+
+        if publish:
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, points)
+            self.obj_cloud_pub.publish(msg)
+            
+        
+        
+    
     def set_point_cloud(self, visualize = False, publish = False):
         rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
         
