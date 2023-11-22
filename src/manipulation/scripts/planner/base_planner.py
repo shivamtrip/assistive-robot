@@ -59,7 +59,7 @@ class BasePlanner():
     def get_collision_boxes(self, state, get_centers = False):
         boxes = []
         x, y, theta, z, phi, ext = state
-        l, l1, l3 = self.lengths
+        l, l1, l3, _ = self.lengths
         centr = np.array([
             x - l * np.cos(theta), 
             y - l * np.sin(theta), 0.093621], dtype = np.float64).reshape(3, 1)
