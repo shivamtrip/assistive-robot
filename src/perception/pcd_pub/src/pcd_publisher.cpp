@@ -103,5 +103,7 @@ int main(int argc, char **argv)
 
   image_transport::Subscriber sub = it.subscribe("/camera/aligned_depth_to_color/image_raw", 1, imageCallback);
   point_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("/low_res_pointcloud", 1);
-  ros::spin();
+  while (ros::ok()){
+    ros::spinOnce();
+  }
 }

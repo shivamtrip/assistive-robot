@@ -53,14 +53,14 @@ def get_collision_boxes(state, get_centers = False):
         extent = np.array(base_box_dims, dtype = np.float64).reshape(3, 1)
     )
     boxes.append(base_box_o3d)
-
-    arm_center = base_center + np.array(
+    arm_center = np.array(
         [
             (- l1 * np.sin(theta) + (arm_min_extension + ext)* np.sin(theta))/2,
             (l1 * np.cos(theta)  - (arm_min_extension + ext) * np.cos(theta))/2,
-            z + base_center[2]
+            z + base_center[2][0]
         ]
     ).reshape(3, 1)
+    arm_center += base_center
     
     arm_box_o3d = o3d.geometry.OrientedBoundingBox(
         center = arm_center,
@@ -72,7 +72,7 @@ def get_collision_boxes(state, get_centers = False):
     gripper_center = base_center + np.array([
         (gripper_offset[0] + ext - l1/2) * np.sin(theta) + (gripper_length/2 + 0) * np.sin(theta + phi) + gripper_offset[1],
         -(gripper_offset[0] + ext - l1/2) * np.cos(theta) - (gripper_length/2 + 0) * np.cos(theta + phi) + gripper_offset[2],
-        z + base_center[2] + gripper_offset[3]
+        z + base_center[2][0] + gripper_offset[3]
     ]).reshape(3, 1)
     
     gripper_box_o3d = o3d.geometry.OrientedBoundingBox(
@@ -180,9 +180,11 @@ def callback(msg):
         "arm" : final_state[4],
         "wrist" : final_state[5],
     }
-    boxes, centers = get_collision_boxes(final_state)
-    visualize_boxes_rviz(boxes, centers)
-    print(debug_state)
+    global curstate
+    curstate = final_state
+    # boxes, centers = get_collision_boxes(final_state)
+    # visualize_boxes_rviz(boxes, centers)     
+    # print(debug_state)
 
 def get_transform(listener, base_frame, camera_frame):
 
@@ -230,8 +232,13 @@ def parse_scene(depth, rgb ):
     cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
         rgbd, cam, extrinsics
     )
+    global scene_cloud
     
+    cloud = cloud.voxel_down_sample(voxel_size=0.05)
     points = np.array(cloud.points)
+    
+    # scene_cloud = points.copy()
+    scene_cloud = cloud
     if time.time() - prevtime > 2:
         header = Header()
         header.stamp = rospy.Time.now()
@@ -241,7 +248,39 @@ def parse_scene(depth, rgb ):
         prevtime = time.time()
         print("publishing ")
     
+def execute_plan(plan, sleep_between_waypoints = 0.7):
     
+    for i, waypoint in enumerate(plan):
+        boxes, centers = planner.get_collision_boxes(waypoint)
+        visualize_boxes_rviz(boxes, centers)     
+        rospy.loginfo("Sending waypoint")
+        rospy.sleep(sleep_between_waypoints)
+        base_translate_by = 0
+        if i != 0 and abs(waypoint[0] - plan[i - 1][0]) > 0:
+            base_translate_by = waypoint[0] - plan[i - 1][0]
+            
+        if i > len(plan) // 2:
+            break
+        move_to_pose(trajectory_client, {
+            "base_translate;by" : base_translate_by,
+            "lift|;to" : waypoint[3],
+            "arm|;to" : waypoint[5],
+            "wrist_yaw|;to": waypoint[4],
+        })
+        
+        if base_translate_by > 0:
+            rospy.sleep(0.1)
+        # rospy.sleep(0.1)
+        # rospy.sleep(0.1)
+        # if i != 0 and abs(waypoint[4] - plan[i-1][4]) > 0:
+        #     rospy.sleep(1)
+    # move_to_pose(trajectory_client, {
+    #     "lift|;to" : waypoint[3],
+    #     "arm|;to" : waypoint[5],
+    #     "wrist_yaw|;to": waypoint[4],
+    # })
+        
+
 
 if __name__ == '__main__':
     rospy.init_node('test')
@@ -253,6 +292,12 @@ if __name__ == '__main__':
     from sensor_msgs.msg import Image
     from sensor_msgs.msg import CameraInfo
     from sensor_msgs.msg import PointCloud2
+    import sys
+    sys.path.append('/home/alfred/alfred-autonomy/src/manipulation/scripts/')
+    sys.path.append('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/planner')
+    from naive_planner import NaivePlanner
+    from astar_planner import AStarPlanner
+    
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
@@ -260,15 +305,30 @@ if __name__ == '__main__':
     import cv_bridge
     bridge = cv_bridge.CvBridge()
     
+    scene_cloud = None
+    
     listener = tf.TransformListener()
     
+    
+    stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
+    stow_robot_service.wait_for_service()
     trajectory_client = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
     trajectory_client.wait_for_server()
+    stow_robot_service()
+    
+    move_to_pose(trajectory_client, {
+        "head_pan;to" : -np.pi/2,
+        "head_tilt;to" : -30 * np.pi/180,
+    })
+    rospy.sleep(2)
     
     depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
     
     obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
+
+    msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=30)
+    intrinsics = np.array(msg.K).reshape(3,3)
 
     synced_messages = message_filters.ApproximateTimeSynchronizer([
             depth_image_subscriber, rgb_image_subscriber,
@@ -276,14 +336,34 @@ if __name__ == '__main__':
     synced_messages.registerCallback(parse_scene)
     
     
-    msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=30)
-    intrinsics = np.array(msg.K).reshape(3,3)
+    # x, y, theta, z, phi, ext
+    curstate = None
+    while curstate is None or scene_cloud is None:
+        rospy.loginfo("Waiting for populating vars")
+        rospy.sleep(0.1)
     
+    curstate[2] = 0
+    curstate[4] = 1 #stowed
+    goalstate = [0, 0.0, 0, 0.8, 0, 0.6]
+    planner = AStarPlanner(curstate, goalstate, scene_cloud)
     
-    move_to_pose(trajectory_client, {
-        "head_pan;to" : -np.pi/2,
-        "head_tilt;to" : -30 * np.pi/180,
-    })
+    plan, success = planner.plan()
+    print("Plan: ", plan)
+    print("Success: ", success)
+
+    # x, y, theta, z, phi, ext
+    
+    execute_plan(plan)
+    rospy.sleep(2)
+    # plan = plan[::-1]
+    
+    # execute_plan(plan)
+    
+    # stow_robot_service()
+        
+        
+        
+    
     
     try:
         rospy.spin()

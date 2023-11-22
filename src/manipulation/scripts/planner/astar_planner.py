@@ -12,7 +12,7 @@ class AStarPlanner(BasePlanner):
             [
                 0.01,  # x
                 0.1,  # z
-                1,  # phi
+                0.1,  # phi
                 0.1,  # ext
             ]
         ).tolist()
@@ -25,21 +25,18 @@ class AStarPlanner(BasePlanner):
         dist = 0
         dist += abs(x - tx)
         dist += abs(z - tz)
-        # dist += abs(phi - tphi)
-        dist += abs(ext - text)
+        dist += abs(phi - tphi) * 0.8
+        dist += abs(ext - text) * 0.8
         return dist
 
 
     def convert_to_full_state(self, state):
         x, z, phi, ext = state
         full_state = np.array(self.start).copy()
-        full_state[1] = x
+        full_state[0] = x
         full_state[3] = z
         
-        if phi == 1:
-            full_state[4] = 0
-        else:
-            full_state[4] = np.pi
+        full_state[4] = phi * np.pi
         full_state[5] = ext
         return full_state
 
@@ -47,24 +44,32 @@ class AStarPlanner(BasePlanner):
     def generate_neighbors(self, current_state):
         new_state = np.array(current_state).copy()
         resolutions = self.resolutions
-        neighbors = [
-            new_state.copy() + np.array([resolutions[0], 0, 0, 0]),
-            new_state.copy() - np.array([resolutions[0], 0, 0, 0]),
+        # neighbors = [
+        #     new_state.copy() + np.array([resolutions[0], 0, 0, 0]),
+        #     new_state.copy() - np.array([resolutions[0], 0, 0, 0]),
 
-            new_state.copy() + np.array([0.0, resolutions[1], 0, 0]),
-            new_state.copy() - np.array([0.0, resolutions[1], 0, 0]),
+        #     new_state.copy() + np.array([0.0, resolutions[1], 0, 0]),
+        #     new_state.copy() - np.array([0.0, resolutions[1], 0, 0]),
 
-            new_state.copy() + np.array([0.0, 0.0, 0, resolutions[3]]),
-            new_state.copy() - np.array([0.0, 0.0, 0, resolutions[3]]),
-        ]
+        #     new_state.copy() + np.array([0.0, 0.0, 0, resolutions[3]]),
+        #     new_state.copy() - np.array([0.0, 0.0, 0, resolutions[3]]),
+            
+        # ]
 
-        new_state[2] *= -1
-        neighbors.append(new_state.copy())
-
+        # new_state[2] *= -1
+        # neighbors.append(new_state.copy())
+        neighbors = []
+        for i in range(4):
+            arr = np.zeros((4,))
+            arr[i] = resolutions[i]
+            neighbors.append(new_state.copy() + arr)
+            neighbors.append(new_state.copy() - arr)
+        
         finalneighbours = []
         
         for neighbor in neighbors:
-            if self.check_valid_config(neighbor):
+            fullstate = self.convert_to_full_state(neighbor)
+            if self.check_valid_config(fullstate):
                 finalneighbours.append(tuple(np.round(neighbor, 3)))
 
         return finalneighbours
@@ -108,29 +113,25 @@ class AStarPlanner(BasePlanner):
             goal[5]
         ])
         resolutions = self.resolutions
-        start = tuple(start.tolist())
-        goal = tuple(goal.tolist())
+        start = tuple(np.round(start, 2).tolist())
+        goal = tuple(np.round(goal, 2).tolist())
         open_list = []
         closed_set = set()
         came_from = {}
         g_score = {start: 0}
         f_score = {start: self.heuristic(start, goal)}
         heapq.heappush(open_list, (f_score[start], start))
-        while open_list:
+        minerr = [np.inf, None]
+        its = 0
+        while open_list and its < 2000 and minerr[0] > 0.04:
+            its += 1
             _, current = heapq.heappop(open_list)
-            current = tuple(np.round(np.array(current), 4))
-            err = np.linalg.norm(np.array(self.config_to_workspace(current, orig_start)) - np.array(self.config_to_workspace(goal, orig_start)))
-            print(err, current, len(open_list))
-            if err < 0.1:
-                path = []
-                while current in came_from:
-                    path.append(current)
-                    current = came_from[current]
-                path.append(start)
-                path.reverse()
-                print("Found Path. Path length = ", len(path))
-                return path, True
-
+            current = tuple(np.round(np.array(current), 2))
+            err = np.linalg.norm(np.array(self.config_to_workspace(current)) - np.array(self.config_to_workspace(goal)))
+            print(its, err, current)
+            if err < minerr[0]:
+                minerr = [err, current]
+                print(err)
             closed_set.add(current)
             neighbours = self.generate_neighbors(current)
             for neighbor in neighbours:
@@ -146,5 +147,15 @@ class AStarPlanner(BasePlanner):
                         continue
                 came_from[neighbor] = current
                 heapq.heappush(open_list, (f_score[neighbor], neighbor))
-                    
+        
+        if minerr[0] < 0.1:
+            path = [goal]
+            current = minerr[1]
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.append(start)
+            path.reverse()
+            print("Found Path. Path length = ", len(path))
+            return path, True
         return [], False 
