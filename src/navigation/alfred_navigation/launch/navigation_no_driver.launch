@@ -20,12 +20,17 @@
 
   <!-- LASER RANGE FINDER -->
   <include file="$(find alfred_core)/launch/subsystems/driver/rplidar.launch" />
+  <!-- <include file="$(find pcd_pub)/launch/low_res_pcd_pub.launch" /> -->
 
   <!-- MAP SERVER -->
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_yaml)" />
 
   <!-- LOCALIZATION -->
-  <include file="$(find alfred_navigation)/launch/navigation/amcl.launch" />
+  
+  <include file="$(find alfred_navigation)/launch/localization/amcl.launch" />
+  <node name="navigation_manager_node" pkg="alfred_navigation" type="navigation_manager.py" output="screen" />
+
+  <rosparam file="$(find alfred_navigation)/config/navman.yaml" command="load" ns="navigation" />
 
   <!-- NAVIGATION -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
@@ -38,11 +43,10 @@
     <rosparam file="$(find alfred_navigation)/config/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find alfred_navigation)/config/global_costmap_params_withmap.yaml" command="load" />
     <rosparam file="$(find alfred_navigation)/config/dwa_local_planner_params.yaml" command="load" />
-    <!-- <rosparam file="$(find alfred_navigation)/config/base_local_planner_params.yaml" command="load" /> -->
+    <rosparam file="$(find alfred_navigation)/config/base_global_planner_params.yaml" command="load" />
     <rosparam file="$(find alfred_navigation)/config/move_base_params.yaml" command="load" />
-    <!-- <rosparam param="recovery_behaviors"> [ { name: "my_reset", type: "moveback_recovery/MovebackRecovery " } ] </rosparam> -->
+
     <remap from="/cmd_vel" to="/alfred/cmd_vel" />
-    <!-- <rosparam file="$(find alfred_navigation)/config/base_local_planner_params.yaml" command="load" /> -->
   </node>
 
   <!-- VISUALIZE -->

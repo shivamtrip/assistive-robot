@@ -5,7 +5,6 @@ from visual_servoing import AlignToObject
 import rospy
 import actionlib
 from enum import Enum
-import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
@@ -14,6 +13,7 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
+from scene_parser import SceneParser
 
 class States(Enum):
     IDLE = 0
@@ -33,88 +33,36 @@ class ManipulationFSM:
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
-        # REFACTOR this to be a ros parameter loaded upon launch.
-        # self.label2name = {
-        #     0: "soda_can"
-        #     39: "bottle",
-        #     47: "apple",
-        #     65: "remote", 
-        #     46: "banana",
-        # }
-        self.label2name = {
-            0: 'soda_can',
-            1: 'tissue_paper',
-            2: 'toothbrush',
-            3: 'tie',
-            4: 'cell phone',
-            5: 'banana',
-            6: 'apple',
-            7: 'orange',
-            8: 'bottle',
-            9: 'cup',
-            10: 'teddy_bear'
-        }
+        self.real_time_diff = 0.5 ## Running on robot's wifi adapter
 
-        #Initiliaze object specific params. 
-        self.offset_dict = {
-            'bottle': (0, 0.0, 0.0),
-            'apple': (0, 0.0, 0.0),
-            'remote': (0, 0.0, 0.0), 
-            "banana" : (0, 0.0, 0.0),
-            "soda_can" : (0, 0.0, 0.0),
-            'tissue_paper': (-0.0, 0.02, 0.05),
-            'toothbrush': (-0.0, 0.0, 0.0),
-            'tie': (-0.0, 0.0, 0.0),
-            'cell phone': (-0.0, 0.0, 0.0),
-            'orange': (-0.0, 0.0, 0.0),
-            'cup': (-0.0, 0.0, 0.0),
-            'teddy_bear': (-0.0, 0.0, 0.0)
-        } 
+        
+        self.class_list = rospy.get_param('/object_detection/class_list')
+        self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
 
-        self.isContactDict = {
-            'bottle': False,
-            'apple':  True,
-            'remote': True,
-            'banana': True,
-            "soda_can": False,
-            'tissue_paper': False,
-            'toothbrush': False,
-            'tie': True,
-            'cell phone': True,
-            'apple': False,
-            'orange': False,
-            'bottle': False,
-            'cup': False,
-            'teddy_bear': False
-        }
+        self.offset_dict = rospy.get_param('/manipulation/offsets')
+        self.isContactDict = rospy.get_param('/manipulation/contact')
+        
+        self.n_max_servo_attempts = rospy.get_param('/manipulation/n_max_servo_attempts')   
+        self.n_max_pick_attempts = rospy.get_param('/manipulation/n_max_pick_attempts')
 
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.main, auto_start=False)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        self.graspActionClient = actionlib.SimpleActionClient('grasp_detector', GraspPoseAction)
-        self.planeFitClient = actionlib.SimpleActionClient('plane_detector', PlaneDetectAction)
-
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
         self.trajectoryClient.wait_for_server()
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for grasp_detector server...")
-        self.graspActionClient.wait_for_server()
 
-        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for plane_detector server...")
-        # self.planeFitClient.wait_for_server()
-
-
-        self.visualServoing = AlignToObject(-1)
-
-        
-        
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow_robot service...")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
+        
+        self.scene_parser = SceneParser()
 
-
+        self.visualServoing = AlignToObject(self.scene_parser)
         self.manipulationMethods = ManipulationMethods()
+        
+        
         self.server.start() # start server only after everything under this is initialized
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
     
@@ -125,55 +73,6 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
         self.server.publish_feedback(feedback)
 
-    def requestGraspAndPlaneFit(self, getGrasp = True, getPlane = True):
-        graspPoseGoal = GraspPoseGoal()
-        graspPoseGoal.request = self.goal.objectId
-        print("requesting grasp for object", self.goal.objectId)
-        self.send_feedback({"msg": "requesting grasp for object", "data": {"objectId": self.goal.objectId}})
-        graspSuccess = not getGrasp
-        planeSuccess = not getPlane
-
-        self.planeOfGrasp = None
-        self.grasp = None
-
-        planeFitGoal = PlaneDetectGoal()
-        while not (graspSuccess and planeSuccess):
-            if self.grasp is not None and self.grasp.success == True:
-                graspSuccess = True
-                self.state = States.WAITING_FOR_PLANE
-            elif getGrasp:
-                self.graspActionClient.send_goal(graspPoseGoal)
-                self.graspActionClient.wait_for_result()
-                self.grasp = self.graspActionClient.get_result()
-                rospy.loginfo(f"Received grasp = {self.grasp}", )
-
-            if self.planeOfGrasp is not None and self.planeOfGrasp.success == True:
-                planeSuccess = True
-                self.state = States.WAITING_FOR_GRASP
-            elif getPlane:
-                self.planeFitClient.send_goal(planeFitGoal)
-                self.planeFitClient.wait_for_result()
-                self.planeOfGrasp = self.planeFitClient.get_result()
-                rospy.loginfo(f"Received plane = {self.planeOfGrasp}", )
-
-        if getGrasp and getPlane:
-            self.heightOfObject = abs(self.grasp.z - self.planeOfGrasp.z)
-        
-        return self.grasp, self.planeOfGrasp
-
-    def estimatePlacingLocation(self, planeOfGrasp, heightOfObject):
-        x, y, z, a, b, c, d = planeOfGrasp.x, planeOfGrasp.y, planeOfGrasp.z, planeOfGrasp.a, planeOfGrasp.b, planeOfGrasp.c, planeOfGrasp.d
-        placingLocation = np.array([
-            x, 
-            abs(abs(y) - self.manipulationMethods.getEndEffectorPose()[0]), 
-            # 1.0,
-            # 0.85
-            z
-        ])
-        placingLocation[2] += heightOfObject
-        
-        return placingLocation
-
     def reset(self):
         self.state = States.IDLE
         self.grasp = None
@@ -181,12 +80,14 @@ class ManipulationFSM:
 
     def main(self, goal : TriggerGoal):
         self.goal = goal
-        self.state = States.IDLE
-        print("Requested goal", goal)
+        self.state = States.PICK
         objectManipulationState = States.PICK
-        self.visualServoing.objectId = goal.objectId
-        rospy.loginfo("Stowing robot prior to manipulation!")
-        self.stow_robot_service()
+
+        self.scene_parser.set_object_id(goal.objectId)
+        
+        rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
+        # self.stow_robot_service()
+        
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
@@ -194,61 +95,107 @@ class ManipulationFSM:
             rospy.loginfo("Received place request.")
             objectManipulationState = States.PLACE
 
-
         nServoTriesAttempted = 0
-        nServoTriesAllowed = 2
+        nServoTriesAllowed = self.n_max_servo_attempts
 
         nPickTriesAttempted = 0
-        nPickTriesAllowed = 2
+        nPickTriesAllowed = self.n_max_pick_attempts
+        # move_to_pose(
+        #     self.trajectoryClient,
+        #     {
+        #         'head_pan;to' : -np.pi/2,
+        #         'head_tilt;to' : - 30 * np.pi/180,
+        #         # 'base_rotate;by': np.pi/2,
+        #     }
+        # )
+        # while not rospy.is_shutdown():
+        #     self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        #     grasp = self.scene_parser.get_grasp(publish = True)
+        #     print(grasp[1] * 180 / np.pi)
+        #     move_to_pose(
+        #         self.trajectoryClient,
+        #         {
+        #             'wrist_yaw;to': grasp[1],
+        #         }
+        #     )
+        #     rospy.sleep(2)
+        # exit()
 
-        try: 
-            while True:
-                if self.state == States.IDLE:
-                    self.state = States.VISUAL_SERVOING
-                    if objectManipulationState == States.PLACE:
-                        self.send_feedback({'msg' : "Trigger Request received. Placing"})
-                        self.state = States.PLACE
-                    else:
-                        self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
-                elif self.state == States.VISUAL_SERVOING:
-                    success = self.visualServoing.main(goal.objectId,)
-                    if success:
-                        self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
-                        self.state = objectManipulationState
-                    else:
-                        if nServoTriesAttempted >= nServoTriesAllowed:
-                            self.send_feedback({'msg' : "Servoing failed. Aborting."})
-                            self.reset()
-                            return TriggerResult(success = False)
-                        
-                        self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(nServoTriesAttempted) + " of " + str(nServoTriesAllowed) + " allowed."})
-                        nServoTriesAttempted += 1
-                        self.visualServoing.recoverFromFailure()
+        # move_to_pose(trajectoryClient = self.trajectoryClient, pose = {
+        #     "head_tilt;to" : -10*np.pi/180,   
+        # }
+        # )
+        # self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+        # plane = self.scene_parser.get_plane(publish = True)
+        # exit()
 
-                elif self.state == States.PICK:
-                    self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                    self.send_feedback({'msg' : "moving to pregrasp pose"})
-                    self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-                    self.visualServoing.alignObjectHorizontal(offset = self.manipulationMethods.getEndEffectorPose()[1])
-                    # self.requestGraspAndPlaneFit(getGrasp = True, getPlane = True)   
-                    self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = True, getPlane = False)   
+        while not rospy.is_shutdown():
+            if self.state == States.IDLE:
+                self.state = States.VISUAL_SERVOING
+                if objectManipulationState == States.PLACE:
+                    self.send_feedback({'msg' : "Trigger Request received. Placing"})
+                    self.state = States.PLACE
+                else:
+                    self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
+            elif self.state == States.VISUAL_SERVOING:
+                success = self.visualServoing.main()
+                if success:
+                    self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
+                    self.state = objectManipulationState
+                else:
+                    if nServoTriesAttempted >= nServoTriesAllowed:
+                        self.send_feedback({'msg' : "Servoing failed. Aborting."})
+                        self.reset()
+                        return TriggerResult(success = False)
+                    
+                    self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(nServoTriesAttempted) + " of " + str(nServoTriesAllowed) + " allowed."})
+                    nServoTriesAttempted += 1
+                    self.visualServoing.recoverFromFailure()
+
+            elif self.state == States.PICK:
+               
+                self.scene_parser.time_diff_for_realtime = self.real_time_diff ## Not using wifi adapter for testing. Increased realtime threshold
+                self.state = States.WAITING_FOR_GRASP_AND_PLANE
+                self.send_feedback({'msg' : "moving to pregrasp pose"})
+                
+                # basic planning here
+                self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
+                ee_pose = self.manipulationMethods.getEndEffectorPose()
+                self.visualServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
+
+                
+                
+                self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+                grasp = self.scene_parser.get_grasp(publish = True)
+                plane = self.scene_parser.get_plane(publish = True)
+                
+                
+                
+                
+                if grasp:
+                    grasp_center, grasp_yaw = grasp
+                    
+                    if plane:
+                        plane_height = plane[1]
+                        self.heightOfObject = abs(grasp_center[2] - plane_height)
+                    else:
+                        self.heightOfObject = 0.2 #default height of object if plane is not detected
+                    
                     offsets = self.offset_dict[self.label2name[goal.objectId]]
-                    
-                    x_grasp = self.grasp.x + offsets[0]
-                    z_grasp = self.grasp.z + offsets[2]
-                    y_grasp = abs(abs(self.grasp.y) - self.manipulationMethods.getEndEffectorPose()[0]) + offsets[1]
-                    
+                    offsets[1] -= 0.01 #constant safety factor
+                    grasp = (grasp_center + np.array(offsets)), grasp_yaw
                     self.manipulationMethods.pick(
                         self.trajectoryClient, 
-                        x_grasp, 
-                        y_grasp, 
-                        z_grasp, 
-                        self.grasp.yaw,
+                        grasp,
                         moveUntilContact = self.isContactDict[self.label2name[goal.objectId]]
                     ) 
-                    success = self.manipulationMethods.checkIfGraspSucceeded()
+
+                    rospy.loginfo(f"{rospy.get_name()} : Checking if grasp succeeded.")
+                    
+                    success = self.scene_parser.checkIfGraspSucceeded()
                     if success:
-                        self.send_feedback({'msg' : "Pick succeeded! Starting to place."})
+                        self.manipulationMethods.reset_cam_and_lift_after_pick()
+                        self.send_feedback({'msg' : "Pick succeeded! "})
                         self.state = States.COMPLETE
                     else:
                         self.send_feedback({'msg' : "Pick failed. Reattempting."})
@@ -259,53 +206,47 @@ class ManipulationFSM:
                         
                         self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(nPickTriesAttempted) + " of " + str(nPickTriesAllowed) + " allowed."})
                         nPickTriesAttempted += 1
+                        self.stow_robot_service()
+                        self.state = States.VISUAL_SERVOING
 
-                elif self.state == States.PLACE:
-                    self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                    # self.grasp, self.planeOfGrasp = self.requestGraspAndPlaneFit(getGrasp = False, getPlane = True)
-                    self.state = States.PLACE
-                    heightOfObject = goal.heightOfObject
-                    move_to_pose(self.trajectoryClient, {
+            elif self.state == States.PLACE:
+                self.heightOfObject = goal.heightOfObject
+                move_to_pose(
+                    self.trajectoryClient,
+                    {
                         'head_pan;to' : -np.pi/2,
-                    })
-                    rospy.sleep(0.5)
-                    move_to_pose(
-                        self.trajectoryClient,
-                        {
-                            'base_rotate;by': np.pi/2,
-                        }
-                    )
-                    # placingLocation = self.estimatePlacingLocation(self.planeOfGrasp, heightOfObject)
-                    placingLocation = np.array([0.0, 1.0, 1.1])
-                    
-                    self.manipulationMethods.place(self.trajectoryClient, placingLocation[0], placingLocation[1], placingLocation[2], 0)
+                        'head_tilt;to' : - 30 * np.pi/180,
+                        'base_rotate;by': np.pi/2,
+                    }
+                )
+                rospy.sleep(5)
+                self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+                plane = self.scene_parser.get_plane(publish = True)
+                if plane:
+                    # placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                    placingLocation = np.array([
+                        0.0, 0.7, 0.9
+                    ])
+                    self.manipulationMethods.place(self.trajectoryClient, placingLocation)
                     self.stow_robot_service()
-                    self.state = States.COMPLETE
+                self.state = States.COMPLETE
 
-                elif self.state == States.COMPLETE:
-                    # self.send_feedback({'msg' : "Work complete successfully."})
-                    rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
-                    move_to_pose(self.trajectoryClient, {
-                        "head_pan;to" : 0,
-                    })
-                    break
+            elif self.state == States.COMPLETE:
+                # self.send_feedback({'msg' : "Work complete successfully."})
+                rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
+                move_to_pose(self.trajectoryClient, {
+                    "head_pan;to" : 0,
+                })
+                break
 
-        except KeyboardInterrupt:
-            print("User Exited!!")
-
-        # self.heightOfObject = abs(self.grasp.z - self.planeOfGrasp.z) 
-        self.heightOfObject = 0
+        
         self.reset()
         self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
 
 
-   
-
 
 if __name__ == '__main__':
-
     node = ManipulationFSM()
-
     try:
         rospy.spin()
     except KeyboardInterrupt:

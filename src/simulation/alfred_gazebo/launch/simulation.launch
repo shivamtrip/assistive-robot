@@ -6,7 +6,7 @@
   <arg name="headless" default="false"/>
   <arg name="debug" default="false"/>
   <arg name="rviz" default="false"/>
-  <arg name="model" default="$(find stretch_gazebo)/urdf/stretch_gazebo.urdf.xacro"/>
+  <arg name="model" default="$(find alfred_gazebo)/urdf/stretch_gazebo_standard_gripper.urdf.xacro"/>
   <arg name="gpu_lidar" default="false"/>
   <arg name="visualize_lidar" default="false"/>
   <arg name="world" default="$(find alfred_gazebo)/worlds/nursing_home2.world"/>

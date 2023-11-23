@@ -19,6 +19,22 @@ from helpers import move_to_pose
 import tf
 from sensor_msgs.msg import JointState
 from control_msgs.msg import FollowJointTrajectoryAction
+from geometry_msgs.msg import PointStamped
+
+# def get_grasp(self):
+#     if not self.clearAndWaitForNewObject(5):
+#         return [], False
+    
+#     dimg = self.depth_image.copy()
+#     dimg *= self.ws_mask
+    
+#     cloud = self.create_point_cloud_from_depth_image(dimg, organized = False)
+#     transform = self.get_transform('camera_color_optical_frame', 'base_link')
+#     cloud = self.transform_point_cloud(cloud, transform, format='3x4')
+#     print(cloud.shape)
+#     x, y, z = np.median(cloud, axis = 0)
+    
+#     return [x, y, z], True
 
 class ManipulationMethods:
     """Methods for object manipulation
@@ -29,15 +45,8 @@ class ManipulationMethods:
         self.listener : tf.TransformListener = tf.TransformListener()
         self.grip_dist_sub  = rospy.Subscriber('/manipulation/distance', std_msgs.msg.Int32, self.get_grip_dist)
 
-        # deprecated since servo is not required visual alignment now
-        # self.grip_servo_pub = rospy.Publisher('/manipulation/servo', std_msgs.msg.UInt16, queue_size=10)
-        # self.grip_servo_pub.publish(178)
-
         self.grip_dist=None
-
         self.contact_threshold = 7
-
-
         self.av_effort = 20
         self.av_effort_window_size = 3
         self.states = [0 for i in range(self.av_effort_window_size)]
@@ -62,33 +71,53 @@ class ManipulationMethods:
                     self.isContact = False
     
     def move_to_pregrasp(self, trajectoryClient):
-        # #Changed yaw to 180 since sometimes gripper will collide with table at yaw=0
+        
         move_to_pose(trajectoryClient, {
             "lift;to" : 0.85,
-            })
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "wrist_yaw;to" : 0,
-            
+            "head_pan;to" : 0,
+            "head_tilt;to" : -30 * np.pi/180,
+            'arm;to' : 0.02,
+            # "head_tilt;to" : 0 * np.pi/180
         })
+
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to" : 0.85,
+        #     "head_pan;to" : -np.pi/2,
+        #     "head_tilt;to" : -30 * np.pi/180,
+        #     'arm;to' : 0.02,
+        #     # "head_tilt;to" : 0 * np.pi/180
+        # })
+
         move_to_pose(trajectoryClient, {
+            # "wrist_yaw;to" : 0,
             "stretch_gripper;to" : 100,
         })
-        rospy.sleep(2)
+        # rospy.sleep(5)
 
+        
     def getEndEffectorPose(self):
-        from_frame_rel = 'base_link'
-        to_frame_rel = 'link_grasp_center'
-        while not rospy.is_shutdown():
-            try:
-                translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
-                rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
-                return [abs(translation[0]), translation[1], translation[2]]
-            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                continue
+        base_point = PointStamped()
+        base_point.header.frame_id = '/link_grasp_center'
+        base_point.point.x = 0
+        base_point.point.y = 0
+        base_point.point.z = 0
+        point = self.listener.transformPoint('base_link', base_point).point
+        return [point.x, point.y, point.z]
+
+
+    # def getEndEffectorPose(self):
+    #     from_frame_rel = 'link_grasp_center'
+    #     to_frame_rel = 'base_link'
+    #     while not rospy.is_shutdown():
+    #         try:
+    #             translation, rotation = self.listener.lookupTransform(to_frame_rel, from_frame_rel, rospy.Time(0))
+    #             rospy.loginfo('The pose of target frame %s with respect to %s is: \n %s, %s', to_frame_rel, from_frame_rel, translation, rotation)
+    #             return [(translation[0]), translation[1], translation[2]]
+    #         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+    #             continue
             
-        rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(to_frame_rel, from_frame_rel))
-        return None
+    #     rospy.logerr(f"[{rospy.get_name()}] " + "Transform not found between {} and {}".format(to_frame_rel, from_frame_rel))
+    #     return None
     
        
     def get_grip_dist(self,msg):
@@ -97,56 +126,88 @@ class ManipulationMethods:
         print("reading distance",msg.data)
         self.grip_dist = msg.data
 
-    def pick(self, trajectoryClient, x, y, z, theta, moveUntilContact = False):
+    def pick(self, trajectoryClient, grasp, moveUntilContact = False):
         """ Called after the pregrasp pose is reached"""
 
-        print("Extending to ", x, y, z, theta)
-        print("EXECUTING GRASP")
+        (x_g, y_g, z_g), grasp_yaw = grasp
         
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+        
+        if not moveUntilContact:
+            move_to_pose(trajectoryClient, {
+                "lift;by": z_g - ee_z,
+            })
+        else:
+            move_to_pose(trajectoryClient, {
+                "lift;to": z_g + 0.1,
+            }
+            )
+            # rospy.sleep(5)
+        
+        print(grasp_yaw)
+        if moveUntilContact:
+            move_to_pose(trajectoryClient, {
+                'wrist_yaw;to' : grasp_yaw
+            })
+        else:
+            move_to_pose(trajectoryClient, {
+                    'wrist_yaw;to': 0
+                })
+        rospy.sleep(5)
+        
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+
+        
+        # if abs(x_g - ee_x) > 0.02:
         move_to_pose(trajectoryClient, {
-            "lift;to": z,
+            'base_translate;by' : x_g - ee_x
         })
         rospy.sleep(3)
+        
+        
 
+        print("Extending to ", x_g, y_g, z_g, grasp_yaw)
+        print(" end effector pose ", ee_x, ee_y, ee_z)
+            
         move_to_pose(trajectoryClient, {
-            "arm;to": y,
+            "arm;by": abs(y_g - ee_y),
         })
-        rospy.sleep(5)
+        # rospy.sleep(5)
 
         if moveUntilContact:
             self.move_until_contact(
                 trajectoryClient,
                 {
-                    "lift;to": z - 0.2,
+                    "lift;to": z_g - 0.2,
                 }
             )
         
         move_to_pose(trajectoryClient, {
             "stretch_gripper;to": -80,
         })
-
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": z + 0.10,
-        })
         rospy.sleep(3)
 
         move_to_pose(trajectoryClient, {
-           "arm;to" : 0,
+            "lift;by": 0.1,
+            "arm;to" : 0,
+            "wrist_yaw;to" : np.pi,
         })
-        rospy.sleep(2)
+        
+        # rospy.sleep(5)
+
         move_to_pose(trajectoryClient, {
-           "wrist_yaw;to" : np.pi,
+            "lift;to": 0.4,
+            # "head_pan;to": 0,
         })
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": z - 0.3,
-        })
+        # # rospy.sleep(5)
+
+    def reset_cam_and_lift_after_pick(self, trajectoryClient):
+        """Resets the camera and lift after pick is complete"""
+
         move_to_pose(trajectoryClient, {
             "head_pan;to": 0,
-        }
-        )
-        rospy.sleep(3)
+        })
+        # rospy.sleep(5)
 
         
     def pick_with_feedback(self, trajectoryClient, x, y, z, theta):
@@ -234,15 +295,15 @@ class ManipulationMethods:
         self.isContact = False
         while not self.isContact or curz >= pose['lift;to']:
             curz = self.states[-1]
-            # print(curz, pose['lift;to'], isContact)
             if self.isContact:
                 break
             move_to_pose(trajectory_client, {
                 'lift;to': curz - 0.01,
-            })
+            }, asynchronous = True)
             rospy.sleep(0.05)
+
         move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
-            'lift;to': curz + 0.04,
+            'lift;to': curz + 0.02,
         })
 
     def checkIfGraspSucceeded(self):
@@ -251,9 +312,10 @@ class ManipulationMethods:
         Returns:
             bool: True if successful, False otherwise
         """
+        # returns true perenially for now since grasp success recognition is disabled.
         return True
             
-    def place(self, trajectoryClient, x, y, z, theta):
+    def place(self, trajectoryClient, placing_location):
         """Placing the object at the desired location
 
         Args:
@@ -263,24 +325,34 @@ class ManipulationMethods:
             z (float): z position of the location to place
             theta (_type_): _description_
         """
-
+        x, y, z = placing_location
+        
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+        
+        
+        
         move_to_pose(trajectoryClient, {
-            "lift;to": z,
+            "lift;by": z - ee_z,
         })
-
-        rospy.sleep(5)
+        # rospy.sleep(3)
+        
         move_to_pose(trajectoryClient, {
-            "wrist_yaw;to": theta*(np.pi/180),
-        })
-
-        rospy.sleep(3)
-
-        move_to_pose(trajectoryClient, {
-            "arm;to": y,
+            "wrist_yaw;to": 0,
         })
         
+        rospy.sleep(2)
+        
+        move_to_pose(trajectoryClient, {
+            'base_translate;by' : (x - ee_x)
+            }
+        )
         rospy.sleep(3)
 
+        move_to_pose(trajectoryClient, {
+            "arm;by": abs(y - ee_y),
+            }
+        )
+        # rospy.sleep(5)
         self.move_until_contact(
             trajectoryClient,
             {
@@ -288,28 +360,23 @@ class ManipulationMethods:
             }
         )
         move_to_pose(trajectoryClient, {
-            "stretch_gripper;to": 50,
+            "stretch_gripper;to": 100,
         })
-
-        rospy.sleep(4)
+        rospy.sleep(3)
         
         move_to_pose(trajectoryClient, {
+            'lift;by' : 0.1,
             "arm;to": 0,
         })
-        
-        rospy.sleep(0.5)
-
+        # rospy.sleep(5)
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to": np.pi,
         })
-        rospy.sleep(7)
+        rospy.sleep(2)
         
-        rospy.sleep(0.5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": 0.4,
-        })
-        
-        # rospy.sleep(6)
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to": 0.4,
+        # })
         
     
 if __name__=='__main__':

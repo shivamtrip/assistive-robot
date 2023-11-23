@@ -22,20 +22,11 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
   tf2_geometry_msgs
   tf2_ros
+  genmsg 
+  actionlib_msgs
+  actionlib
 )
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES moveback_recovery
-  CATKIN_DEPENDS
-    costmap_2d
-    geometry_msgs
-    nav_core
-    pluginlib
-    roscpp
-    tf2
-    tf2_ros
-)
 
 # pluginlib_export_plugin_description_file(moveback_recovery moveback_plugin.xml)
 # it works if you uncomment, fail the build and recomment
@@ -44,20 +35,7 @@ add_library(moveback_recovery src/moveback_recovery.cpp)
 add_dependencies(moveback_recovery ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(moveback_recovery ${catkin_LIBRARIES})
 
-install(TARGETS moveback_recovery
-       ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-       RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-       )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-  FILES_MATCHING PATTERN "*.h"
-)
-
-install(FILES moveback_plugin.xml
-    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
 
 
 # find_package(Eigen3 REQUIRED)
@@ -115,18 +93,19 @@ include_directories(
 #   Service2.srv
 # )
 
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
+# Generate actions in the 'action' folder
+add_action_files(
+  DIRECTORY action 
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+  FILES
+  MovebackRecovery.action
+)
+
+# Generate added messages and services with any dependencies listed here
+generate_messages(
+  DEPENDENCIES
+  std_msgs actionlib_msgs  # Or other packages containing msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -158,6 +137,20 @@ include_directories(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 
+
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES moveback_recovery
+  CATKIN_DEPENDS
+    costmap_2d
+    geometry_msgs
+    nav_core
+    pluginlib
+    roscpp
+    tf2
+    tf2_ros
+    actionlib_msgs
+)
 
 ###########
 ## Build ##
@@ -204,6 +197,21 @@ include_directories(
 ## Install ##
 #############
 
+
+install(TARGETS moveback_recovery
+       ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+       RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+       )
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(FILES moveback_plugin.xml
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 # all install targets should use catkin DESTINATION variables
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
 

@@ -2,9 +2,8 @@
 
 import numpy as np
 import cv2
-import ros_numpy
 import open3d as o3d
-
+import fusion
 from sensor_msgs.msg import Image, CameraInfo, PointCloud2, PointField
 import rospy
 from std_msgs.msg import String
@@ -52,7 +51,8 @@ class ManipulationPerception:
 
         while not self.obtainedInitialPoints and not self.obtainedIntrinsics :
             rospy.loginfo(f"[{rospy.get_name()}] " + " Waiting to start services")
-            rospy.sleep(1)
+            rospy.loginfo(f"{self.obtainedInitialPoints}, {self.obtainedIntrinsics}")
+            # rospy.sleep(1)
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready")
 
         # range of occupancy grid is from:
@@ -145,33 +145,67 @@ class ManipulationPerception:
         self.occupancyGrid[voxels[:, 0], voxels[:, 1], voxels[:, 2]] += 1
     
     
-    def collectData(self):
+    def collectData(self, fuser ):
         # pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
        
         
         # self.getPointcloud()
         # self.aggregateCloudIntoOccupancy()
         # plot_plane(self.occupancyGrid, self.voxelResolution)
-
+        # print("Starting")
+        rospy.loginfo("Starting")
         move_to_pose(self.trajectoryClient, {
             'head_pan;to' : -np.pi/3,
             'head_tilt;to' : np.deg2rad(-10)
         })
         rospy.sleep(3)
+        # time.sleep(3)
         # self.aggregateCloudIntoOccupancy()
 
+        volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length=4.0 / 512.0,
+            sdf_trunc=0.04,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
         for angle in np.arange(-np.pi/2, np.pi/2, np.deg2rad(10)):
             move_to_pose(self.trajectoryClient, {
                 'head_pan;to' : angle,
             })
             rospy.sleep(0.3)
-            self.getPointcloud()
-            self.aggregateCloudIntoOccupancy()
-        
-
-        plot_plane(self.occupancyGrid, self.voxelResolution)
-
-        np.save("occupancyGrid_005.npy", self.occupancyGrid)  # 0.1m resolution and 0.05       
+            color = o3d.geometry.Image(self.color.astype(np.uint8))
+            depth = self.depth.astype(np.uint16)
+            depth[depth < 150] = 0
+            depth = o3d.geometry.Image(depth)
+            
+            extrinsics = self.get_transform()
+            extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+            intrinsics = self.intrinsics
+            weight = 1
+            rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+                color, depth, depth_scale=1000, convert_rgb_to_intensity=False)
+            cam = o3d.camera.PinholeCameraIntrinsic()
+            cam.intrinsic_matrix = intrinsics
+            cam.width = self.color.shape[1]
+            cam.height = self.color.shape[0]
+            volume.integrate(
+                rgbd,
+                cam,
+                np.linalg.inv(extrinsics))
+            # fuser.integrate(color, depth, intrinsics, extrinsics, weight)
+            # self.getPointcloud()
+            # self.aggregateCloudIntoOccupancy(
+        # tsdf, col = fuser.get_volume()
+        # np.save("tsdf.npy", tsdf)
+        # np.save("col.npy", col)
+        # point_cloud = fuser.get_point_cloud()
+        # # fusion.meshwrite("mesh.ply", verts, faces, norms, colors)
+        # fusion.pcwrite("pc.ply", point_cloud)
+        # plot_plane(self.occupancyGrid, self.voxelResolution)
+        mesh = volume.extract_triangle_mesh()
+        mesh.compute_vertex_normals()
+        o3d.visualization.draw_geometries([mesh],
+                                      )
+        o3d.io.write_triangle_mesh("mesh.ply", mesh)
+        # np.save("occupancyGrid_005.npy", self.occupancyGrid)  # 0.1m resolution and 0.05       
 
 
 class Camera():
@@ -256,8 +290,16 @@ if __name__ == "__main__":
     armclient.wait_for_server()
     headclient.wait_for_server()
     gripperclient.wait_for_server()
-
-    objectLocalizer.collectData()
+    print("Starting to collect data")
+    from fusion import TSDFVolume
+    vol_bnds = np.zeros((3,2))
+    vol_bnds[:, 0] = np.array([-2, -2, 0])
+    vol_bnds[:, 1] = np.array([2, 2, 3])
+    fuser = TSDFVolume(vol_bnds, voxel_size=0.05)
+    
+    objectLocalizer.collectData(fuser)
+    # fuser.integrate(objectLocalizer.points, np.eye(4))
+    rospy.loginfo("Compelte :)")
     try:
         rospy.spin()
     except rospy.ROSInterruptException:

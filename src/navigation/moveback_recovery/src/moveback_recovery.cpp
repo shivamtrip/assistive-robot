@@ -78,10 +78,7 @@ void MovebackRecovery::runBehavior()
   geometry_msgs::PoseStamped global_pose;
   local_costmap_->getRobotPose(global_pose);
 
-  double current_angle = tf2::getYaw(global_pose.pose.orientation);
-  double start_angle = current_angle;
 
-  bool got_180 = false;
   bool reverse = true;      // if reverse is true, move back
 
 
@@ -116,7 +113,7 @@ void MovebackRecovery::runBehavior()
 
   double cur_x; 
   double cur_y; 
-  double dist_travelled; 
+  double dist_travelled = 0; 
 
   cur_x = init_x;
   cur_y = init_y;
@@ -186,70 +183,81 @@ void MovebackRecovery::runBehavior()
   }
 
 
-  // Rotate Recovery Behavior
+  // // Rotate Recovery Behavior
 
-  std::cout << "Rotating In-Place " << dist_travelled << std::endl;
-  while (n.ok() &&
-        (!got_180 ||
-        std::fabs(angles::shortest_angular_distance(current_angle, start_angle)) > tolerance_))
-  {
-    // Update Current Angle
-    local_costmap_->getRobotPose(global_pose);
-    current_angle = tf2::getYaw(global_pose.pose.orientation);
+  // bool done_rotating = false;
+  // double current_angle = tf2::getYaw(global_pose.pose.orientation);
+  // double start_angle = current_angle;
+  // double rotation_angle = 22.5;
+  // double goal_angle = start_angle + rotation_angle * (M_PI/180);
+  // double dist_left = rotation_angle;
 
-    // compute the distance left to rotate
-    double dist_left;
-    if (!got_180)
-    {
-      // If we haven't hit 180 yet, we need to rotate a half circle plus the distance to the 180 point
-      double distance_to_180 = std::fabs(angles::shortest_angular_distance(current_angle, start_angle + M_PI));
-      dist_left = M_PI + distance_to_180;
+  // std::cout << "Rotating In-Place " << dist_travelled << std::endl;
+  
+  // while (n.ok() &&
+  //       (!done_rotating))
+  // {
+  //   // Update Current Angle
+  //   local_costmap_->getRobotPose(global_pose);
+  //   current_angle = tf2::getYaw(global_pose.pose.orientation);
+ 
+  //   // compute the distance left to rotate
+  //   if (!done_rotating)
+  //   {
 
-      if (distance_to_180 < tolerance_)
-      {
-        got_180 = true;
-      }
-    }
-    else
-    {
-      // If we have hit the 180, we just have the distance back to the start
-      dist_left = std::fabs(angles::shortest_angular_distance(current_angle, start_angle));
-    }
+  //     std::cout << "The distance left to rotate is " << dist_left * (180/M_PI) << " degrees" << std::endl;
 
-    double x = global_pose.pose.position.x, y = global_pose.pose.position.y;
+  //     double distance_to_goal = std::fabs(angles::shortest_angular_distance(current_angle, goal_angle));
+  //     dist_left = distance_to_goal;
 
-    // check if that velocity is legal by forward simulating
-    double sim_angle = 0.0;
-    while (sim_angle < dist_left)
-    {
-      double theta = current_angle + sim_angle;
+  //     if (distance_to_goal < tolerance_)
+  //     {
+  //       std::cout << "Done rotating!" << std::endl;
+  //       done_rotating = true;
+  //     }
 
-      // make sure that the point is legal, if it isn't... we'll abort
-      double footprint_cost = world_model_->footprintCost(x, y, theta, local_costmap_->getRobotFootprint(), 0.0, 0.0);
-      if (footprint_cost < 0.0)
-      {
-        ROS_ERROR("Rotate recovery can't rotate in place because there is a potential collision. Cost: %.2f",
-                  footprint_cost);
-        return;
-      }
+      
+  //   }
+  //   // else
+  //   // {
+  //   //   // If we have hit the 180, we just have the distance back to the start
+  //   //   dist_left = std::fabs(angles::shortest_angular_distance(current_angle, start_angle));
+  //   // }
 
-      sim_angle += sim_granularity_;
-    }
+  //   double x = global_pose.pose.position.x, y = global_pose.pose.position.y;
 
-    // compute the velocity that will let us stop by the time we reach the goal
-    double vel = sqrt(2 * acc_lim_th_ * dist_left);
+  //   // check if that velocity is legal by forward simulating
+  //   double sim_angle = 0.0;
+  //   while (sim_angle < dist_left)
+  //   {
+  //     double theta = current_angle + sim_angle;
 
-    // make sure that this velocity falls within the specified limits
-    vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
+  //     // make sure that the point is legal, if it isn't... we'll abort
+  //     double footprint_cost = world_model_->footprintCost(x, y, theta, local_costmap_->getRobotFootprint(), 0.0, 0.0);
+  //     if (footprint_cost < 0.0)
+  //     {
+  //       ROS_ERROR("Rotate recovery can't rotate in place because there is a potential collision. Cost: %.2f",
+  //                 footprint_cost);
+  //       return;
+  //     }
 
-    geometry_msgs::Twist cmd_vel;
-    cmd_vel.linear.x = 0.0;
-    cmd_vel.linear.y = 0.0;
-    cmd_vel.angular.z = vel;
+  //     sim_angle += sim_granularity_;
+  //   }
 
-    vel_pub.publish(cmd_vel);
+  //   // compute the velocity that will let us stop by the time we reach the goal
+  //   double vel = sqrt(2 * acc_lim_th_ * dist_left);
 
-    r.sleep();
-  }
+  //   // make sure that this velocity falls within the specified limits
+  //   vel = std::min(std::max(vel, min_rotational_vel_), max_rotational_vel_);
+
+  //   geometry_msgs::Twist cmd_vel;
+  //   cmd_vel.linear.x = 0.0;
+  //   cmd_vel.linear.y = 0.0;
+  //   cmd_vel.angular.z = vel;
+
+  //   vel_pub.publish(cmd_vel);
+
+  //   r.sleep();
+  // }
 }
 };  // namespace moveback_recovery

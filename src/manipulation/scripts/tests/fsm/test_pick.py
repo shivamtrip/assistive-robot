@@ -21,14 +21,32 @@ from helpers import move_to_pose
 
 from fsm import ManipulationFSM
 
+
+# class_list:
+#   # - 'drawer'
+#   - 'soda_can' # 0
+#   - 'tissue_paper' #1
+#   - 'toothbrush' #2
+#   - 'tie' #3
+#   - 'cell phone' #4
+#   - 'banana' #5
+#   - 'apple' #6
+#   - 'orange' #7
+#   - 'bottle' #8
+#   - 'cup' #9
+#   - 'teddy bear' #10
+#   - 'remote' #11
+
+
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
+    class_list = rospy.get_param('/object_detection/class_list')
     node = ManipulationFSM()
     goal = TriggerGoal()
-    goal.objectId = 4
+    goal.objectId = 9
     goal.isPick = True
     node.main(goal)
     rospy.sleep(5)

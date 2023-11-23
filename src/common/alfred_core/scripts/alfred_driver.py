@@ -19,10 +19,11 @@ import rospy
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TransformStamped
-
-# from helpers.joint_trajectory_server import JointTrajectoryAction
+from sensor_msgs.msg import JointState, CameraInfo, Image
+from colorama import Fore, Back, Style
+# from helpers.joint_traj_server import JointTrajectoryAction
 from helpers.body_wrapper import JointTrajectoryAction
-
+import threading
 
 from std_srvs.srv import Trigger, TriggerResponse
 from std_srvs.srv import SetBool, SetBoolResponse
@@ -48,6 +49,38 @@ class AlfredBodyNode:
 
         self.robot_mode_rwlock = RWLock()
         self.robot_mode = None
+        # camera services
+        
+        # TODO CONFLICT WITH REALSENSE
+        # self.rotated_intrinsics_pub = rospy.Publisher('/camera/color/camera_info_rotated', CameraInfo, queue_size=1)
+        # self.get_rotated_intrinsics()
+    def get_rotated_intrinsics(self):
+        self.camera_intrinsics = rospy.wait_for_message('/camera/color/camera_info', CameraInfo)
+        K = np.array(self.camera_intrinsics.K).reshape((3,3))
+        height = self.camera_intrinsics.height
+        width = self.camera_intrinsics.width
+        fx_old = K[0,0]
+        fy_old = K[1,1]
+        cx_old = K[0,2]
+        cy_old = K[1,2]
+        fx_new = fy_old
+        fy_new = fx_old
+        cx_new = width - cy_old
+        cy_new = cx_old
+        rotated_intrinsic = np.array([[fx_new,0,cx_new],[0,fy_new,cy_new],[0,0,1]])
+        
+        new_intrinsics = CameraInfo()
+        new_intrinsics.header = Header()
+        new_intrinsics.header.frame_id = self.camera_intrinsics.header.frame_id
+        new_intrinsics.height = self.camera_intrinsics.width
+        new_intrinsics.width = self.camera_intrinsics.height
+        new_intrinsics.distortion_model = self.camera_intrinsics.distortion_model
+        new_intrinsics.D = self.camera_intrinsics.D
+        new_intrinsics.K = rotated_intrinsic.flatten().tolist()
+        new_intrinsics.R = self.camera_intrinsics.R
+        
+        self.rotated_camera_intrinsics = new_intrinsics
+        
         
     ###### MOBILE BASE VELOCITY METHODS #######
 
@@ -91,7 +124,7 @@ class AlfredBodyNode:
         pose_time_s = base_status['pose_time_s']
 
         if self.robot_mode == 'manipulation':
-            x = self.mobile_base_manipulation_origin['x']
+            # x = self.mobile_base_manipulation_origin['x']
             x_vel = 0.0
             x_effort = 0.0
 
@@ -109,6 +142,10 @@ class AlfredBodyNode:
             t.transform.rotation.z = q[2]
             t.transform.rotation.w = q[3]
             self.tf_broadcaster.sendTransform(t)
+            
+            # self.rotated_intrinsics_pub.publish(self.rotated_camera_intrinsics)
+            
+            
 
         # publish odometry
         odom = Odometry()
@@ -219,6 +256,7 @@ class AlfredBodyNode:
         def code_to_run():
             self.linear_velocity_mps = 0.0
             self.angular_velocity_radps = 0.0
+            self.robot.head.move_to('head_tilt', -30 * np.pi/180)
         self.change_mode('navigation', code_to_run)
 
     def turn_on_manipulation_mode(self):
@@ -235,7 +273,6 @@ class AlfredBodyNode:
             theta = base_status['theta']
             self.mobile_base_manipulation_origin = {'x':x, 'y':y, 'theta':theta} 
         self.change_mode('manipulation', code_to_run)
-
 
     def calibrate(self):
         def code_to_run():
@@ -304,42 +341,54 @@ class AlfredBodyNode:
             success=True,
             message='is_runstopped: {0}'.format(request.data)
             )
+        
+
+
+
     
-    def isRobotReady(self):
+    def batteryCheck(self, msg):
         # TODO(@praveenvnktsh): finish this function
-        # status = self.robot.pimu.pull_status()
-        # VOLTAGE = status['voltage']
-        # CURRENT = status['current']
+        
+        def val_in_range(val_name, val, alert = False):
+            if not alert:
+                print(Fore.GREEN +'[Pass] ' + val_name + ' with ' + str(val))
+                return True
+            else:
+                print(Fore.RED +'[Fail] ' + val_name + ' with ' +str(val)+ ' out of range ')
+                return False
 
-        # # Check if the voltage is within the range
-        # VMIN = self.robot.pimu.config['low_voltage_alert']
-        # VMAX = 14.0
-        # if VOLTAGE < VMIN or VOLTAGE > VMAX:
-        #     return False
-
-        # # Check if the current is within the range
-        # IMIN = 0.1
-        # IMAX = self.robot.pimu.config['high_current_alert']
-        # if CURRENT < IMIN or CURRENT > IMAX:
-        #     return False
-
-        return True
+        # #####################################################
+        
+        robot_status = self.robot.get_status()
+        pimu_status = robot_status['pimu']
+        
+        self.robot.pimu.pull_status()
+        ready = val_in_range('Voltage',pimu_status['voltage'], alert=pimu_status['low_voltage_alert'])
+        ready = ready and val_in_range('Current',pimu_status['current'], alert=pimu_status['high_current_alert'])
+        print(Style.RESET_ALL)
+        if not ready:
+            msg = "Please Recharge the battery!"
+        else:
+            msg = "Battery is fine!"
+            
+        return TriggerResponse(ready, msg)
     
     def stow(self, msg):
+        rospy.loginfo("Stowing....")
         temp = self.robot_mode
         self.turn_on_manipulation_mode()
         self.robot.head.move_to('head_pan', self.robot.get_stow_pos('head_pan'))
-        self.robot.head.move_to('head_tilt',self.robot.get_stow_pos('head_pan'))
+        self.robot.head.move_to('head_tilt', self.robot.get_stow_pos('head_tilt'))
 
-        print('--------- Stowing Arm ----')
         pos_arm = self.robot.get_stow_pos('arm')
         self.robot.arm.move_to(pos_arm)
-        self.robot.end_of_arm.move_to('wrist_yaw', self.robot.get_stow_pos('wrist_yaw'))
-        self.robot.push_command()
-        print('--------- Stowing Lift ----')
+        # self.robot.end_of_arm.move_to('stretch_gripper', self.robot.get_stow_pos('stretch_gripper'))
+        self.robot.end_of_arm.move_to('wrist_yaw', np.pi * 175/180)
+        # self.robot.push_command()
         self.robot.lift.move_to(0.4)
         self.robot.push_command()
-        time.sleep(1)
+        
+        self.robot.lift.wait_until_at_setpoint()
         if temp == 'navigation':
             self.turn_on_navigation_mode()
         else:
@@ -347,26 +396,29 @@ class AlfredBodyNode:
 
         return TriggerResponse()
     
+    def check_battery_thread(self):
+        while not rospy.is_shutdown():
+            time.sleep(300)
+            self.batteryCheck(None)
 
     def main(self):
 
         rospy.init_node('alfred_driver')
         self.node_name = rospy.get_name()
         
-       
-        
         rospy.loginfo(f"{self.node_name} started")
 
         self.robot = rb.Robot()
         self.robot.startup()
-        if self.isRobotReady() == False:
-            rospy.loginfo("Battery is low. Please charge. Thanks!")
+        
+        if self.batteryCheck(None).success == False:
             exit()
+            
+        threading.Thread(target=self.check_battery_thread).start()
         rospy.loginfo("Battery is fine!")
         if not self.robot.is_calibrated():
             rospy.loginfo("Homing the robot. Please wait :)")
             self.robot.home()
-
 
         self.stow(None)
 
@@ -375,47 +427,47 @@ class AlfredBodyNode:
             self.turn_on_navigation_mode()
         elif mode == "manipulation":
             self.turn_on_manipulation_mode()
-        self.broadcast_odom_tf = rospy.get_param('~brxoadcast_odom_tf', True)
-        rospy.loginfo('broadcast_odom_tf = ' + str(self.broadcast_odom_tf))
+        self.broadcast_odom_tf = rospy.get_param('~broadcast_odom_tf', True)
+        # rospy.loginfo('broadcast_odom_tf = ' + str(self.broadcast_odom_tf))
         
         if self.broadcast_odom_tf:
             self.tf_broadcaster = tf2_ros.TransformBroadcaster()
 
         large_ang = np.radians(45.0)
         filename = rospy.get_param('~controller_calibration_file')
-        rospy.loginfo('Loading controller calibration parameters for the head from YAML file named {0}'.format(filename))
+        # rospy.loginfo('Loading controller calibration parameters for the head from YAML file named {0}'.format(filename))
         with open(filename, 'r') as fid:
 
             self.controller_parameters = yaml.safe_load(fid)
-            rospy.loginfo('controller parameters loaded = {0}'.format(self.controller_parameters))
+            rospy.logdebug('controller parameters loaded = {0}'.format(self.controller_parameters))
 
             head_tilt_calibrated_offset_rad = self.controller_parameters['tilt_angle_offset']
             if (abs(head_tilt_calibrated_offset_rad) > large_ang):
                 rospy.logwarn('WARNING: head_tilt_calibrated_offset_rad HAS AN UNUSUALLY LARGE MAGNITUDE')
-            rospy.loginfo('head_tilt_calibrated_offset_rad in degrees = {0}'.format(np.degrees(head_tilt_calibrated_offset_rad)))
+            rospy.logdebug('head_tilt_calibrated_offset_rad in degrees = {0}'.format(np.degrees(head_tilt_calibrated_offset_rad)))
 
             head_pan_calibrated_offset_rad = self.controller_parameters['pan_angle_offset']
             if (abs(head_pan_calibrated_offset_rad) > large_ang):
                 rospy.logwarn('WARNING: head_pan_calibrated_offset_rad HAS AN UNUSUALLY LARGE MAGNITUDE')
-            rospy.loginfo('head_pan_calibrated_offset_rad in degrees = {0}'.format(np.degrees(head_pan_calibrated_offset_rad)))
+            rospy.logdebug('head_pan_calibrated_offset_rad in degrees = {0}'.format(np.degrees(head_pan_calibrated_offset_rad)))
 
             head_pan_calibrated_looked_left_offset_rad = self.controller_parameters['pan_looked_left_offset']
             if (abs(head_pan_calibrated_looked_left_offset_rad) > large_ang):
                 rospy.logwarn('WARNING: head_pan_calibrated_looked_left_offset_rad HAS AN UNUSUALLY LARGE MAGNITUDE')
-            rospy.loginfo('head_pan_calibrated_looked_left_offset_rad in degrees = {0}'.format(np.degrees(head_pan_calibrated_looked_left_offset_rad)))
+            rospy.logdebug('head_pan_calibrated_looked_left_offset_rad in degrees = {0}'.format(np.degrees(head_pan_calibrated_looked_left_offset_rad)))
 
             head_tilt_backlash_transition_angle_rad = self.controller_parameters['tilt_angle_backlash_transition']
-            rospy.loginfo('head_tilt_backlash_transition_angle_rad in degrees = {0}'.format(np.degrees(head_tilt_backlash_transition_angle_rad)))
+            rospy.logdebug('head_tilt_backlash_transition_angle_rad in degrees = {0}'.format(np.degrees(head_tilt_backlash_transition_angle_rad)))
 
             head_tilt_calibrated_looking_up_offset_rad = self.controller_parameters['tilt_looking_up_offset']
             if (abs(head_tilt_calibrated_looking_up_offset_rad) > large_ang):
                 rospy.logwarn('WARNING: head_tilt_calibrated_looking_up_offset_rad HAS AN UNUSUALLY LARGE MAGNITUDE')
-            rospy.loginfo('head_tilt_calibrated_looking_up_offset_rad in degrees = {0}'.format(np.degrees(head_tilt_calibrated_looking_up_offset_rad)))
+            rospy.logdebug('head_tilt_calibrated_looking_up_offset_rad in degrees = {0}'.format(np.degrees(head_tilt_calibrated_looking_up_offset_rad)))
 
             arm_calibrated_retracted_offset_m = self.controller_parameters['arm_retracted_offset']
             if (abs(arm_calibrated_retracted_offset_m) > 0.05):
                 rospy.logwarn('WARNING: arm_calibrated_retracted_offset_m HAS AN UNUSUALLY LARGE MAGNITUDE')
-            rospy.loginfo('arm_calibrated_retracted_offset_m in meters = {0}'.format(arm_calibrated_retracted_offset_m))
+            rospy.logdebug('arm_calibrated_retracted_offset_m in meters = {0}'.format(arm_calibrated_retracted_offset_m))
 
         self.linear_velocity_mps = 0.0 # m/s ROS SI standard for cmd_vel (REP 103)
         self.angular_velocity_radps = 0.0 # rad/s ROS SI standard for cmd_vel (REP 103)
@@ -433,16 +485,16 @@ class AlfredBodyNode:
         # ~ symbol gets parameter from private namespace
         self.joint_state_rate = rospy.get_param('~rate', 15.0)
         self.timeout = rospy.get_param('~timeout', 1.0)
-        rospy.loginfo("{0} rate = {1} Hz".format(self.node_name, self.joint_state_rate))
-        rospy.loginfo("{0} timeout = {1} s".format(self.node_name, self.timeout))
+        # rospy.loginfo("{0} rate = {1} Hz".format(self.node_name, self.joint_state_rate))
+        # rospy.loginfo("{0} timeout = {1} s".format(self.node_name, self.timeout))
 
         self.use_fake_mechaduinos = rospy.get_param('~use_fake_mechaduinos', False)
-        rospy.loginfo("{0} use_fake_mechaduinos = {1}".format(rospy.get_name(), self.use_fake_mechaduinos))
+        # rospy.loginfo("{0} use_fake_mechaduinos = {1}".format(rospy.get_name(), self.use_fake_mechaduinos))
 
         self.base_frame_id = 'base_link'
-        rospy.loginfo("{0} base_frame_id = {1}".format(self.node_name, self.base_frame_id))
+        # rospy.loginfo("{0} base_frame_id = {1}".format(self.node_name, self.base_frame_id))
         self.odom_frame_id = 'odom'
-        rospy.loginfo("{0} odom_frame_id = {1}".format(self.node_name, self.odom_frame_id))
+        # rospy.loginfo("{0} odom_frame_id = {1}".format(self.node_name, self.odom_frame_id))
 
         self.joint_state_pub = rospy.Publisher('joint_states', JointState, queue_size=1)
 
@@ -454,6 +506,10 @@ class AlfredBodyNode:
         self.fail_out_of_range_goal = rospy.get_param('~fail_out_of_range_goal', True)
         self.joint_trajectory_action = JointTrajectoryAction(self, self.robot)
         self.joint_trajectory_action.server.start()
+
+        self.batteryCheckService = rospy.Service('/check_battery',
+                                                Trigger,
+                                                self.batteryCheck)
 
         self.stowRobotService = rospy.Service('/stow_robot',
                                                 Trigger,
@@ -474,6 +530,7 @@ class AlfredBodyNode:
                                               SetBool,
                                               self.runstop_service_callback)
         
+        
         self.head_pan_cg = HeadPanCommandGroup(node=self) \
             if 'head_pan' in self.robot.head.joints else None
         self.head_tilt_cg = HeadTiltCommandGroup(node=self) \
@@ -489,6 +546,8 @@ class AlfredBodyNode:
         self.command_groups = [self.arm_cg, self.lift_cg, self.mobile_base_cg, self.head_pan_cg,
                                self.head_tilt_cg, self.wrist_yaw_cg, self.gripper_cg]
         
+        
+        rospy.loginfo("Alfred Driver is ready for operation ;)")
         try:
             while not rospy.is_shutdown():
                 self.command_mobile_base_velocity_and_publish_state()

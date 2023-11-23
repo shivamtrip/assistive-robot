@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <launch>
     <rosparam file="$(find alfred_hri)/config/config.yaml" command="load"/>
-    <arg name="test"/>
-    <node name="hri_node" pkg="alfred_hri" type="main.py" output="screen">
+    <arg name="test" default="false"/>
+    <node name="alfred_hri" pkg="alfred_hri" type="main.py" output="screen">
+        <param  name="test" value="$(arg test)"/>
     </node>
 </launch>

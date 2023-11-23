@@ -2,43 +2,31 @@
 from enum import Enum
 import json
 from move_base_msgs.msg import MoveBaseActionFeedback, MoveBaseFeedback
+from alfred_navigation.msg import NavManActionFeedback, NavManFeedback
 import time
 import rospy
 from firebase_node import FirebaseNode
 import os
 from sensor_msgs.msg import JointState
 
-# class State:
-#     def __init__(self, name, transitions : dict):
-#         self.name = name
-#         self.transitions = transitions
-#         self.outcomes = self.transitions.keys()
-
-#     # override this function
-#     def execute(self, **kwargs):
-#         raise NotImplementedError
-
-#     def onComplete(self, **kwargs):
-#         raise NotImplementedError
-    
-#     def run(self, manager, **kwargs):
-#         self.execute(**kwargs)
-#         self.onComplete(**kwargs)
 
 class BotStateManager():
     def __init__(self, updateCallback):
+
         self.position = None
         self.orientation = None
         self.currentSemanticLocation = LocationOfInterest.HOME # GEOFENCE THIS USING DEFINED BOXES TODO(@shivamtrip)
         self.navigationOrigin = LocationOfInterest.HOME
         self.navigationGoal = LocationOfInterest.HOME
-        self.objectOfInterest = ObjectOfInterest.NONE
+        self.objectOfInterest = -1
         self.currentGlobalState = GlobalStates.WAITING_FOR_COMMAND
         self.operationMode = OperationModes.AUTONOMOUS
         self.emotion = Emotions.NEUTRAL
 
         with open(os.path.expanduser("~/alfred-autonomy/src/planning/task_planner/config/firebase_schema.json")) as f:
             self.state_dict = json.load(f)
+        
+    
 
         self.firebaseNode = FirebaseNode(
             self.state_dict, 
@@ -48,6 +36,19 @@ class BotStateManager():
         self.jointStateSubscriber = rospy.Subscriber("/alfred/joint_states", JointState, self.joint_state_callback) 
         self.last_update_time = time.time()
         self.updateCallback = updateCallback
+
+    def update_param(self, path, value):
+        child = self.firebaseNode.db.child(self.firebaseNode.root)
+        for key in path.split("/"):
+            child = child.child(key)
+        child.set(value)
+
+        # Update self.state_dict
+        keys = path.split("/")
+        current_dict = self.state_dict
+        for key in keys[:-1]:
+            current_dict = current_dict[key]
+        current_dict[keys[-1]] = value
 
     def isAutonomous(self):
         self.pollOperationState()
@@ -76,7 +77,8 @@ class BotStateManager():
         self.emotion = emotion
         self.firebaseNode.update_node(self.state_dict)
     def pollOperationState(self):
-        mode = self.firebaseNode.db.get().val()['operation_mode']
+        root = self.firebaseNode.root
+        mode = self.firebaseNode.db.child(root).get().val()['operation_mode']
         if mode == "AUTONOMOUS":
             self.operationMode = OperationModes.AUTONOMOUS
         else:
@@ -92,9 +94,10 @@ class BotStateManager():
         self.updateCallback()
 
     def get_teleop_commands_from_firebase(self, msg, callback = True):
-        self.state_dict['teleop_commands'] = self.firebaseNode.db.get().val()['teleop_commands']
-        commands = self.firebaseNode.db.get().val()['teleop_commands']
-        mode = self.firebaseNode.db.get().val()['operation_mode']
+        root = self.firebaseNode.root
+        self.state_dict['teleop_commands'] = self.firebaseNode.db.child(root).get().val()['teleop_commands']
+        commands = self.firebaseNode.db.child(root).get().val()['teleop_commands']
+        mode = self.firebaseNode.db.child(root).get().val()['operation_mode']
         if mode == "AUTONOMOUS":
             self.operationMode = OperationModes.AUTONOMOUS
         else:
@@ -114,6 +117,8 @@ class BotStateManager():
                 "effort": msg.effort[msg.name.index(name)]
             }
         self.firebaseNode.update_node(self.state_dict)
+
+    
     
     def isExtendedCommunicationLossTeleop(self):
         return time.time() - (self.state_dict['teleop_commands']['last_command_stamp']) > 10
@@ -122,18 +127,32 @@ class BotStateManager():
         self.state_dict["global_state"] = self.currentGlobalState.name
         self.state_dict['current_task']["origin"] = self.navigationOrigin.name
         self.state_dict['current_task']["goal"] = self.navigationGoal.name
-        self.state_dict['current_task']["object_of_interest"] = self.objectOfInterest.name
+        self.state_dict['current_task']["object_of_interest"] = self.objectOfInterest
 
         # emotion params
 
-    def navigation_feedback(self, msg : MoveBaseFeedback):
-        self.position = msg.base_position.pose.position
-        self.orientation = msg.base_position.pose.orientation
+    # def navigation_feedback(self, msg : MoveBaseFeedback):
+    #     self.position = msg.base_position.pose.position
+    #     self.orientation = msg.base_position.pose.orientation
         
-        if time.time() - self.last_update_time > 1:
-            self.last_update_time = time.time()
-            rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
-            rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+    #     # if time.time() - self.last_update_time > 1:
+    #     #     self.last_update_time = time.time()
+    #     rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
+    #     rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+
+    def navigation_feedback(self, msg : NavManFeedback):
+        # self.position = msg.base_position.pose.position
+        # self.orientation = msg.base_position.pose.orientation
+
+        self.status = msg.status
+        
+        rospy.logdebug(f"[{rospy.get_name()}]:" +"Current Status: {}".format(self.status))
+
+        # if time.time() - self.last_update_time > 1:
+        #     self.last_update_time = time.time()
+        # rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
+        # rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
+
 
     def manipulation_feedback(self, feedback):
         pass
@@ -165,19 +184,6 @@ class GlobalStates(Enum):
     CALL = 8
     
 
-class ObjectOfInterest(Enum): 
-    # FILL WITH CLASS LABELS FOR THE OBJECT DETECTION PIPELINE
-    NONE = -1
-    USER = 0
-    BOTTLE = 39
-    BOX = 2
-    GLASS = 3
-    TABLE = 60
-    REMOTE = 65
-    APPLE = 47
-    BANANA = 46
-    
-
 class LocationOfInterest(Enum):
     # FILL WITH LOCATION LABELS FROM GROUNDING PIPELINE
     HOME = -1
@@ -185,6 +191,17 @@ class LocationOfInterest(Enum):
     KITCHEN = 1
     TABLE = 2
     NET = 3
+    ROBOTS = 4   
+    SINK = 5 
+#     {
+#     "HOME": {"x" : -2.38, "y":-7.66, "theta":180},
+#     "TABLE" : {"x" : -3.32, "y":-9.54, "theta":270},
+#     "LIVING_ROOM" : {"x" : -3.69, "y":-3.83, "theta":0},
+#     "NET" : {"x" : -4.311476783752441, "y" : -1.6926142692565918, "theta" : 90},
+#     "KITCHEN" : {"x" : -5.8, "y" : -1.65, "theta" : 180},
+#     "ROBOTS" : {"x" : -3.82, "y" : -2.42, "theta" : 0}
+# }
+
 
 class VerbalResponseStates(Enum):
     # FILL WITH VERBAL RESPONSES

@@ -54,3 +54,10 @@ logs/*
 *.egg
 */SOURCES.txt
 latest
+
+
+*.tif
+*.png
+*.ply
+*.json
+*.cmake

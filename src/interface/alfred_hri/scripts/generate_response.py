@@ -69,7 +69,7 @@ class ResponseGenerator():
         
         self.sounds = {}
 
-        self.primitives_file = rospy.get_param("primitives_file_name", "primitives.json")
+        self.primitives_file = rospy.get_param("primitives_file_name", "resources/commands/primitives.json")
         self.primitives_file_path = os.path.join(rospkg.RosPack().get_path("alfred_hri"), self.primitives_file)
 
         self.primitives = json.load(open(self.primitives_file_path))
@@ -97,7 +97,8 @@ class ResponseGenerator():
 
     def play_sound_file(self, file):
         # Play a sound file
-        os.system(f"aplay {file}")
+        os.system(f"aplay --nonblock {file}")
+        # pass
 
 
     def weather(self, city):
@@ -163,7 +164,7 @@ class ResponseGenerator():
         if text is not None:
             rospy.loginfo("Heard: " + text)
             
-            closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.75)
+            closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.85)
             if len(closest_command) > 0:
                 rospy.loginfo("Closest command: " + closest_command[0])
                 cmd = closest_command[0]
