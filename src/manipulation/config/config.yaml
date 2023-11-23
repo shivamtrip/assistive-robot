@@ -26,8 +26,8 @@ recoveries:
 # scene_parser:
 time_diff_for_realtime : 0.3 #seconds - for scene parser to determine whether the estimate is live or stale
 object_filter:
-  height : 0.7
-  radius : 2.5
+  height : 0.5
+  radius : 5
 
 offsets:
   bottle: [0, -0.01, 0.0]

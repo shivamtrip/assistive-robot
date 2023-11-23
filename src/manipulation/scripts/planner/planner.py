@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import open3d as o3d
-# from planner.astar_planner import AStarPlanner
-# from planner.naive_planner import NaivePlanner
+from planner.astar_planner import AStarPlanner
+from planner.naive_planner import NaivePlanner
 
 class Planner:
     
@@ -11,7 +11,7 @@ class Planner:
 
         self.resolution = 0.05 #resolution for planning base and voxelizing/rasterizing point cloud
         self.radius_reachable = int(0.85 / self.resolution)
-        self.max_dist_traverse = int(4 / self.resolution)
+        self.max_dist_traverse = int(1.3 / self.resolution)
         self.characteristic_dist = 0.15 / self.resolution
         
         self.lengths = [
@@ -110,7 +110,7 @@ class Planner:
                 base_theta
             ]
         )
-        return [navigation_target], is_plan_reqd
+        return navigation_target, is_plan_reqd
     
     
     

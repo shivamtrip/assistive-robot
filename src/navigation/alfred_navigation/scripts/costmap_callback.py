@@ -32,7 +32,7 @@ class ProcessCostmap():
     def print_map_params(self,):
         """ Print the map parameters"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None  ," Empty costmap!! Please load costmap first!!"
 
         info = self.costmap_info    
         print("Map parameters: ")
@@ -45,7 +45,7 @@ class ProcessCostmap():
     def get_cell_coordinates(self,row, col):
         """ Given cell coordinates in costmap, return the corresponding world coordinates"""
         
-        assert self.costmap ," Empty costmap!!"
+        assert self.costmap is not None ," Empty costmap!!"
 
         info = self.costmap_info    
         x = info.origin.position.x + col * info.resolution
@@ -56,7 +56,7 @@ class ProcessCostmap():
 
     def isValidRowCol(self,row,col):
         
-        assert self.costmap ," Empty costmap!!Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!!Please load costmap first!!"
 
         info = self.costmap_info    
         if row >= 0 and row < info.height and col >= 0 and col < info.width:
@@ -67,7 +67,7 @@ class ProcessCostmap():
     def get_cell_indices(self,x, y,z=0):
         """ Given world coordinates, return the corresponding cell coordinates in costmap"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
         assert np.isclose(z,0) ," Costmap is 2D but z is not 0!!"
 
         info = self.costmap_info    
@@ -82,7 +82,7 @@ class ProcessCostmap():
 
         """ Given world coordinates, return whether the cell is safe or not. It helps dowstream in determining whether path exists or not"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
         ref_cost = 10
 
@@ -106,7 +106,7 @@ class ProcessCostmap():
     def findNearestSafeCell(self,x,y,z):
         """ Given world coordinates, return the nearest safe cell coordinates in costmap"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
         row, col = self.get_cell_indices(x, y)
         assert self.isValidRowCol(row,col), "Computed cell indices out of bounds!! Given x,y,z: {},{},{} are bad points!".format(x,y,z)
@@ -125,7 +125,7 @@ class ProcessCostmap():
     def findNearestSafePoint(self,x,y,z):
         """ Given world coordinates, return the nearest safe cell coordinates in costmap"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
         row, col = self.get_cell_indices(x, y)
         print("Retrieved row, col: ",(row,col))
@@ -146,7 +146,7 @@ class ProcessCostmap():
     def RunBFSForSearch(self,row,col):
         """ Given cell coordinates, return the nearest safe cell coordinates in costmap"""
 
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
         rospy.logdebug("Running nearest safe cell finder!!")
 
@@ -174,7 +174,7 @@ class ProcessCostmap():
 
         rospy.loginfo("Sampling obstacle cells!!")
             
-        assert self.costmap ," Empty costmap!! Please load costmap first!!"
+        assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
         iters = 0
         samples=[]

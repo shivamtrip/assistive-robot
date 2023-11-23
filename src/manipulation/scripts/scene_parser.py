@@ -7,6 +7,8 @@ from yolo.msg import Detections
 import rospy
 import time
 import tf
+from visualization_msgs.msg import Marker
+
 from geometry_msgs.msg import Vector3, Vector3Stamped, PoseStamped, Point, Pose, PointStamped, Point32
 from sensor_msgs.msg import PointCloud2
 from scipy.spatial.transform import Rotation as R
@@ -26,6 +28,8 @@ class SceneParser:
         
         self.obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
         self.plane_cloud_pub = rospy.Publisher('/plane_cloud', PointCloud2, queue_size=10)
+        self.marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
+
         
         self.obtained_initial_images = False
         self.request_clear_object = False
@@ -37,6 +41,8 @@ class SceneParser:
         self.scene_points = None
         self.object_points = None
         self.prevtime = time.time()
+        
+        self.tsdf_volume = None
         
         synced_messages = message_filters.ApproximateTimeSynchronizer([
             self.depth_image_subscriber, self.rgb_image_subscriber,
@@ -53,6 +59,13 @@ class SceneParser:
             'intrinsics' : np.array(msg.K).reshape(3,3),
             'focal_length' : self.intrinsics[0][0],
         }
+        
+        cam = o3d.camera.PinholeCameraIntrinsic()
+        cam.intrinsic_matrix = self.intrinsics
+        cam.width = msg.width
+        cam.height = msg.height
+        
+        self.o3d_cam = cam
         
         rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
@@ -80,8 +93,11 @@ class SceneParser:
     def set_object_id(self, object_id):
         self.objectId = object_id
             
-    def clear_observations(self):
+    def clear_observations(self, wait = False):
         self.request_clear_object = True
+        while wait and self.request_clear_object:
+            rospy.sleep(0.1)
+        
     
     def clearAndWaitForNewObject(self, numberOfCopies = 10):
         rospy.loginfo("Clearing object location array")
@@ -101,6 +117,8 @@ class SceneParser:
         return True
     
     def get_latest_observation(self):
+        if len(self.objectLocArr) == 0:
+            return [np.inf, np.inf, np.inf, np.inf, np.inf], False
         object_properties = self.objectLocArr[-1]
         x, y, z, confidence, pred_time = object_properties
         isLive = False
@@ -205,7 +223,17 @@ class SceneParser:
                 self.current_detection = [x1, y1, x2, y2]
 
         return True
-            
+    
+    def convert_point_from_to_frame(self, x, y, z, from_frame, to_frame):
+        camera_point = PointStamped()
+        camera_point.header.frame_id = from_frame
+        camera_point.point.x = x
+        camera_point.point.y = y
+        camera_point.point.z = z
+        point = self.listener.transformPoint(to_frame, camera_point).point
+        return [point.x, point.y, point.z]
+        
+    
     def convertPointToFrame(self, x_f, y_f, z, to_frame = "base_link"):
         intrinsic = self.intrinsics
         fx = intrinsic[0][0]
@@ -254,6 +282,82 @@ class SceneParser:
         radius = np.sqrt(x**2 + y**2)
         
         return (angleToGo, x, y, z, radius), True
+    
+    
+    def reset_tsdf(self):
+        self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length= 0.01,
+            sdf_trunc=0.04,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+        )
+    
+    def get_pcd_from_tsdf(self, publish = False):
+        pcd = self.tsdf_volume.extract_point_cloud()
+        points = np.array(pcd.points)
+        points = points[points[:, 2] < 1.6]
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id = "base_link"  # Set your desired frame_id
+        msg = pcl2.create_cloud_xyz32(header, points)
+        self.obj_cloud_pub.publish(msg)
+        return pcd
+    
+    def capture_shot(self, publish = False):
+        
+        extrinsics = self.get_transform('camera_color_optical_frame', 'base_link')
+        extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+        object_properties, isLive = self.get_latest_observation()
+        if isLive:
+            x, y, z, confidence, _ = object_properties
+            detection = [x, y, z]
+            marker = Marker()
+            marker.header.frame_id = "base_link"
+            marker.header.stamp = rospy.Time.now()
+            marker.header.stamp = rospy.Time.now()
+
+            # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+            marker.type = 2
+            marker.id = 10
+
+            # Set the scale of the marker
+            marker.scale.x = 0.05
+            marker.scale.y = 0.05
+            marker.scale.z = 0.05
+
+            # Set the color
+            color=  [1, 0, 0]
+            center = detection
+            marker.color.r = color[0]
+            marker.color.g = color[1]
+            marker.color.b = color[2]
+            marker.color.a = 1
+
+            # Set the pose of the marker
+            marker.pose.position.x = center[0]
+            marker.pose.position.y = center[1]
+            marker.pose.position.z = center[2]
+            
+            quat = R.from_matrix(np.eye(3)).as_quat()
+            
+            marker.pose.orientation.x = quat[0]
+            marker.pose.orientation.y = quat[1]
+            marker.pose.orientation.z = quat[2]
+            marker.pose.orientation.w = quat[3]
+            self.marker_pub.publish(marker)
+
+        depthimg = self.depth_image.copy()
+        rgbimg = self.color_image.copy()  
+        depth = o3d.geometry.Image(depthimg)
+        color = o3d.geometry.Image(rgbimg.astype(np.uint8))
+        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            color, depth, depth_scale=1000, convert_rgb_to_intensity=False
+        )
+
+        self.tsdf_volume.integrate(
+                rgbd_image,
+                self.o3d_cam,
+                extrinsics)
+        
     
     def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask):
         """

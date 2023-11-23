@@ -43,7 +43,6 @@ class NavigationManager():
         rospy.loginfo(f"[{self.node_name}]:" + "Waiting for move_base server...")
         self.movebase_client.wait_for_server()
 
-        # self.moveback_client.wait_for_server()
         self.n_max_attempts = rospy.get_param("/navman/n_attempts", 3)
         self.n_attempts = 0
         self.last_update_time = time.time()
@@ -71,7 +70,6 @@ class NavigationManager():
         movebase_goal = MoveBaseGoal()
         
         movebase_goal.target_pose.header.frame_id = "map"
-
         # send goal
         movebase_goal.target_pose.pose.position.x = self.nav_goal_x
         movebase_goal.target_pose.pose.position.y = self.nav_goal_y        

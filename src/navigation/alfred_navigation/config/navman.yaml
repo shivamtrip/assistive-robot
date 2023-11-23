@@ -1,4 +1,4 @@
-n_attempts: 15
+n_attempts: 5
 
 des_obs_thresh : 10
 big_obs_thresh : 50

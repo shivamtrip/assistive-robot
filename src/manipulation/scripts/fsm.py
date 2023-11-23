@@ -1,7 +1,8 @@
 #! /usr/bin/env python3
 
 from manip_basic_control import ManipulationMethods
-from visual_servoing import AlignToObject
+# from visual_servoing import AlignToObject
+from advanced_servoing import AlignToObject
 import rospy
 import actionlib
 from enum import Enum
@@ -14,7 +15,7 @@ from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetect
 from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
 from scene_parser import SceneParser
-
+from planner.planner import Planner
 class States(Enum):
     IDLE = 0
     VISUAL_SERVOING = 1
@@ -57,10 +58,10 @@ class ManipulationFSM:
         self.stow_robot_service.wait_for_service()
         
         self.scene_parser = SceneParser()
+        self.planner = Planner()
 
-        self.visualServoing = AlignToObject(self.scene_parser)
+        self.visualServoing = AlignToObject(self.scene_parser, self.planner)
         self.manipulationMethods = ManipulationMethods()
-        
         
         self.server.start() # start server only after everything under this is initialized
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
@@ -99,7 +100,6 @@ class ManipulationFSM:
             
             offsets = self.offset_dict[self.label2name[self.goal.objectId]]
             
-            # offsets[1] -= 0.01 #constant safety factor
             
             grasp = (grasp_center + np.array(offsets)), grasp_yaw
             self.manipulationMethods.pick(
@@ -184,9 +184,8 @@ class ManipulationFSM:
                         self.reset()
                         return TriggerResult(success = False)
                     
-                    self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(nServoTriesAttempted) + " of " + str(nServoTriesAllowed) + " allowed."})
+                    self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
-                    self.visualServoing.recoverFromFailure()
 
             elif self.state == States.PICK:
                 self.state = States.WAITING_FOR_GRASP_AND_PLANE

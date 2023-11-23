@@ -1,6 +1,6 @@
 import numpy as np
 import heapq
-from base_planner import BasePlanner
+from planner.base_planner import BasePlanner
 
 
 class AStarPlanner(BasePlanner):

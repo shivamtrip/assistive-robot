@@ -46,9 +46,11 @@ class State(Enum):
 
 
 class AlignToObject:
-    def __init__(self, scene_parser : SceneParser):
+    def __init__(self, scene_parser : SceneParser, planner):
         self.node_name = 'visual_alignment'
         self.state = State.SEARCH
+        
+        self.planner = planner
         
         self.scene_parser = scene_parser
         self.pid_gains = rospy.get_param('/manipulation/pid_gains')
@@ -75,18 +77,27 @@ class AlignToObject:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
         
+        self.switch_to_navigation_mode = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        self.switch_to_navigation_mode.wait_for_service()
+        
+        self.switch_to_manipulation_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+        self.switch_to_manipulation_mode.wait_for_service()
+        
         self.forward_vel = rospy.get_param('/manipulation/forward_velocity')
         self.interval_before_restart = rospy.get_param('/manipulation/forward_velocity')
         
         self.obj_tf_publisher = tf.TransformBroadcaster()
-
+        
         rospy.loginfo(f"[{self.node_name}]: Initial images obtained.")
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
         self.prevtime = time.time()
         
+    def is_object_reachable(self, object_location, cloud):
+        nav_target, is_required = self.planner.plan_base(cloud, object_location)
+        return nav_target, is_required
+    
     
     def find_renav_location(self):
-        
         rospy.loginfo(f"[{self.node_name}]: Finding and orienting to object")
         
         move_to_pose(self.trajectoryClient, {
@@ -94,29 +105,21 @@ class AlignToObject:
             'head_pan;to' : self.vs_range[0],
         })
         rospy.sleep(2)
-        
-        nRotates = 0
+        self.scene_parser.reset_tsdf()
+        self.scene_parser.clear_observations(wait = True)
         while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
                 rospy.sleep(self.vs_range[3]) #settling time.
-
+                self.scene_parser.capture_shot()
+            
             [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
-            self.scene_parser.clear_observations()
-            if success:
-                self.objectLocation = [x, y, z]
-                rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
-                move_to_pose(self.trajectoryClient, {
-                    'base_rotate;by' : angleToGo,
-                    'head_pan;to' : 0,
-                })
-                
-                return True
-        
-        return False
-
+            self.objectLocation = [x, y, z]
+            cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
+            return self.objectLocation, cloud, success
+            
 
     def alignObjectForManipulation(self):
         """
@@ -133,17 +136,38 @@ class AlignToObject:
      
     def main(self):
         rospy.loginfo("Triggered Visual Servoing")
-        object_location, success = self.find_renav_location()
-        if success:
-            
-            pass
+        is_object_found = False
+        
+        while not is_object_found:
+            self.switch_to_manipulation_mode()
+            rospy.sleep(1)
+            object_location, cloud, is_object_found = self.find_renav_location()
+            rospy.loginfo("Object found: " + str(is_object_found))
+            if is_object_found:
+                target, is_nav_required = self.is_object_reachable(object_location, cloud)
+                rospy.loginfo("is_nav_required?: " + str(is_nav_required))
+                if not is_nav_required:
+                    return True
+                move_to_pose(self.trajectoryClient, {
+                    'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
+                    'head_pan;to' : 0,
+                })
+                # convert target to world frame
+                rospy.loginfo("new_to?: " + str(target))
+                target = self.scene_parser.convert_point_from_to_frame(target[0], target[1], 0, from_frame = 'base_link', to_frame = 'map')
+                self.switch_to_navigation_mode()
+                rospy.loginfo("new_to?: " + str(target))
+                self.navigation_client.send_goal(NavManGoal(
+                    x = target[0],
+                    y = target[1],
+                    theta = target[2],
+                ))
+                self.navigation_client.wait_for_result()
+            else:
+                # add behavior to recover from not finding the object.
+                # for now return false
+                return False
         return True
-    
-        
-    def reset(self):
-        self.state = State.SEARCH
-        
-    
 
 if __name__ == "__main__":
     # unit test

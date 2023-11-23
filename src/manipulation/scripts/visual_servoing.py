@@ -44,7 +44,7 @@ class State(Enum):
 
 
 class AlignToObject:
-    def __init__(self, scene_parser : SceneParser):
+    def __init__(self, scene_parser : SceneParser, planner = None):
         self.node_name = 'visual_alignment'
         self.state = State.SEARCH
         
