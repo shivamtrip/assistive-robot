@@ -102,6 +102,7 @@ class GraspDetector():
         self.depth_img = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
         self.color_img = self.bridge.imgmsg_to_cv2(color, desired_encoding="bgr8")
         self.obtainedInitialImages = True
+        print(rospy.get_rostime())
         
 
     def getCamInfo(self,msg):
@@ -267,6 +268,8 @@ class GraspDetector():
 
         color_img = self.color_img
         depth_img = self.depth_img
+        
+        cv2.imwrite('/home/praveen/alfred-autonomy/src/perception/grasp_detector/scripts/color_grasp.png',color_img)
 
         graspNetFailed = False
         if self.mode == 'graspnet':

@@ -1,6 +1,7 @@
 
 base_model: 'yolov8x.pt'
-custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/sodacan_tissue.pt'
+custom_model : '/home/praveen/alfred-autonomy/src/perception/object_detection/model/custom_model/best_new.pt'
+# custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/custom_model/best.pt'
 # custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/drawers.pt'
 
 subscribe_topic: '/camera/color/small_image'
@@ -15,14 +16,15 @@ device_2: 'cuda:1'
 
 class_list:
   # - 'drawer'
-  - 'soda_can'
-  - 'tissue_paper'
-  - 'toothbrush'
-  - 'tie'
-  - 'cell_phone'
-  - 'banana'
-  - 'apple'
-  - 'orange'
-  - 'bottle'
-  - 'cup'
-  - 'teddy_bear'
+  - 'soda_can' # 0
+  - 'tissue_paper' #1
+  - 'toothbrush' #2
+  - 'tie' #3
+  - 'cell phone' #4
+  - 'banana' #5
+  - 'apple' #6
+  - 'orange' #7
+  - 'bottle' #8
+  - 'cup' #9
+  - 'teddy bear' #10
+  - 'remote' #11

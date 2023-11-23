@@ -33,9 +33,11 @@ class ObjectDetectionNode:
         self.model = YOLO(rospy.get_param('/object_detection/base_model'))
         self.model.to(rospy.get_param('/object_detection/device_1'))
         
-        self.model_custom = YOLO(rospy.get_param('/object_detection/custom_model'))
         
+        self.model_custom = YOLO(rospy.get_param('/object_detection/custom_model'))
         self.model_custom.to(rospy.get_param('/object_detection/device_2'))
+        
+        print(self.model.names)
         
         rospy.loginfo(f"[{rospy.get_name()}] " + "Loaded model")
         self.visualize = rospy.get_param('/object_detection/visualize')
@@ -55,7 +57,7 @@ class ObjectDetectionNode:
         self.started_publishing = False
     
     def runModel(self, img, model, outputs):
-        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+
         results = model(img, show = False, verbose= False)
         
         if self.started_publishing == False:
@@ -78,7 +80,6 @@ class ObjectDetectionNode:
         h *= upscale_fac
         w *= upscale_fac
         for (b,cls, conf) in zip(box,box_cls, confs):
-            
             if model.names[cls.item()] in self.class_list:
                 
                 new_class_id = self.class_id_map[model.names[cls.item()]]
@@ -104,7 +105,7 @@ class ObjectDetectionNode:
     def mergeResults(self, results_coco, resultscustom, img):
         boxes1, classes1, confs1 = results_coco
         boxes2, classes2, confs2 = resultscustom
-        
+        # print(classes1, classes2)
         
         if len(boxes2) == 0:
             boxes = np.array(boxes1)
@@ -126,7 +127,7 @@ class ObjectDetectionNode:
                 cls = classes[i]
                 img = cv2.rectangle(img, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
                 
-                img = cv2.putText(img, str(cls),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
+                img = cv2.putText(img, str(self.class_list[cls]),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
                             0.5, (0,0,255), 1, cv2.LINE_AA)
                 
         
@@ -137,19 +138,23 @@ class ObjectDetectionNode:
     def callback(self,ros_rgb_image):
         self.last_image_time = time.time()
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
+        # rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+        rotated_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
         
+        image_time = ros_rgb_image.header.stamp
         
-        r1 = [None, None, None]
-        r2 = [None, None, None]
+        r1 = [[], [], []]
+        r2 = [[], [], []]
         
-        t1 = threading.Thread(target = self.runModel, args = (rgb_image, self.model, r1))
-        t2 = threading.Thread(target = self.runModel, args = (rgb_image, self.model_custom, r2))
+        t2 = threading.Thread(target = self.runModel, args = (rotated_image, self.model, r1))
+        t1 = threading.Thread(target = self.runModel, args = (rotated_image, self.model_custom, r2))
         t1.start()
         t2.start()
         
         t1.join()
         t2.join()   
 
+        
         boxes, classes, confs, annotated_img = self.mergeResults(r1, r2, rgb_image)
         # print("Boxes=", boxes)
         # print("Classes=", classes)
@@ -161,6 +166,8 @@ class ObjectDetectionNode:
         nPredictions = len(classes)
 
         msg = Detections()
+        # print(image_time)
+        msg.header.stamp = image_time
         msg.nPredictions  = nPredictions
         msg.box_bounding_boxes = boxes.tolist()
         msg.box_classes = classes.tolist()
@@ -170,8 +177,8 @@ class ObjectDetectionNode:
         
         if self.visualize:
             annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
-            annotated_img = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-            self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(annotated_img))
+            rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+            self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv2.rotate(annotated_img, cv2.ROTATE_90_CLOCKWISE)))
 
 
 
