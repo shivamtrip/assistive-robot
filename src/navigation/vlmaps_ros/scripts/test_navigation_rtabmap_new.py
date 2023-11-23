@@ -49,6 +49,7 @@ class TestTaskPlanner:
         self.data_dir = rospy.get_param('/vlmaps_robot/data_dir')
         self.cs =   rospy.get_param('/vlmaps_robot/cs')
         self.gs =  rospy.get_param('/vlmaps_robot/gs')
+        self.area_threshold_to_match = rospy.get_param('/vlmaps_robot/area_threshold_to_match')
         self.camera_height = rospy.get_param('/vlmaps_robot/camera_height')
         self.max_depth_value = rospy.get_param('/vlmaps_robot/max_depth_value')
         self.depth_sample_rate = rospy.get_param('/vlmaps_robot/depth_sample_rate')
@@ -125,8 +126,8 @@ class TestTaskPlanner:
 
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
-        safe_goal2D = self.get_2D_goals_rtabmap(outputs,label=obj1)
-        safe_movebase_goal = self.convertToMovebaseGoals(safe_goal2D)
+        safe_goal2D = self.get_2D_goal_rtabmap(outputs,label=obj1)
+        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
@@ -154,7 +155,7 @@ class TestTaskPlanner:
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
         for label in [obj1, obj2]:
-            goals2D.append(list(self.get_2D_goals_rtabmap(outputs,label=label)))
+            goals2D.append(list(self.get_2D_goal_rtabmap(outputs,label=label)))
         
         goals2D = np.mean(goals2D, axis=0,keepdims=False)
         theta = goals2D[2]
@@ -168,7 +169,7 @@ class TestTaskPlanner:
         else:
             safe_goal2D = (goals2D[0],goals2D[1],theta)
 
-        safe_movebase_goal = self.convertToMovebaseGoals(safe_goal2D)
+        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
@@ -177,6 +178,72 @@ class TestTaskPlanner:
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)
+
+    def move_object_closest_to(self, obj1, obj2):
+        """ Navigates to the object of category 'obj1' 
+        that is closest to the object of category 'obj2' """
+
+        for obj in zip(obj1, obj2):
+            if not obj in self.labels:
+                rospy.logwarn(f"[{rospy.get_name()}]:" +"Object {} not in vlmaps labels".format(obj))
+                rospy.loginfo(f"[{rospy.get_name()}]:" +"Adding {} to vlmaps labels".format(obj))
+                self.labels.append(" " + obj)
+
+        # Call vlmaps
+        self.vlmaps_caller.send_goal(self.labels)
+        rospy.sleep(0.5)
+        mask_list = self.vlmaps_caller.results
+        masks = np.array(mask_list)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Received {} masks from vlmaps".format(masks.shape[0]))
+
+        # Postprocess the results
+        outputs = postprocess_masks(masks,self.labels)
+        safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2)
+        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+        
+        # Send goal to movebase
+        self.navigate_to_location(safe_movebase_goal)
+        
+        if (self.show_vis):
+            self.show_vlmaps_results(mask_list,outputs,self.labels)
+
+    def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str)-> tuple:
+        """ Finds the object of category 'obj1' 
+        that is closest to the object of category 'obj2'"""
+
+        assert obj1 in results.keys(), "Object {} not found in the results {}".format(obj1, results.keys())
+        assert obj2 in results.keys(), "Object {} not found in the results {}".format(obj2, results.keys())
+
+        ### Get the largest bbox and find the centroid of the bbox
+        mask1 = results[obj1]['mask'].astype(np.uint8)
+        mask2 = results[obj2]['mask'].astype(np.uint8)
+        res = self.get_locations_dict_rtabmap(results,obj1)
+        goal2d_obj2 = self.get_2D_goal_rtabmap(results,obj2)
+        X2,Y2,theta2 = goal2d_obj2
+        dist_min = 100000
+
+        for i in range(res['x_locs'].shape[0]):
+            area = res['areas'][i]
+            if(area < self.area_threshold_to_match):
+                continue
+            X1,Y1, Z1 = res['x_locs'][i],res['y_locs'][i], res['z_locs'][i]
+            # find distance between x1,y1 and X2,Y2
+            dist = np.sqrt((X1-X2)**2 + (Y1-Y2)**2)
+            if(dist < dist_min):
+                dist_min = dist
+                X, Y, Z = X1,Y1,Z1
+        
+        # set 2d goal
+        X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
+        theta_goal =0
+        goal2D = (X,Y,theta_goal)
+        return goal2D
+
+
 
     def navigation_feedback(self, msg : MoveBaseFeedback):
         self.position = msg.base_position.pose.position
@@ -211,12 +278,9 @@ class TestTaskPlanner:
         tf_base2cam_path = os.path.join(add_params_dir, "rosbag_data_0tf_base2cam.txt")
         tf_base2cam = load_tf(tf_base2cam_path)
         return tf_base2cam
-
-    def get_2D_goals_rtabmap(self,results:dict,label:str)-> tuple:
-        """Returns the 2D goals from the vlmap in map frame"""
-
-        ########### WARNING: This is a hacky way to get the initial pose of the robot. Get Tfs from VLMaps ros action server instead ###########
-        #TODO: @ag6 - Get the initial pose of the robot and associated transforms from the vlmaps action server
+    
+    def transform_to_world_frame(self, pos_des_cam_frame: np.ndarray):
+        """Transforms the desired position from camera frame to world frame"""
 
         # ensure that file exists
         initial_pose_path = os.path.join(self.data_config_dir, 'amcl_pose.json')
@@ -237,27 +301,41 @@ class TestTaskPlanner:
         tf_camera_optical2pcd = get_tf_camera_optical2pcd()
         tf_base2cam = self.get_tf_base2cam()
 
-        assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
+        # Position in world frame
+        pos_des_world_frame = tf_world2rtabmap @ tf_rtabmap2base @ \
+                                tf_base2cam @ tf_camera_optical2pcd @ pos_des_cam_frame
+        assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
 
-        ### Get the largest bbox and find the centroid of the bbox
-        mask = results[label]['mask'].astype(np.uint8)
-        x,y  = find_centroid(results[label]['bboxes'])
+        return pos_des_world_frame
 
+    def convert_vlmap_id_to_world_frame(self, x,y):
+        
         # Vlmap to rtabmap world coordinate
         YY =0 # 2d navigation
         XX,ZZ = grid_id2pos(self.gs,self.cs,x,y)
         print("XX,YY,ZZ: ", XX,YY,ZZ)
         pos_des_cam_frame = np.array([XX,YY,ZZ,1]).reshape(-1,1)
 
-        # find euler angles from tf_base2cam
-        euler_angles = R.from_matrix(tf_base2cam[:3,:3]).as_euler('xyz', degrees=True)
-
         # Position in world frame
-        pos_des_world_frame = tf_world2rtabmap @ tf_rtabmap2base @ \
-                                tf_base2cam @ tf_camera_optical2pcd @ pos_des_cam_frame
+        pos_des_world_frame = self.transform_to_world_frame(pos_des_cam_frame)
         assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
 
         X, Y ,Z = pos_des_world_frame[:3,0]
+
+        return X,Y,Z
+
+    def get_2D_goal_rtabmap(self,results:dict,label:str)-> tuple:
+        """Returns a single 2D goal from the vlmap in map frame"""
+
+        ########### WARNING: This is a hacky way to get the initial pose of the robot. Get Tfs from VLMaps ros action server instead ###########
+        #TODO: @ag6 - Get the initial pose of the robot and associated transforms from the vlmaps action server
+
+        assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
+
+        ### Get the largest bbox and find the centroid of the bbox
+        mask = results[label]['mask'].astype(np.uint8)
+        x,y  = find_best_centroid(results[label]['bboxes'])
+        X, Y ,Z = self.convert_vlmap_id_to_world_frame(x,y)
         print("X,Y,Z (unfiltered): ", X,Y,Z)
         X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
         rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
@@ -267,22 +345,33 @@ class TestTaskPlanner:
         goal2D = (X,Y,theta)
 
         return goal2D
+    
+    def get_locations_dict_rtabmap(self,results:dict,label:str)-> tuple:
+        """Returns the 2D locations of all labels bboxes from the vlmap in 2D map frame"""
+        res={}
+        res['x_locs'] = []
+        res['y_locs'] = []
+        res['z_locs'] = []
+        res['areas'] = []
+        res['theta'] = []    
+        assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
 
-    def convertToMovebaseGoals(self,goals2D: tuple)-> MoveBaseGoal:
-        """Converts 2D goals to movebase goals"""
+        ### Get the largest bbox and find the centroid of the bbox
+        mask = results[label]['mask'].astype(np.uint8)
+        centroids_dict  = find_centroids(results[label]['bboxes'])
 
-        assert isinstance(goals2D, tuple), "goals2D should be of type tuple but found {}".format(type(goals2D))
-        assert len(goals2D) == 3, "goals2D should be of length 3 (x,y,theta) but found {}".format(len(goals2D))
+        # Vlmap to rtabmap world coordinate
+        for i in range(res['x_locs'].shape[0]):
+            X,Y,Z = self.convert_vlmap_id_to_world_frame(centroids_dict['x_locs'][i],centroids_dict['y_locs'][i])
+            theta=0
+            res['x_locs'].append(X)
+            res['y_locs'].append(Y)
+            res['z_locs'].append(Z)
+            res['theta'].append(theta)
+            res['areas'].append(centroids_dict['areas'][i])
 
-        goal = MoveBaseGoal()
-        goal.target_pose.header.frame_id = "map"
-        goal.target_pose.pose.position.x = goals2D[0]
-        goal.target_pose.pose.position.y = goals2D[1]
-        theta = goals2D[2]
-        quaternion = Quaternion(*tf.transformations.quaternion_from_euler(0.0, 0.0, math.radians(theta)))
-        goal.target_pose.pose.orientation = quaternion
+        return res
 
-        return goal
 
     def navigate_to_location(self, goal:MoveBaseGoal):
         """Navigates to the given location"""
@@ -335,7 +424,7 @@ class TestTaskPlanner:
         show_seg_mask(seg, patches)
         show_obstacle_map(obstacles)
 
-def find_centroid(bboxes: np.ndarray):
+def find_best_centroid(bboxes: np.ndarray):
     """Finds the centroid of the mask"""
 
     bboxes = np.array(bboxes)
@@ -352,6 +441,46 @@ def find_centroid(bboxes: np.ndarray):
     x,y  = (max_bbox[0] + max_bbox[2])/2, (max_bbox[1] + max_bbox[3])/2
 
     return x,y
+
+def find_centroids(bboxes: np.ndarray):
+    """Finds the centroids of the mask"""
+
+    centroids_dict={}
+
+    bboxes = np.array(bboxes)
+    bboxes = np.reshape(bboxes,(-1,4))
+    assert bboxes.shape[1] == 4, "bboxes should be of shape (N,4) but found {}".format(bboxes.shape)
+
+    # Find areas
+    areas = (bboxes[:,2] - bboxes[:,0]) * (bboxes[:,3] - bboxes[:,1])
+
+    # Find centroid
+    x_locs,y_locs  = (bboxes[:,0] + bboxes[:,2])/2, (bboxes[:,1] + bboxes[:,3])/2
+
+    assert x_locs.shape == (bboxes.shape[0],), "x_locs should be of shape (N,) but found {}".format(x_locs.shape)
+
+    centroids_dict['areas'] = areas
+    centroids_dict['x_locs'] = x_locs
+    centroids_dict['y_locs'] = y_locs
+
+    return centroids_dict
+
+
+def convertToMovebaseGoals(goals2D: tuple)-> MoveBaseGoal:
+    """Converts 2D goals to movebase goals"""
+
+    assert isinstance(goals2D, tuple), "goals2D should be of type tuple but found {}".format(type(goals2D))
+    assert len(goals2D) == 3, "goals2D should be of length 3 (x,y,theta) but found {}".format(len(goals2D))
+
+    goal = MoveBaseGoal()
+    goal.target_pose.header.frame_id = "map"
+    goal.target_pose.pose.position.x = goals2D[0]
+    goal.target_pose.pose.position.y = goals2D[1]
+    theta = goals2D[2]
+    quaternion = Quaternion(*tf.transformations.quaternion_from_euler(0.0, 0.0, math.radians(theta)))
+    goal.target_pose.pose.orientation = quaternion
+
+    return goal
 
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
