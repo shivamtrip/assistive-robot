@@ -239,9 +239,6 @@ def capture_shot():
         marker.pose.orientation.w = quat[3]
         marker_pub.publish(marker)
 
-        
-    
-    
     tsdf_volume.integrate(
             rgbd_image,
             cam,

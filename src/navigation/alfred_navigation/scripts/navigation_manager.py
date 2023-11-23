@@ -13,7 +13,7 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedb
 from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
 from moveback_recovery.msg import MovebackRecoveryAction, MovebackRecoveryGoal
 from utils import get_quaternion
-
+from costmap_callback import ProcessCostmap
 import time
 
 class NavigationManager():
@@ -36,6 +36,8 @@ class NavigationManager():
         self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, self.update_goal, False)
         self.movebase_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
+        self.costmap_processor = ProcessCostmap()
+        
         # self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
 
         rospy.loginfo(f"[{self.node_name}]:" + "Waiting for move_base server...")
@@ -54,12 +56,14 @@ class NavigationManager():
         
         rospy.loginfo(f"[{self.node_name}]:" + "Navigation Manager received goal from Task Planner")
 
-        self.nav_goal_x = goal.x
-        self.nav_goal_y = goal.y
+        x, y, z = self.costmap_processor.findNearestSafePoint(goal.x, goal.y, 0.0)
+        
+        self.nav_goal_x = x
+        self.nav_goal_y = y
         self.nav_goal_theta = goal.theta
         self.n_attempts = 0
+        
         self.navigate_to_goal()
-
 
 
     def navigate_to_goal(self):        
@@ -67,7 +71,7 @@ class NavigationManager():
         movebase_goal = MoveBaseGoal()
         
         movebase_goal.target_pose.header.frame_id = "map"
-        
+
         # send goal
         movebase_goal.target_pose.pose.position.x = self.nav_goal_x
         movebase_goal.target_pose.pose.position.y = self.nav_goal_y        
