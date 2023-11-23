@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import open3d as o3d
-from planner.astar_planner import AStarPlanner
-from planner.naive_planner import NaivePlanner
+# from planner.astar_planner import AStarPlanner
+# from planner.naive_planner import NaivePlanner
 
 class Planner:
     
@@ -11,7 +11,7 @@ class Planner:
 
         self.resolution = 0.05 #resolution for planning base and voxelizing/rasterizing point cloud
         self.radius_reachable = int(0.85 / self.resolution)
-        self.max_dist_traverse = int(1.3 / self.resolution)
+        self.max_dist_traverse = int(4 / self.resolution)
         self.characteristic_dist = 0.15 / self.resolution
         
         self.lengths = [
@@ -39,12 +39,12 @@ class Planner:
         h, w = img.shape[:2]
         sorted_points = points[np.argsort(points[:,2])]
 
-        def convert_point_to_img(x, y, offset = h//2):
+        def convert_point_to_img(x, y, offset = 0):
             x_ind = int((x - x_min)/self.resolution) + offset
             y_ind = int((y - y_min)/self.resolution) + offset
             return x_ind, y_ind
             
-        def convert_point_to_world(x, y, offset = h//2):
+        def convert_point_to_world(x, y, offset = 0):
             x = (x - offset) * self.resolution + x_min
             y = (y - offset) * self.resolution + y_min
             return x, y
@@ -88,9 +88,7 @@ class Planner:
         
         # pick the point with the highest distance
         base_loc = np.unravel_index(np.argmax(reachability_map), reachability_map.shape)
-
         img[:, :, 2][reachability_map != 0] = reachability_map[reachability_map!=0] * 255
-
         img = cv2.circle(img, (base_loc[0], base_loc[1])[::-1], 1, (0, 255, 255), -1)
 
 
@@ -99,7 +97,7 @@ class Planner:
         img = cv2.circle(img, convert_point_to_img(target[0], target[1])[::-1], 2, (255, 0, 0), -1)
         img = cv2.circle(img, convert_point_to_img(source[0], source[1])[::-1], self.max_dist_traverse, (0, 255, 0), 1)
 
-        cv2.imwrite("/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/new/reachability_map.png", img)        
+        cv2.imwrite("/home/hello-robot/alfred-autonomy/src/manipulation/scripts/tests/collision_boxes/reachability_map.png", img)        
         # we want base_dir to be perpendicular to the line joining base_loc and target
         
         base_loc = convert_point_to_world(base_loc[0], base_loc[1])

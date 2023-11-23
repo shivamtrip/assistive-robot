@@ -14,93 +14,12 @@ from std_msgs.msg import Header
 
 import sensor_msgs.point_cloud2 as pcl2
 from sensor_msgs.msg import PointCloud2, PointField
+from geometry_msgs.msg import PointStamped
 
 def get_rotation_mat(theta):
         return np.array([[np.cos(theta), -np.sin(theta), 0],
                             [np.sin(theta), np.cos(theta), 0],
                             [0, 0, 1]], dtype = np.float64)
-
-def get_collision_boxes(state, get_centers = False):
-    x, y, theta, z, phi, ext = state
-    boxes = []
-    dist_baselink_to_center = 0.11587
-    l1 = 0.25
-
-    arm_min_extension = 0.3
-    arm_dims = [0.1, ext + arm_min_extension, 0.1]
-    
-    gripper_length = 0.17
-    gripper_dims = [0.17, 0.17, 0.18] # slightly recessed to allow grasp center to reach object.
-    gripper_offset = [
-        0.22, #distance from arm start to gripper start.
-        0.09, # baseframe x offset to gripper hinge.
-        -0.035, # basefram y offset to gripper hinge
-        -gripper_dims[2] / 2, # gripper z offset
-    ]
-
-    base_z_offset = 0.093621
-    base_box_dims = [0.33, 0.35, 0.19]
-
-    base_center = np.array([
-        x - dist_baselink_to_center * np.cos(theta), 
-        y - dist_baselink_to_center * np.sin(theta), 
-        base_z_offset
-    ], dtype = np.float64).reshape(3, 1)
-    
-    base_box_o3d = o3d.geometry.OrientedBoundingBox(
-        center = base_center,
-        R = get_rotation_mat(theta).reshape(3, 3),
-        extent = np.array(base_box_dims, dtype = np.float64).reshape(3, 1)
-    )
-    boxes.append(base_box_o3d)
-    arm_center = np.array(
-        [
-            (- l1 * np.sin(theta) + (arm_min_extension + ext)* np.sin(theta))/2,
-            (l1 * np.cos(theta)  - (arm_min_extension + ext) * np.cos(theta))/2,
-            z + base_center[2][0]
-        ]
-    ).reshape(3, 1)
-    arm_center += base_center
-    
-    arm_box_o3d = o3d.geometry.OrientedBoundingBox(
-        center = arm_center,
-        R = get_rotation_mat(theta).reshape(3, 3),
-        extent = np.array(arm_dims, dtype = np.float64).reshape(3, 1)
-    )
-    
-    boxes.append(arm_box_o3d)
-    gripper_center = base_center + np.array([
-        (gripper_offset[0] + ext - l1/2) * np.sin(theta) + (gripper_length/2 + 0) * np.sin(theta + phi) + gripper_offset[1],
-        -(gripper_offset[0] + ext - l1/2) * np.cos(theta) - (gripper_length/2 + 0) * np.cos(theta + phi) + gripper_offset[2],
-        z + base_center[2][0] + gripper_offset[3]
-    ]).reshape(3, 1)
-    
-    gripper_box_o3d = o3d.geometry.OrientedBoundingBox(
-        center = gripper_center,
-        R = get_rotation_mat(theta + phi).reshape(3, 3),
-        extent = np.array(gripper_dims, dtype = np.float64).reshape(3, 1)
-    )
-    boxes.append(gripper_box_o3d)
-    centers = []
-    if get_centers:
-        center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
-        center.translate(base_center)
-        center.paint_uniform_color([0, 0, 1])
-        centers.append(center)
-        center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
-        center.translate(np.array([x, y, 0.09]))
-        center.paint_uniform_color([0, 0, 1])
-        centers.append(center)
-        center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
-        center.translate(gripper_center)
-        center.paint_uniform_color([0, 0, 1])
-        centers.append(center)
-        center = o3d.geometry.TriangleMesh.create_sphere(radius=0.03).compute_vertex_normals()
-        center.translate(arm_center)
-        center.paint_uniform_color([0, 0, 1])
-        centers.append(center)
-    
-    return boxes, centers
 
 def visualize_boxes_rviz(boxes, centers):
     colors = [
@@ -135,13 +54,8 @@ def visualize_boxes_rviz(boxes, centers):
         marker.pose.position.x = center[0]
         marker.pose.position.y = center[1]
         marker.pose.position.z = center[2]
-        
         ori = np.array(box.R)
-        
         quat = R.from_matrix(ori).as_quat()
-        
-        
-        
         marker.pose.orientation.x = quat[0]
         marker.pose.orientation.y = quat[1]
         marker.pose.orientation.z = quat[2]
@@ -209,8 +123,9 @@ def get_transform(listener, base_frame, camera_frame):
 
 
 
-def parse_scene(depth, rgb ):
-    global prevtime
+def parse_scene(depth, rgb, detection):
+    global latest_detection
+    global prevtime, rgbd_image, cam
     depth_img = bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
     depth_image = np.array(depth_img, dtype=np.float32)
 
@@ -227,7 +142,7 @@ def parse_scene(depth, rgb ):
     extrinsics = get_transform(listener, 'camera_color_optical_frame', 'base_link')
     extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
     
-    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+    rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
         color, depth, depth_scale=1000, convert_rgb_to_intensity=False
     )
     cam = o3d.camera.PinholeCameraIntrinsic()
@@ -235,56 +150,116 @@ def parse_scene(depth, rgb ):
     cam.width = color_image.shape[1]
     cam.height = color_image.shape[0]
     
-    cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
-        rgbd, cam, extrinsics
-    )
-    global scene_cloud
-    
-    cloud = cloud.voxel_down_sample(voxel_size=0.05)
-    points = np.array(cloud.points)
-    
-    # scene_cloud = points.copy()
-    scene_cloud = cloud
-    if time.time() - prevtime > 2:
-        header = Header()
-        header.stamp = rospy.Time.now()
-        header.frame_id = "base_link"  # Set your desired frame_id
-        msg = pcl2.create_cloud_xyz32(header, points)
-        obj_cloud_pub.publish(msg)
-        prevtime = time.time()
-        print("publishing ")
-    
-def execute_plan(plan):
-    waypoint = None
-    # x, y, theta, z, phi, ext
-    waits = [0.5, 0.1, 0.5, 0.5, 0.1, 0.5]
-    for i, waypoint in enumerate(plan):
-        boxes, centers = planner.get_collision_boxes(waypoint)
-        visualize_boxes_rviz(boxes, centers)     
-        rospy.loginfo("Sending waypoint")
-        idx_to_move = 0
-        for j in range(len(waypoint)):
-            if waypoint[j] != plan[i-1][j]:
-                idx_to_move = j
-                break
-        move_to_pose(trajectory_client, {
-            "base_translate;by" : waypoint[0],
-            "lift|;to" : waypoint[3],
-            "arm|;to" : waypoint[5],
-            "wrist_yaw|;to": waypoint[4],
-        })
-        rospy.sleep(waits[idx_to_move])
-        
-    if waypoint is None:
-        return
-    move_to_pose(trajectory_client, {
-        "lift|;to" : waypoint[3],
-        "arm|;to" : waypoint[5],
-        "wrist_yaw|;to": waypoint[4],
-    })
-        
+    num_detections = (detection.nPredictions)
+    msg = {
+        "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
+        "box_classes" : np.array(detection.box_classes).reshape(num_detections),
+        'confidences' : np.array(detection.confidences).reshape(num_detections),
+    }
+
+    loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == 8)[0]
 
 
+    if len(loc) > 0:
+        loc = loc[0]
+        box = np.squeeze(msg['boxes'][loc]).astype(int)
+        confidence = np.squeeze(msg['confidences'][loc])
+        x1, y1, x2, y2 =  box
+        crop = depth_image[y1 : y2, x1 : x2]
+                
+        z_f = np.median(crop[crop != 0])/1000.0
+        
+        x_f = (x1 + x2)/2
+        y_f = (y1 + y2)/2
+
+        point = convertPointToFrame(x_f, y_f, z_f, "base_link")
+        x, y, z = point.x, point.y, point.z
+        latest_detection = [x, y, z]
+        
+def convertPointToFrame( x_f, y_f, z, to_frame = "base_link"):
+    intrinsic = intrinsics
+    fx = intrinsic[0][0]
+    fy = intrinsic[1][1] 
+    cx = intrinsic[0][2] 
+    cy = intrinsic[1][2]
+
+    x_gb = (x_f - cx) * z/ fx
+    y_gb = (y_f - cy) * z/ fy
+
+    camera_point = PointStamped()
+    camera_point.header.frame_id = 'camera_color_optical_frame'
+    camera_point.point.x = x_gb
+    camera_point.point.y = y_gb
+    camera_point.point.z = z
+    point = listener.transformPoint(to_frame, camera_point).point
+    return point
+
+def capture_shot():
+    global rgbd_image, cam, latest_detection, detections
+    
+    extrinsics = get_transform(listener, 'camera_color_optical_frame', 'base_link')
+    extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
+
+    if latest_detection is not None:
+        detections.append(latest_detection)
+        
+        detection = np.mean(detections, axis = 0)
+        marker = Marker()
+        marker.header.frame_id = "base_link"
+        marker.header.stamp = rospy.Time.now()
+        marker.header.stamp = rospy.Time.now()
+
+        # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+        marker.type = 2
+        marker.id = 10
+
+        # Set the scale of the marker
+        marker.scale.x = 0.05
+        marker.scale.y = 0.05
+        marker.scale.z = 0.05
+
+        # Set the color
+        color=  [1, 0, 0]
+        center = detection
+        marker.color.r = color[0]
+        marker.color.g = color[1]
+        marker.color.b = color[2]
+        marker.color.a = 1
+
+        # Set the pose of the marker
+        marker.pose.position.x = center[0]
+        marker.pose.position.y = center[1]
+        marker.pose.position.z = center[2]
+        
+        quat = R.from_matrix(np.eye(3)).as_quat()
+        
+        marker.pose.orientation.x = quat[0]
+        marker.pose.orientation.y = quat[1]
+        marker.pose.orientation.z = quat[2]
+        marker.pose.orientation.w = quat[3]
+        marker_pub.publish(marker)
+
+        
+    
+    
+    tsdf_volume.integrate(
+            rgbd_image,
+            cam,
+            extrinsics)
+    
+    
+def get_pcd():
+    pcd = tsdf_volume.extract_point_cloud()
+    points = np.array(pcd.points)
+    points = points[points[:, 2] < 1.6]
+    header = Header()
+    header.stamp = rospy.Time.now()
+    header.frame_id = "base_link"  # Set your desired frame_id
+    msg = pcl2.create_cloud_xyz32(header, points)
+    obj_cloud_pub.publish(msg)
+    print("publishing ")
+    return pcd
+    
 if __name__ == '__main__':
     rospy.init_node('test')
     marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
@@ -297,9 +272,10 @@ if __name__ == '__main__':
     import sys
     sys.path.append('/home/alfred/alfred-autonomy/src/manipulation/scripts/')
     sys.path.append('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/planner')
+    from yolo.msg import Detections
     from naive_planner import NaivePlanner
     from astar_planner import AStarPlanner
-    
+    from planner import Planner
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
@@ -308,6 +284,10 @@ if __name__ == '__main__':
     bridge = cv_bridge.CvBridge()
     
     scene_cloud = None
+    rgbd_image = None
+    cam = None
+    latest_detection = None
+    detections = []
     
     listener = tf.TransformListener()
     
@@ -321,12 +301,13 @@ if __name__ == '__main__':
     rospy.Subscriber('/alfred/joint_states', JointState, callback)
     move_to_pose(trajectory_client, {
         "head_pan;to" : -np.pi/2,
-        "head_tilt;to" : -30 * np.pi/180,
+        "head_tilt;to" : -10 * np.pi/180,
     })
     rospy.sleep(2)
     
     depth_image_subscriber = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
     rgb_image_subscriber = message_filters.Subscriber('/camera/color/image_raw', Image)
+    detections_sub = message_filters.Subscriber('/object_bounding_boxes', Detections)
     
     obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
 
@@ -334,41 +315,32 @@ if __name__ == '__main__':
     intrinsics = np.array(msg.K).reshape(3,3)
 
     synced_messages = message_filters.ApproximateTimeSynchronizer([
-            depth_image_subscriber, rgb_image_subscriber,
+            depth_image_subscriber, rgb_image_subscriber,detections_sub
     ], 100, 0.5, allow_headerless=False)
     synced_messages.registerCallback(parse_scene)
     
+    tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
+        voxel_length= 0.01,
+        sdf_trunc=0.04,
+        color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+    )    
     
-    # x, y, theta, z, phi, ext
-    curstate = None
-    while curstate is None or scene_cloud is None:
-        rospy.loginfo("Waiting for populating vars")
+    rospy.loginfo("Waiting for stuff")
+    while cam is None or rgbd_image is None:
         rospy.sleep(0.1)
         
-    rospy.sleep(2)
-    
-    curstate[2] = 0
-    curstate[4] = 1 #stowed
-    print("START", curstate)
-    # exit()
-    goalstate = [0, 0.0, 0, 0.8, 0, 0.6]
-    planner = AStarPlanner(curstate, goalstate, scene_cloud)
-    
-    plan, success = planner.plan()
-    print("Plan: ", plan)
-    print("Success: ", success)
-
-    # x, y, theta, z, phi, ext
-    
-    execute_plan(plan)
-    rospy.sleep(2)
-    plan = plan[::-1]
-    execute_plan(plan)
-    
-    # stow_robot_service()
+    for i, angle in enumerate(np.linspace(-np.pi/2, np.pi/2, 13)):
+        move_to_pose(trajectory_client, {
+            'head_pan;to' : angle,
+        })
+        rospy.loginfo("Capturing shot %d" % i)
+        rospy.sleep(0.8) #settling time.
+        capture_shot()
         
-        
-        
+    cloud = get_pcd()
+    planner = Planner()
+    planner.plan_base(cloud,np.mean(detections, axis = 0))
+    
     
     
     try:
