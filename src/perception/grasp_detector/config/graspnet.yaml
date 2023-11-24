@@ -13,7 +13,8 @@ color_image_topic: "/camera/color/image_raw"
 
 
 # grasping strategy: one of ['graspnet', 'centroid']; TODO: GGCNN
-grasp_mode: 'centroid'
+# grasp_mode: 'centroid'
+grasp_mode: 'graspnet'
 
 # transform frame names
 tf_source_frame: 'camera_depth_optical_frame'
@@ -23,7 +24,7 @@ tf_publish_frame_name: 'grasp'
 
 # graspnet args
 checkpoint_path: '/home/praveen/ws1/src/perception/grasp_detector/scripts/checkpoint-rs.tar'
-model_device_name: 'cuda:0'
+model_device_name: 'cuda:3'
 num_point: 20000
 num_view: 300
 num_angle : 12 # shouldnt this be 1?????
