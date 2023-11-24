@@ -24,3 +24,21 @@ class_list:
   - 'bottle'
   - 'cup'
   - 'teddy_bear'
+
+
+
+detic:
+  annotation_topic: /camera/color/detic_annotated
+  config_path: /usr/local/lib/obj_det_env/Detic/configs/detectron/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.yaml
+  device: 'cuda:2'
+  weight_path: 'https://dl.fbaipublicfiles.com/detic/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.pth'
+  
+  vocab_name : 'lvis'
+  
+  custom_vocab: true
+  class_list: [
+      "toothbrush", "toothpaste",
+      "keys", 
+      "remote control", "cell phone", "watch",
+      "apple", "orange"
+  ]
