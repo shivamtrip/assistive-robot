@@ -104,21 +104,39 @@ class AlignToObjectAdvanced:
             'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
             'head_pan;to' : self.vs_range[0],
         })
+        
         rospy.sleep(2)
         # self.scene_parser.reset_tsdf()
-        self.scene_parser.clear_observations(wait = True)
+        
+        settling_time = self.vs_range[3]
         while not rospy.is_shutdown():
+            self.scene_parser.clear_observations(wait = True)
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
-                rospy.sleep(self.vs_range[3]) #settling time.
-                # self.scene_parser.capture_shot()
+                rospy.sleep(settling_time) #settling time.
+                self.scene_parser.capture_shot()
             
             [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
             self.objectLocation = [x, y, z]
-            # cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
-            cloud = None
+            move_to_pose(self.trajectoryClient, {   
+                'head_pan;to' : angleToGo,
+            })
+            
+            success = self.scene_parser.clearAndWaitForNewObject(10)
+
+            if not success:
+                settling_time += 1
+                continue
+            
+            self.scene_parser.capture_shot()
+            
+            [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
+            self.objectLocation = [x, y, z]
+            
+            cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
+            # cloud = None
             return self.objectLocation, cloud, success
             
 
@@ -127,14 +145,16 @@ class AlignToObjectAdvanced:
         Rotates base to align manipulator for grasping
         """
         rospy.loginfo(f"[{self.node_name}]: Aligning object for manipulation")
+        [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
         move_to_pose(self.trajectoryClient, {
                 'head_pan;to' : -np.pi/2,
-                'base_rotate;by' : np.pi/2,
+                'base_rotate;by' : angleToGo + np.pi/2,
             }
         )
         rospy.sleep(4)
         return True
-     
+    
+         
     def main(self):
         rospy.loginfo("Triggered Visual Servoing")
         is_object_found = False
@@ -145,19 +165,22 @@ class AlignToObjectAdvanced:
             object_location, cloud, is_object_found = self.find_renav_location()
             rospy.loginfo("Object found: " + str(is_object_found))
             if is_object_found:
-                # target, is_nav_required = self.is_object_reachable(object_location, cloud)
-                # theta = target[3]
+                target, is_nav_required = self.is_object_reachable(object_location, cloud)
+                
+                if not is_nav_required:
+                    rospy.loginfo("Object is reachable!")
+                    self.switch_to_manipulation_mode()
+                    self.alignObjectForManipulation()
+                    return True
+                    
                 target = object_location
                 theta = np.arctan2(target[1], target[0])
-                # rospy.loginfo("is_nav_required?: " + str(is_nav_required))
-                # if not is_nav_required:
-                #     return True
+
                 move_to_pose(self.trajectoryClient, {
                     'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
                     'head_pan;to' : 0,
                 })
                 # convert target to world frame
-                rospy.loginfo("new_to?: " + str(target))
                 self.scene_parser.publish_point(target, "point_a", frame = 'base_link')
                 target = self.scene_parser.convert_point_from_to_frame(target[0], target[1], target[2], from_frame = 'base_link', to_frame = 'map')
                 self.scene_parser.publish_point(target, "point_b", frame = 'map')
@@ -169,10 +192,11 @@ class AlignToObjectAdvanced:
                     y = target[1],
                     theta = theta
                 ))
-                self.navigation_client.wait_for_result()
+                wait = self.navigation_client.wait_for_result()
             else:
                 # add behavior to recover from not finding the object.
                 # for now return false
+                # request new search location from task_planner.
                 return False
         return True
 
@@ -182,7 +206,7 @@ if __name__ == "__main__":
     switch_to_manipulation.wait_for_service()
     switch_to_manipulation()
     rospy.init_node("align_to_object", anonymous=True)
-    node = AlignToObject(8)
+    node = AlignToObjectAdvanced(8)
     # node.main(8)
     node.findAndOrientToObject()
     # node.moveTowardsObject()

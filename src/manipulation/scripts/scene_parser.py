@@ -131,7 +131,7 @@ class SceneParser:
         if len(self.objectLocArr) == 0:
             return [np.inf, np.inf, np.inf, np.inf, np.inf], False
         object_properties = self.objectLocArr[-1]
-        x, y, z, confidence, pred_time = object_properties
+        x, y, z, r, p, y, confidence, pred_time = object_properties
         isLive = False
         
         if time.time() - pred_time < self.time_diff_for_realtime:
@@ -205,7 +205,7 @@ class SceneParser:
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
                 # print(x, y, z, x_f, y_f, z_f)
-                self.objectLocArr.append((x, y, z, confidence, time.time()))
+                self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
                 
                 self.current_detection = [x1, y1, x2, y2]
 
@@ -328,9 +328,9 @@ class SceneParser:
         return (angleToGo, x, y, z, radius), True
     
     
-    def reset_tsdf(self):
+    def reset_tsdf(self, resolution = 0.05):
         self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length= 0.01,
+            voxel_length= resolution,
             sdf_trunc=0.04,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )

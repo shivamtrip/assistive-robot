@@ -227,6 +227,13 @@ class ManipulationMethods:
 
         print("reading distance",msg.data)
         self.grip_dist = msg.data
+        
+    def reorient_base(self, trajectoryClient, angle):
+        
+        move_to_pose(trajectoryClient, {
+            'base_rotate;to' : angle
+        })
+        rospy.sleep(3)
 
     def open_drawer(self, trajectoryClient, x, y, z):
         

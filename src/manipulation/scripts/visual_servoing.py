@@ -228,7 +228,7 @@ class AlignToObject:
         curvel = 0.0
         prevsettime = time.time()
         while len(moving_avg_err) <= moving_avg_n and  mean_err > self.mean_err_horiz_alignment:
-            [x, y, z, conf, pred_time], isLive = self.scene_parser.get_latest_observation()
+            [x, y, z, r, p, y, conf, pred_time], isLive = self.scene_parser.get_latest_observation()
             # if isLive:
             rospy.loginfo("Time since last detection = {}".format(time.time() - pred_time))
             xerr = (x - ee_pose_x)

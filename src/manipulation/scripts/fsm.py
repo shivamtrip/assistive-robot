@@ -38,6 +38,7 @@ class ManipulationFSM:
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
+        self.drawer_location = None
 
         
         self.class_list = rospy.get_param('/object_detection/class_list')
@@ -108,15 +109,12 @@ class ManipulationFSM:
                 self.heightOfObject = 0.2 #default height of object if plane is not detected
             
             offsets = self.offset_dict[self.label2name[self.goal.objectId]]
-            
-            
             grasp = (grasp_center + np.array(offsets)), grasp_yaw
             self.manipulationMethods.pick(
                 self.trajectoryClient, 
                 grasp,
                 moveUntilContact = self.isContactDict[self.label2name[self.goal.objectId]]
             ) 
-
             success = self.scene_parser.is_grasp_success()
             return success
         return False
@@ -151,15 +149,23 @@ class ManipulationFSM:
             return False
         
     def open_drawer(self):
-        # self.manipulationMethods.open_drawer()
-        # TODO
-        pass
+        isLive = False
+        while not isLive:
+            (angleToGo, x, y, z, radius), isLive = self.scene_parser.get_latest_observation()
+            rospy.sleep(0.5)
+        if isLive:
+            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
+            self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
+            self.drawer_location = (x, y, z, angleToGo)
+            return True
+        return False
     
     def close_drawer(self):
-        # self.manipulationMethods.close_drawer()
-        # TODO
-        pass
-    
+        if self.drawer_location:
+            (x, y, z, angleToGo) = self.drawer_location
+            self.manipulationMethods.close_drawer(self.trajectoryClient, x, y, z)
+            self.drawer_location = None
+            return True
 
     def manipulate_object(self, goal : TriggerGoal):
         self.goal = goal
@@ -326,12 +332,12 @@ class ManipulationFSM:
             elif self.state == States.CLOSE_DRAWER:
                 success = self.close_drawer()
                 if success:
-                    self.send_feedback({'msg' : "Pick succeeded! "})
+                    self.send_feedback({'msg' : "Close succeeded! "})
                     self.state =  States.COMPLETE
                 else:
-                    self.send_feedback({'msg' : "Pick failed. Reattempting."})
+                    self.send_feedback({'msg' : "Close failed. Reattempting."})
                     if self.nPickTriesAttempted >= self.nPickTriesAllowed:
-                        self.send_feedback({'msg' : "Pick failed. Cannot grasp successfully. Aborting."})
+                        self.send_feedback({'msg' : "Close failed. Cannot grasp successfully. Aborting."})
                         self.reset()
                         return TriggerResult(success = False)
                     
