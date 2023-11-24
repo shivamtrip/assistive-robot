@@ -153,11 +153,12 @@ class ManipulationFSM:
     def open_drawer(self):
         # self.manipulationMethods.open_drawer()
         # TODO
-        
+        pass
     
     def close_drawer(self):
         # self.manipulationMethods.close_drawer()
         # TODO
+        pass
     
 
     def manipulate_object(self, goal : TriggerGoal):
