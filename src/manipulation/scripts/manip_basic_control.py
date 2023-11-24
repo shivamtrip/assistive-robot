@@ -33,11 +33,21 @@ class ManipulationMethods:
         self.grip_dist_sub  = rospy.Subscriber('/manipulation/distance', std_msgs.msg.Int32, self.get_grip_dist)
 
         self.grip_dist=None
-        self.contact_threshold = 7
+        self.contact_threshold = {
+            'joint_lift' : 7,
+            'joint_arm' : 20,
+        }
         self.av_effort = 20
         self.av_effort_window_size = 3
-        self.states = [0 for i in range(self.av_effort_window_size)]
-        self.efforts = [0 for i in range(self.av_effort_window_size)]
+        
+        self.states = {
+            'joint_lift' : [0 for i in range(self.av_effort_window_size)],
+            'joint_arm' : [0 for i in range(self.av_effort_window_size)],
+        }
+        self.efforts =  {
+            'joint_lift' : [0 for i in range(self.av_effort_window_size)],
+            'joint_arm' : [0 for i in range(self.av_effort_window_size)],
+        }
 
         rospy.Subscriber('/alfred/joint_states', JointState, self.callback)
         self.cur_robot_state = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -60,34 +70,46 @@ class ManipulationMethods:
                 continue
     
     def callback(self, msg, verbose = False):
-        for i in range(len(msg.name)):
-            if msg.name[i] == 'joint_lift':
-                effort = msg.effort[i]
-                self.states.append(msg.position[i])
-                self.efforts.append(msg.effort[i])
-                self.states.pop(0)
-                self.efforts.pop(0)
+        arm_efforts = 0
+        for i, k in enumerate(msg.name):
+            if k == 'joint_lift':
+                self.states[k].append(msg.position[i])
+                self.efforts[k].append(msg.effort[i])
+                self.states[k].pop(0)
+                self.efforts[k].pop(0)
                 
-                av_effort = np.mean(self.efforts)
-                if av_effort < self.contact_threshold:
+                av_effort = np.mean(self.efforts[k])
+                if av_effort < self.contact_threshold[k]:
                     self.isContact = True
                     print("Lift effort is too low: {}, there is contact".format(av_effort))
                 else:
                     self.isContact = False
                     
-        for i, k in enumerate(msg.name):
+                self.cur_robot_state[3] += msg.position[i]
             
             if 'arm' in k:
-                self.cur_robot_state[5] += msg.position[i]
+                arm_efforts += abs(msg.effort[i])
+                
             if 'wrist' in k:
                 self.cur_robot_state[4] += msg.position[i]
-            if k == 'joint_lift':
-                self.cur_robot_state[3] += msg.position[i]
+                
             # if k == "joint_head_pan":
             #     final_state[2] -= msg.position[i]
+            
+        self.efforts['joint_arm'].append(arm_efforts / 5)
+        self.efforts['joint_arm'].pop(0)
         
+        av_effort = np.mean(self.efforts['joint_arm'])
+        if av_effort > self.contact_threshold['joint_arm']:
+            self.isContact = True
+            print("Arm effort is too high: {}, there is contact".format(av_effort))
+        else:
+            self.isContact = False
+
         transform = self.get_transform('link_arm_l4', 'link_arm_l0')
+        self.states['joint_arm'].append(self.cur_robot_state[5])
         self.cur_robot_state[5] = np.linalg.norm(transform[:3, 3])
+        
         if verbose:
             debug_state = {
                 "x" : self.cur_robot_state[0],
@@ -206,22 +228,96 @@ class ManipulationMethods:
         print("reading distance",msg.data)
         self.grip_dist = msg.data
 
-    
+    def open_drawer(self, trajectoryClient, x, y, z):
         
-    def move_until_contact(self, trajectory_client, pose):
+        move_to_pose(trajectory_client, {
+            "lift;to" : z + 0.02,
+            'wrist_yaw;to' : np.pi/2, 
+            "head_pan;to" : -np.pi/2,
+            "head_tilt;to" : -30 * np.pi/180,
+            'arm;to' : 0.02,
+        })
+        move_to_pose(trajectory_client, {
+            "stretch_gripper;to" : 100,
+        })
+        
+        self.move_until_contact_arm(trajectory_client, {
+            'arm;to' : y + 0.05,
+        })
+        
+        move_to_pose(trajectoryClient, {
+            'lift;by' : -0.02,
+        })
+        move_to_pose(trajectoryClient, {
+            'arm;by' : -0.3,
+        })
+        
+        return self.states['joint_arm'][-1]
+    
+    
+    def close_drawer(self, trajectoryClient, x, y, z):
+        move_to_pose(trajectoryClient, {
+            'base_translate;by' : x
+        })
+        move_to_pose(trajectoryClient, {
+            'arm;to' : y,
+        })
+        self.move_until_contact_lift(trajectoryClient, {
+            'lift;to' : z - 0.01
+        })
+        
+        self.move_until_contact_arm(trajectoryClient, {
+            'arm;to' : 1,
+        })
+        
+        move_to_pose(trajectoryClient, {
+            'lift;by' : 0.02,
+        })
+        
+        move_to_pose(trajectoryClient, {
+            "arm;to" : 0.02,
+            "lift;to" : 0.4,
+            'wrist_yaw;to' : np.pi
+        })
+        
+        rospy.sleep(1)
+        
+        
+    def move_until_contact_arm(self, trajectory_client, pose):
         """Function to move the robot until contact is made with the table
 
         Args:
             trajectory_client (actionserver): Client for the trajectory action server
             pose (dict): Dictionary of the pose to move to
         """
-        while len(self.states) == 0:
-            rospy.sleep(0.5)
-            
-        curz = self.states[-1]
+        curarm = self.states['joint_arm'][-1]
+        self.isContact = False
+        while not self.isContact or curarm >= pose['arm;to']:
+            curarm = self.states['joint_arm'][-1]
+            if self.isContact:
+                break
+
+            move_to_pose(trajectory_client, {
+                'arm;by': 0.01,
+            }, asynchronous = True)
+
+            rospy.sleep(0.05)
+
+        move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
+            'arm;by': -0.01,
+        })    
+    
+    def move_until_contact_lift(self, trajectory_client, pose):
+        """Function to move the robot until contact is made with the table
+
+        Args:
+            trajectory_client (actionserver): Client for the trajectory action server
+            pose (dict): Dictionary of the pose to move to
+        """
+        curz = self.states['joint_lift'][-1]
         self.isContact = False
         while not self.isContact or curz >= pose['lift;to']:
-            curz = self.states[-1]
+            curz = self.states['joint_lift'][-1]
             if self.isContact:
                 break
             move_to_pose(trajectory_client, {
@@ -281,7 +377,7 @@ class ManipulationMethods:
         # rospy.sleep(5)
 
         if moveUntilContact:
-            self.move_until_contact(
+            self.move_until_contact_lift(
                 trajectoryClient,
                 {
                     "lift;to": z_g - 0.2,
@@ -346,7 +442,7 @@ class ManipulationMethods:
             }
         )
         # rospy.sleep(5)
-        self.move_until_contact(
+        self.move_until_contact_lift(
             trajectoryClient,
             {
                 "lift;to": z - 0.2,

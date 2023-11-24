@@ -74,8 +74,8 @@ class GraspGenerator:
         y2 = bbox[3]
         self.workspace_mask = np.zeros((color.shape[0],color.shape[1]),dtype=np.uint8)
         self.workspace_mask[
+            y1-inflate:y2 - inflate,
             x2-inflate:x1+inflate,
-            y1-inflate:y2 - inflate
         ] = 255
 
         factor_depth = 1000

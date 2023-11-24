@@ -1,0 +1,12 @@
+#input  
+bool to_open 
+int64 aruco_id
+float32[] saved_position
+---
+#output
+bool success
+float32[] saved_position
+---
+#feedback
+int64 curState
+string curStateInfo

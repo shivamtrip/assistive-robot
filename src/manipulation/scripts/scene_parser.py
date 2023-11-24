@@ -58,7 +58,12 @@ class SceneParser:
             'height' : msg.height,
             'intrinsics' : np.array(msg.K).reshape(3,3),
             'focal_length' : self.intrinsics[0][0],
+            "distortion_coefficients" : np.array(msg.D).reshape(5,1),
         }
+        
+        self.dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
+        self.arucoParams = cv2.aruco.DetectorParameters_create()
+        
         
         cam = o3d.camera.PinholeCameraIntrinsic()
         cam.intrinsic_matrix = self.intrinsics
@@ -69,6 +74,7 @@ class SceneParser:
         
         rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
+        self.parse_mode = ("YOLO", None)
         
         
         starttime = time.time()
@@ -88,17 +94,22 @@ class SceneParser:
 
         rospy.loginfo("Scene parser initialized")
 
-            
-            
-    def set_object_id(self, object_id):
-        self.objectId = object_id
-            
+    def set_parse_mode(self, mode, id = None):
+        """
+        track mode = "ARUCO" or mode = "YOLO"
+        id is the object to track or the id of the aruco marker
+        """
+        self.parse_mode = mode
+        self.objectId = id
+        self.clear_observations(wait = True)
+
+    
+                     
     def clear_observations(self, wait = False):
         self.request_clear_object = True
         while wait and self.request_clear_object:
             rospy.sleep(0.1)
-        
-    
+            
     def clearAndWaitForNewObject(self, numberOfCopies = 10):
         rospy.loginfo("Clearing object location array")
         self.request_clear_object = True
@@ -127,7 +138,6 @@ class SceneParser:
             isLive = True
         
         return object_properties, isLive
-
     
     def is_grasp_success(self):
         """Checks if the grasp was successful or not
@@ -138,41 +148,18 @@ class SceneParser:
         # returns true perenially for now since grasp success recognition is disabled.
         return True
     
-    def parse_scene(self, depth, rgb , detection):
-        self.obtained_initial_images = True
-        # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
-        
-        # self.prevtime = time.time()
-        
-        # convert images to numpy arrays
-        depth_img = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
-        self.depth_image = np.array(depth_img, dtype=np.float32)
-        
-        color_img = self.bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
-        self.color_image = np.array(color_img, dtype=np.uint8)
-        
-        
+    def parse_detections(self, detection):
         # get object detections
+        
+
         num_detections = (detection.nPredictions)
         msg = {
             "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
             "box_classes" : np.array(detection.box_classes).reshape(num_detections),
             'confidences' : np.array(detection.confidences).reshape(num_detections),
         }
-        
-        
-        # to ensure thread safe behavior, writing happens only in this function on a separate thread
-        if self.request_clear_object:
-            self.request_clear_object = False
-            self.objectLocArr = []
-        
-        
-        if self.objectId is None:
-            return False # no object id set
 
         loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
-        
-        
         if len(loc) > 0:
             loc = loc[0]
             box = np.squeeze(msg['boxes'][loc]).astype(int)
@@ -219,9 +206,60 @@ class SceneParser:
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
                 # print(x, y, z, x_f, y_f, z_f)
                 self.objectLocArr.append((x, y, z, confidence, time.time()))
-        
+                
                 self.current_detection = [x1, y1, x2, y2]
 
+    def parse_aruco(self, image):
+        
+        (corners, ids, _) = cv2.aruco.detectMarkers(image, 
+                                                    self.dictionary,
+                                                    parameters=self.arucoParams
+                                                    )
+        intrinsics = self.cameraParams['intrinsics']
+        distorition_coefficients = self.cameraParams['distortion_coefficients']
+        if ids is not None:
+
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, 0.05, cameraMatrix=intrinsics, distCoeffs=distorition_coefficients)
+            for rvec, tvec, id in zip(rvecs, tvecs, ids):
+                if id == self.objectId: # looking only for a single ID please.
+      
+                    quat = cv2.Rodrigues(rvec)[0]
+                    quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
+                    quaternion = quaternion/np.linalg.norm(quaternion)
+                    self.tf_broadcaster.sendTransform((tvec[0][0], tvec[0][1], tvec[0][2]),quaternion,rospy.Time.now(),"aruco_pose" + str(id),"camera_color_optical_frame")
+                    
+                    roll, pitch, yaw = tf.transformations.euler_from_quaternion(quaternion)
+                    x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
+                    self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
+                    self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
+                    
+
+    def parse_scene(self, depth, rgb , detection):
+        self.obtained_initial_images = True
+        # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
+        
+        # self.prevtime = time.time()
+        
+        # convert images to numpy arrays
+        depth_img = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
+        self.depth_image = np.array(depth_img, dtype=np.float32)
+        
+        color_img = self.bridge.imgmsg_to_cv2(rgb, desired_encoding="passthrough")
+        self.color_image = np.array(color_img, dtype=np.uint8)
+        
+        if self.request_clear_object:
+            self.request_clear_object = False
+            self.objectLocArr = []
+        
+        
+        if self.objectId is None:
+            return False # no object id set
+        
+        if self.parse_mode == "ARUCO":
+            self.parse_aruco(rgb)
+        elif self.parse_mode == "YOLO":
+            self.parse_detections(detection)
+        
         return True
     
     def convert_point_from_to_frame(self, x, y, z, from_frame, to_frame):
@@ -271,14 +309,20 @@ class SceneParser:
     
     def estimate_object_location(self):
         objectLocs = np.array(self.objectLocArr)
+        
         if len(objectLocs) == 0:
             return [np.inf, np.inf, np.inf, np.inf, np.inf], False
 
-        weights = objectLocs[:, 3]
+        weights = objectLocs[:, 6]
+        # x, y, z, r, p, y, conf, time
         x = np.average(objectLocs[:, 0], weights = weights)
         y = np.average(objectLocs[:, 1], weights = weights)
         z = np.average(objectLocs[:, 2], weights = weights)
-        angleToGo = np.arctan2(y, x)
+        
+        if self.mode ==  "ARUCO":
+            angleToGo = np.average(objectLocs[:, 5], weights = weights)
+        elif self.mode == "YOLO":
+            angleToGo = np.arctan2(y, x) #orient to face the aruco
         radius = np.sqrt(x**2 + y**2)
         
         return (angleToGo, x, y, z, radius), True
@@ -738,7 +782,6 @@ if __name__ == "__main__":
     rospy.init_node("scene_parser")
     import json
     parser = SceneParser()
-    parser.set_object_id(0)
     
     rospy.spin()
     # idx = str(12).zfill(6)

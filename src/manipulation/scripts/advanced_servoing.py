@@ -45,7 +45,7 @@ class State(Enum):
     FAILED = -1
 
 
-class AlignToObject:
+class AlignToObjectAdvanced:
     def __init__(self, scene_parser : SceneParser, planner):
         self.node_name = 'visual_alignment'
         self.state = State.SEARCH
