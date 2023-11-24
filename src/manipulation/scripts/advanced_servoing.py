@@ -105,7 +105,7 @@ class AlignToObject:
             'head_pan;to' : self.vs_range[0],
         })
         rospy.sleep(2)
-        self.scene_parser.reset_tsdf()
+        # self.scene_parser.reset_tsdf()
         self.scene_parser.clear_observations(wait = True)
         while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
@@ -113,11 +113,12 @@ class AlignToObject:
                     'head_pan;to' : angle,
                 })
                 rospy.sleep(self.vs_range[3]) #settling time.
-                self.scene_parser.capture_shot()
+                # self.scene_parser.capture_shot()
             
             [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
             self.objectLocation = [x, y, z]
-            cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
+            # cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
+            cloud = None
             return self.objectLocation, cloud, success
             
 
@@ -144,23 +145,29 @@ class AlignToObject:
             object_location, cloud, is_object_found = self.find_renav_location()
             rospy.loginfo("Object found: " + str(is_object_found))
             if is_object_found:
-                target, is_nav_required = self.is_object_reachable(object_location, cloud)
-                rospy.loginfo("is_nav_required?: " + str(is_nav_required))
-                if not is_nav_required:
-                    return True
+                # target, is_nav_required = self.is_object_reachable(object_location, cloud)
+                # theta = target[3]
+                target = object_location
+                theta = np.arctan2(target[1], target[0])
+                # rospy.loginfo("is_nav_required?: " + str(is_nav_required))
+                # if not is_nav_required:
+                #     return True
                 move_to_pose(self.trajectoryClient, {
                     'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
                     'head_pan;to' : 0,
                 })
                 # convert target to world frame
                 rospy.loginfo("new_to?: " + str(target))
-                target = self.scene_parser.convert_point_from_to_frame(target[0], target[1], 0, from_frame = 'base_link', to_frame = 'map')
+                self.scene_parser.publish_point(target, "point_a", frame = 'base_link')
+                target = self.scene_parser.convert_point_from_to_frame(target[0], target[1], target[2], from_frame = 'base_link', to_frame = 'map')
+                self.scene_parser.publish_point(target, "point_b", frame = 'map')
                 self.switch_to_navigation_mode()
                 rospy.loginfo("new_to?: " + str(target))
+                
                 self.navigation_client.send_goal(NavManGoal(
                     x = target[0],
                     y = target[1],
-                    theta = target[2],
+                    theta = theta
                 ))
                 self.navigation_client.wait_for_result()
             else:

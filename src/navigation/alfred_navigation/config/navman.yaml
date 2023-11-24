@@ -1,6 +1,7 @@
-n_attempts: 5
+n_attempts: 0
 
 des_obs_thresh : 10
 big_obs_thresh : 50
 
-costmap_topic : '/move_base/global_costmap/costmap'
+global_costmap_topic : '/move_base/global_costmap/costmap'
+local_costmap_topic : '/move_base/local_costmap/costmap'

@@ -10,8 +10,8 @@ class Planner:
     def __init__(self):
 
         self.resolution = 0.05 #resolution for planning base and voxelizing/rasterizing point cloud
-        self.radius_reachable = int(0.85 / self.resolution)
-        self.max_dist_traverse = int(1.3 / self.resolution)
+        self.radius_reachable = int(1.5/ self.resolution)
+        self.max_dist_traverse = int(5 / self.resolution)
         self.characteristic_dist = 0.15 / self.resolution
         
         self.lengths = [
@@ -106,13 +106,12 @@ class Planner:
             [
                 base_loc[0],
                 base_loc[1],
-                0,
+                0.85,
                 base_theta
             ]
         )
         return navigation_target, is_plan_reqd
-    
-    
+
     
     def get_state_from_ee_target(self, ee_target):
         tx, ty, tz = ee_target

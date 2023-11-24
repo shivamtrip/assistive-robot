@@ -205,12 +205,12 @@ class SceneParser:
             point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
             x, y, z = point.x, point.y, point.z
             # print(x, y, z)
-            # self.tf_broadcaster.sendTransform((x, y, z),
-            #     tf.transformations.quaternion_from_euler(0, 0, 0),
-            #     rospy.Time.now(),
-            #     "object_pose",
-            #     "base_link"
-            # )
+            self.tf_broadcaster.sendTransform((x, y, z),
+                tf.transformations.quaternion_from_euler(0, 0, 0),
+                rospy.Time.now(),
+                "object_pose",
+                "base_link"
+            )
             
             
             radius = np.sqrt(x**2 + y**2)
@@ -302,8 +302,18 @@ class SceneParser:
         self.obj_cloud_pub.publish(msg)
         return pcd
     
+    def publish_point(self, point, name = "point", frame = "base_link"):
+        self.tf_broadcaster.sendTransform((point[0], point[1], point[2]),
+            tf.transformations.quaternion_from_euler(0, 0, 0),
+            rospy.Time.now(),
+            name,
+            frame
+        )
+        
+    
     def capture_shot(self, publish = False):
         
+        rospy.sleep(0.1)
         extrinsics = self.get_transform('camera_color_optical_frame', 'base_link')
         extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
         object_properties, isLive = self.get_latest_observation()

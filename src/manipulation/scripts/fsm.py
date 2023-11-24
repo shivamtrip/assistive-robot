@@ -186,7 +186,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
-
+                self.state = States.COMPLETE
             elif self.state == States.PICK:
                 self.state = States.WAITING_FOR_GRASP_AND_PLANE
                 self.send_feedback({'msg' : "moving to pregrasp pose"})

@@ -10,24 +10,70 @@ from scipy.spatial.transform import Rotation as R
 from nav_msgs.msg import OccupancyGrid
 import numpy as np
 import matplotlib.pyplot as plt
-
+import cv2
 class ProcessCostmap():
 
-    def __init__(self,):
+    def __init__(self, update_callback):
 
-        self.costmap_topic = rospy.get_param('/navigation/costmap_topic')
-
-        data = rospy.wait_for_message(self.costmap_topic, OccupancyGrid)
-        self.costmap = np.array(data.data).reshape((data.info.height, data.info.width))
-        self.costmap_info = data.info
+        self.goal = None
+        self.update_callback = update_callback
+        self.costmap = None
+        self.costmap_info = None
+        
+        self.costmap_sub = rospy.Subscriber(rospy.get_param('/navigation/global_costmap_topic'), OccupancyGrid, self.costmap_callback)
+        # self.costmap = 
+        while self.costmap is None and not rospy.is_shutdown():
+            rospy.loginfo("Waiting for global costmap...")
+            rospy.sleep(1)
         rospy.loginfo("Received global costmap...")
         
         # Obstacle threshold
         self.des_obs_thresh = rospy.get_param('/navigation/des_obs_thresh')
         self.big_obs_thresh = rospy.get_param('/navigation/big_obs_thresh')
+        
 
         rospy.loginfo("Costmap processor initialized!!")
+        
+        
+        
+        
+    def set_goal(self, goal):
+        self.goal = goal
 
+    def costmap_callback(self, msg):
+        """ Callback function to receive costmap """
+
+        self.costmap = np.array(msg.data).reshape((msg.info.height, msg.info.width))
+        self.costmap_info = msg.info
+        if self.goal is not None:
+            safe = self.isSafe(self.goal.x, self.goal.y, 0.0)
+            self.goal = None
+            if not safe:
+                self.update_callback()
+        # self.viz_cv(0, 0)
+        # visualizations
+        
+    def viz_cv(self, x, y):
+        costmap = self.costmap
+        costmap = costmap.astype(np.float32)
+        costmap -= np.min(costmap)
+        costmap /= np.max(costmap)
+        costmap *= 255
+        costmap = costmap.astype(np.uint8)
+        costmap = cv2.cvtColor(costmap, cv2.COLOR_GRAY2BGR)
+
+        print("COLORING", x, y)
+        cv2.circle(costmap, (int(x), int(y)), 5, (0, 0, 255), -1)
+        mask = costmap > 10
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        rmin, rmax = np.where(rows)[0][[0, -1]]
+        cmin, cmax = np.where(cols)[0][[0, -1]]
+        costmap = costmap[rmin:rmax,cmin:cmax]
+        costmap = cv2.resize(costmap, (0,0), fx=3, fy=3)
+        cv2.imwrite('/home/hello-robot/alfred-autonomy/src/navigation/alfred_navigation/scripts/tests/temp.png', costmap)
+        # cv2.imshow("costmap", costmap)
+        # cv2.waitKey(1)
 
     def print_map_params(self,):
         """ Print the map parameters"""
@@ -84,20 +130,21 @@ class ProcessCostmap():
 
         assert self.costmap is not None ," Empty costmap!! Please load costmap first!!"
 
-        ref_cost = 10
+        max_allowed_cost = 50
+        safe_cost = 30
 
         row, col = self.get_cell_indices(x, y)
         assert self.isValidRowCol(row,col), "Computed cell indices out of bounds!! Given x,y,z: {},{},{} are bad points!".format(x,y,z)
 
         if row is not None and col is not None:
-            if np.isclose(self.costmap[row,col],0) or self.costmap[row,col] <=10:
-                rospy.logdebug("Computed Cell is safe!! Row: {}, Col: {}".format(row,col))
+            if self.costmap[row,col] <= safe_cost:
+                rospy.loginfo("Cell is safe!! Row: {}, Col: {}".format(row,col))
                 return True
-            elif self.costmap[row,col]> 10 and self.costmap[row,col] < ref_cost:
-                rospy.logdebug("Computed Cell Row: {}, Col: {} has significant cost {}".format(row,col,self.costmap[row,col]))
+            elif self.costmap[row,col] > safe_cost and self.costmap[row,col] < max_allowed_cost:
+                rospy.loginfo("Cell Row: {}, Col: {} has significant cost {}".format(row,col,self.costmap[row,col]))
                 return True
             else:
-                rospy.logdebug("Computed Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,self.costmap[row,col]))
+                rospy.logdebug("Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,self.costmap[row,col]))
                 return False
         else:
             rospy.logwarn("No cell indices computed!!")
@@ -137,8 +184,10 @@ class ProcessCostmap():
                 return x, y, z
             else:
                 rospy.loginfo("Computed Cell is not safe!! Row: {}, Col: {}".format(row,col))
-                row,col = self.RunBFSForSearch(row,col)
-                return self.get_cell_coordinates(row,col)
+                row,col = self.RunBFSForSearch(row, col)
+                # self.viz_cv(col, row)
+                coords = self.get_cell_coordinates(row, col)
+                return coords
         else:
             rospy.logwarn("No cell indices computed!!")
             return None
@@ -212,7 +261,9 @@ class ProcessCostmap():
         """ Useful for visualization and debugging all helper functions"""
 
         rospy.loginfo("Visualizing and debugging!!")
-
+        plt.ion()
+        plt.clf()
+        plt.cla()
         # Print the map parameters
         self.print_map_params()
 
@@ -262,7 +313,8 @@ class ProcessCostmap():
         ax.legend()
 
         # Save plot
-        plt.savefig('costmap.png')
+        # plt.savefig('costmap.png')
+        plt.show()
 
 
 if __name__ == '__main__':

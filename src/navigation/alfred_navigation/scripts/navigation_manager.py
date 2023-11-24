@@ -27,102 +27,104 @@ class NavigationManager():
         self.node_name = 'navigation_manager'
         rospy.init_node(self.node_name)
         
-        self.nav_goal_x = None
-        self.nav_goal_y = None
-        self.nav_goal_theta = None
+        self.goal = None
 
         self.nav_result = None
 
-        self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, self.update_goal, False)
+        self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, auto_start = False)
         self.movebase_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        
+        self.navman_server.register_preempt_callback(self.pre_emption)
+        self.navman_server.register_goal_callback(self.goal_cb)
+        
 
-        self.costmap_processor = ProcessCostmap()
+        self.costmap_processor = ProcessCostmap(self.pre_emption)
         
         # self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
 
         rospy.loginfo(f"[{self.node_name}]:" + "Waiting for move_base server...")
         self.movebase_client.wait_for_server()
 
-        self.n_max_attempts = rospy.get_param("/navman/n_attempts", 3)
+        self.n_max_attempts = rospy.get_param("/navigation/n_attempts", 3)
         self.n_attempts = 0
         self.last_update_time = time.time()
         
+        self.navigating = False
+        self.preempted = False
         self.navman_server.start()
         rospy.loginfo(f"[{self.node_name}]:" + "Navigation Manager is ready!")
 
-
-    def update_goal(self, goal : NavManGoal):
+    def goal_cb(self):
+        self.goal = self.navman_server.accept_new_goal()
+        self.movebase_client.cancel_all_goals()
+        rospy.loginfo(f"[{self.node_name}]:" + "Cancelled movebase. Received new goal to navigate to ({}, {})".format(self.goal.x, self.goal.y))
         
-        rospy.loginfo(f"[{self.node_name}]:" + "Navigation Manager received goal from Task Planner")
+    def pre_emption(self):
+        rospy.loginfo(f"[{self.node_name}]:" + "Pre-empting goal...")
+        self.preempted = True
+        self.navman_server.set_preempted()
+        
+        
+    def main(self):
+        while not rospy.is_shutdown():
+            if self.goal is not None:
+                self.navigate_to_goal(self.goal)
+                self.goal = None
+            else:
+                rospy.sleep(0.1)
 
+    def navigate_to_goal(self, goal):
+        rospy.loginfo(f"[{self.node_name}]:" + "Navigation Manager received goal")
         x, y, z = self.costmap_processor.findNearestSafePoint(goal.x, goal.y, 0.0)
-        
-        self.nav_goal_x = x
-        self.nav_goal_y = y
-        self.nav_goal_theta = goal.theta
-        self.n_attempts = 0
-        
-        self.navigate_to_goal()
 
+        goal.x = x
+        goal.y = y
 
-    def navigate_to_goal(self):        
+        self.goal = goal
+        self.costmap_processor.set_goal(goal)
 
+        # navigate to goal location
         movebase_goal = MoveBaseGoal()
-        
         movebase_goal.target_pose.header.frame_id = "map"
-        # send goal
-        movebase_goal.target_pose.pose.position.x = self.nav_goal_x
-        movebase_goal.target_pose.pose.position.y = self.nav_goal_y        
-        quaternion = get_quaternion(self.nav_goal_theta)
+        movebase_goal.target_pose.pose.position.x = self.goal.x
+        movebase_goal.target_pose.pose.position.y = self.goal.y
+        quaternion = get_quaternion(self.goal.theta)
         movebase_goal.target_pose.pose.orientation = quaternion
 
         self.movebase_client.send_goal(movebase_goal, feedback_cb = self.navigation_feedback)
-        
         rospy.loginfo(f"[{self.node_name}]:" + "Sending goal to move_base")
-
+        
         wait = self.movebase_client.wait_for_result()
-
-        self.check_result()
-
-
-    def check_result(self):
-
-        if self.movebase_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
-
+        
+        if self.movebase_client.get_state() == actionlib.GoalStatus.PREEMPTED:
+            rospy.loginfo(f"[{self.node_name}]:" +"Preempted")
+            self.navigate_to_goal(self.goal)
+        elif self.movebase_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{self.node_name}]:" +"Failed to reach goal. Debugging...")
-            self.movebase_client.cancel_goal()
             self.debug_nav_failure()
         else:
             self.send_navman_result(success = True)
-
         
+
     
     def debug_nav_failure(self):
-        # TODO - in future, add specific conditions where things can be fixed.
-        # For now, just try again until success.
-
-        # print("Sending moveback goal!")
-        # moveback_goal = MovebackRecoveryGoal()
-        # moveback_goal.execute = True
-        # self.moveback_client.send_goal(moveback_goal)
-
-        # print("Successfully sent Moveback goal!")
-
         if self.n_attempts < self.n_max_attempts:
             self.n_attempts += 1
-            rospy.loginfo(f"[{self.node_name}]:" + f"Trying again: {self.n_max_attempts - self.n_max_attempts} left")
-            self.navigate_to_goal()
+            rospy.loginfo(f"[{self.node_name}]:" + f"Trying again: {self.n_max_attempts - self.n_attempts} left")
+            rospy.loginfo(f"Have attempted " + str(self.n_attempts) + " times")
+            self.navigate_to_goal(self.goal)
         else:
             self.send_navman_result(success = False)
+            
         
         
     def send_navman_result(self, success):
-
+        self.costmap_processor.set_goal(None)
         navman_result = NavManResult()
-
+        self.goal = None
+        self.n_attempts = 0
         if success:
             navman_result.success = True
-            self.n_attempts = 0
             self.navman_server.set_succeeded(navman_result)
             rospy.loginfo(f"[{self.node_name}]:" + f"Goal reached successfully.")
         else:
@@ -135,10 +137,10 @@ class NavigationManager():
         self.position = msg.base_position.pose.position
         self.orientation = msg.base_position.pose.orientation
         
-        if time.time() - self.last_update_time > 1:
-            self.last_update_time = time.time()
-            rospy.loginfo(f"[{self.node_name}]:" +"Current position: {}".format(self.position))
-            rospy.loginfo(f"[{self.node_name}]:" +"Current orientation: {}".format(self.orientation))
+        # if time.time() - self.last_update_time > 1:
+        #     self.last_update_time = time.time()
+        #     rospy.loginfo(f"[{self.node_name}]:" +"Current position: {}".format(self.position))
+        #     rospy.loginfo(f"[{self.node_name}]:" +"Current orientation: {}".format(self.orientation))
         
 
 
@@ -146,5 +148,5 @@ if __name__ == '__main__':
 
     
     node = NavigationManager()
-
-    rospy.spin()
+    node.main()
+        
