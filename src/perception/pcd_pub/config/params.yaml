@@ -1,0 +1,1 @@
+downscale_factor: 3 # this is an integer as it operates on an image. Subsamples by skipping intermediate points

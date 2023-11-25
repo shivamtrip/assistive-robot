@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <!-- <arg name="map_yaml" doc="filepath to previously captured map (required)" default="/home/hello-robot/ws/src/navigation/alfred_navigation/maps/vincentian_floor_2_v1.yaml"/>  -->
-  <arg name="map_yaml" doc="filepath to previously captured map (required)" default="/home/hello-robot/ws/src/navigation/alfred_navigation/maps/ai_ms_hallway.yaml"/> 
+  <arg name="map_yaml" doc="filepath to previously captured map (required)" default="/home/hello-robot/ws/src/navigation/alfred_navigation/maps/ai_ms.yaml"/> 
   <arg name="rviz"     default="true" doc="whether to show Rviz" />
 
   <!-- STRETCH DRIVER -->

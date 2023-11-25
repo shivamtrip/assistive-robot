@@ -16,13 +16,13 @@
   <param name="initial_cov_yy" value="0.03"/>
 
   <!-- <param name="initial_pose_x" value="-0.3"/>		 -->
-  <!-- <param name="initial_pose_x" value="-2.38"/>
+  <param name="initial_pose_x" value="-2.38"/>
   <param name="initial_pose_y" value="-7.66"/>
-  <param name="initial_pose_a" value="2.85"/> -->
+  <param name="initial_pose_a" value="2.85"/>
 
-  <param name="initial_pose_x" value="-19.1"/>
+  <!-- <param name="initial_pose_x" value="-19.1"/>
   <param name="initial_pose_y" value="13.6"/>
-  <param name="initial_pose_a" value="2.1"/>
+  <param name="initial_pose_a" value="2.1"/> -->
   <!-- translation std dev, m -->
   <param name="odom_alpha3" value="0.8"/>
   <param name="odom_alpha4" value="0.2"/>

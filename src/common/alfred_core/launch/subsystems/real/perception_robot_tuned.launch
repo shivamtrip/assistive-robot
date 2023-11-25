@@ -9,6 +9,7 @@
 
      <!-- REDUCE RATE AND USE NUC TIME -->
      <!-- <node name="d435i_accel_correction" pkg="stretch_core" type="d435i_accel_correction" output="screen" /> -->  
+     <include file="$(find pcd_pub)/launch/low_res_pcd_pub.launch" />
      <include file="$(find image_shrink)/launch/image_shrinker.launch" />
           
 
@@ -43,7 +44,7 @@
           <arg name="infra_fps" value="15"/>
 
           <!-- publish depth streams aligned to other streams -->
-          <arg name="align_depth" value="false"/>
+          <arg name="align_depth" value="true"/>
 
           <!-- publish an RGBD point cloud -->
 
