@@ -32,8 +32,6 @@ class ProcessCostmap():
 
     def costmap_callback(self, data):
 
-        rospy.loginfo("Costmap callback!!")
-
         if(not self.LOADED_COSTMAP):
             rospy.loginfo("Costmap received!!")
             self.costmap = np.array(data.data).reshape((data.info.height, data.info.width))
@@ -42,6 +40,7 @@ class ProcessCostmap():
             rospy.loginfo("Costmap loaded!!")
 
         if(self.LOADED_COSTMAP):
+            rospy.loginfo("unregistering costmap subscriber!!")
             self.costmap_sub.unregister()
             pass 
             ### Run visualization

@@ -20,7 +20,7 @@ import numpy as np
 class vlmaps_fsm():
 
     def __init__(self, labels: list) -> None:
-        self.vlmaps_client = actionlib.SimpleActionClient('vlmaps_server', VLMapsAction)
+        self.vlmaps_client = actionlib.SimpleActionClient('lseg_server', VLMapsAction)
 
         # wait for server
         rospy.loginfo("Waiting for VLMAPS server...")
