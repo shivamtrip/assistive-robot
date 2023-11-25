@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   sensor_msgs
+  move_base_msgs
   message_generation
   actionlib_msgs
 )
@@ -69,12 +70,14 @@ add_action_files(
     DIRECTORY action
     FILES
     VLMaps.action
+    VLMaps_primitive.action
 )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
   sensor_msgs
+  move_base_msgs
   std_msgs
   actionlib_msgs
 )

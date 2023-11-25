@@ -1,0 +1,9 @@
+string primitive
+string obj1
+string obj2
+---
+Header header
+move_base_msgs/MoveBaseGoal goal
+bool success
+---
+int32 status
