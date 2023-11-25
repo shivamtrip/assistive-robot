@@ -52,7 +52,8 @@ def create_lseg_map_batch(img_save_dir, use_self_built_map: False ,camera_height
     text_feats = text_feats.cpu().numpy()
     model = LSegEncNet(lang, arch_option=0, block_depth=0, activation="lrelu", crop_size=crop_size)
     model_state_dict = model.state_dict()
-    pretrained_state_dict = torch.load("../lseg/checkpoints/demo_e200.ckpt")
+    checkpoint_file = os.path.join(img_save_dir,"../..","scripts/lseg/checkpoints/demo_e200.ckpt")
+    pretrained_state_dict = torch.load(checkpoint_file)
     pretrained_state_dict = {k.lstrip("net."): v for k, v in pretrained_state_dict["state_dict"].items()}
     model_state_dict.update(pretrained_state_dict)
     model.load_state_dict(pretrained_state_dict)
@@ -76,7 +77,8 @@ def create_lseg_map_batch(img_save_dir, use_self_built_map: False ,camera_height
     pose_dir = os.path.join(img_save_dir, "pose")
     semantic_dir = os.path.join(img_save_dir, "semantic")
     obj2cls_path = os.path.join(img_save_dir, "obj2cls_dict.txt")
-    add_params_dir = os.path.join(img_save_dir, "add_params")
+    config_dir = os.path.join(img_save_dir, "../..", "config/data_configs/")
+    add_params_dir = os.path.join(config_dir, "add_params")
 
     rgb_list = sorted(os.listdir(rgb_dir), key=lambda x: int(x.split("_")[-1].split(".")[0]))
     depth_list = sorted(os.listdir(depth_dir), key=lambda x: int(x.split("_")[-1].split(".")[0]))
@@ -89,8 +91,9 @@ def create_lseg_map_batch(img_save_dir, use_self_built_map: False ,camera_height
     semantic_list = [os.path.join(semantic_dir, x) for x in semantic_list]
 
     # Get camera intrinsics path, base2cam tf path
-    tf_base2cam_path = os.path.join(add_params_dir, "rosbag_data_0tf_base2cam.txt")
-    cam_intrinsics_path = os.path.join(add_params_dir, "rosbag_data_0cam_intrinsics.txt") 
+    tail = os.path.split(img_save_dir)[-1]
+    tf_base2cam_path = os.path.join(add_params_dir, f"{tail}_0tf_base2cam.txt")
+    cam_intrinsics_path = os.path.join(add_params_dir, f"{tail}_0cam_intrinsics.txt") 
 
     map_save_dir = os.path.join(img_save_dir, "map")
     os.makedirs(map_save_dir, exist_ok=True)

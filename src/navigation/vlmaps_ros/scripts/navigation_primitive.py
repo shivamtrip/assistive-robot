@@ -39,22 +39,21 @@ from utils.clip_mapping_utils import *
 from vis_tools import *
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Quaternion
+from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveResult, VLMaps_primitiveFeedback
 
 class TestTaskPlanner:
     def __init__(self):
         rospy.init_node('Nav_primitive_tester')
 
         # Initialize all paths and directories
+        self.action_server = actionlib.SimpleActionServer(
+            'vlmaps_primitive_server', VLMaps_primitiveAction, execute_cb=self.execute_cb, auto_start=False)
         self.bridge = CvBridge()
         self.root_dir = rospy.get_param('/vlmaps_robot/root_dir')
         self.data_dir = rospy.get_param('/vlmaps_robot/data_dir')
         self.cs =   rospy.get_param('/vlmaps_robot/cs')
         self.gs =  rospy.get_param('/vlmaps_robot/gs')
         self.area_threshold_to_match = rospy.get_param('/vlmaps_robot/area_threshold_to_match')
-        self.camera_height = rospy.get_param('/vlmaps_robot/camera_height')
-        self.max_depth_value = rospy.get_param('/vlmaps_robot/max_depth_value')
-        self.depth_sample_rate = rospy.get_param('/vlmaps_robot/depth_sample_rate')
-        self.use_self_built_map = rospy.get_param('/vlmaps_robot/use_self_built_map')
         self.inference = rospy.get_param('/vlmaps_robot/inference')
         self.cuda_device = rospy.get_param('/vlmaps_robot/cuda_device')
         self.show_vis = rospy.get_param('/vlmaps_robot/show_vis')
@@ -62,18 +61,11 @@ class TestTaskPlanner:
 
         # Stores update time
         self.last_update_time = time.time()
-        
-        # Initialize navigation services and clients
-        self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
- 
-        self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
-        self.stow_robot_service.wait_for_service()
-
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for move_base server...")
-        self.navigation_client.wait_for_server()
+        # Defines navigation primitives
+        self.primitives_mapping = {"go_to_object": self.go_to_object,
+                                    "move_between_objects": self.move_between_objects,
+                                    "move_object_closest_to": self.move_object_closest_to}
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing costmap processor node...")
         self.costmap_processor = ProcessCostmap()
@@ -84,26 +76,44 @@ class TestTaskPlanner:
         self.labels = self.labels.split(",")
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Starting Server...")
+        self.start()
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Server Started.")
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "VLMaps Primitive Node Ready.")
+
+
+    def execute_cb(self, goal):
+        """ Parses the goal and calls the appropriate function to get 2d nav goals!"""
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Received goal: {}".format(goal))
+
+        self.goal_primitive = goal.primitive
+        self.goal_obj1 = goal.obj1
+        self.goal_obj2 = goal.obj2
+        self.task_requested = True
+
+        if self.goal_primitive not in self.primitives_mapping.keys():
+            rospy.logerr(f"[{rospy.get_name()}]:" +"Primitive {} not in primitive list {}".format(self.goal_primitive, self.primitives_mapping.keys()))
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending result to action server")
+            self.action_server.set_aborted(VLMaps_primitiveResult())
+            return
         
-    def executeTask(self):
+        else:
+            safe_movebase_goal = self.primitives_mapping[self.goal_primitive](self.goal_obj1, self.goal_obj2)
+            
+        self.publish_goal(safe_movebase_goal)
 
-        self.stow_robot_service()
-        self.startNavService()
-        rospy.sleep(0.5)
 
-        # Implement navigation primitive - go_to_object(obj A)
-        self.go_to_object(" sofa")
+    def publish_goal(self, goal):
 
-        navSuccess = self.navigate_to_location(self.navigationGoal)
-        if not navSuccess:
-            rospy.loginfo("Failed to navigate to table, adding intermediate waypoints")
-            navSuccess = self.navigate_to_location(self.navigationGoal)
-   
-        self.task_requested = False
-        self.time_since_last_command = rospy.Time.now()
+        msg = VLMaps_primitiveResult()
+        msg.header = rospy.Header()
+        msg.goal = goal
+        msg.success = True
+        self.action_server.set_succeeded(msg)
+        rospy.logdebug(f"[{rospy.get_name()}] " + "Published goals for primitive successfully")
+    
 
-    def go_to_object(self, obj1):
+    def go_to_object(self, obj1, obj2):
         """ Inferences over vlmaps and navigates to object location """
 
         assert obj1 in self.labels, "Object not in vlmaps labels"
@@ -121,13 +131,9 @@ class TestTaskPlanner:
         safe_goal2D = self.get_2D_goal_rtabmap(outputs,label=obj1)
         safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
-        
-        # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
-        
-        if (self.show_vis):
-            self.show_vlmaps_results(mask_list,outputs,self.labels)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Found goal to movebase {}".format(safe_movebase_goal))
+        return safe_movebase_goal
+
 
     def move_between_objects(self, obj1, obj2):
         """ Inferences over vlmaps and navigates between the two objects in the scene."""
@@ -163,13 +169,9 @@ class TestTaskPlanner:
 
         safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
-        
-        # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
-        
-        if (self.show_vis):
-            self.show_vlmaps_results(mask_list,outputs,self.labels)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Found goal to movebase {}".format(safe_movebase_goal))
+        return safe_movebase_goal   
+
 
     def move_object_closest_to(self, obj1, obj2):
         """ Navigates to the object of category 'obj1' 
@@ -194,13 +196,9 @@ class TestTaskPlanner:
         safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2)
         safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
-        
-        # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
-        
-        if (self.show_vis):
-            self.show_vlmaps_results(mask_list,outputs,self.labels)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Found goal to movebase {}".format(safe_movebase_goal))
+        return safe_movebase_goal
+
 
     def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str)-> tuple:
         """ Finds the object of category 'obj1' 
@@ -235,6 +233,7 @@ class TestTaskPlanner:
         goal2D = (X,Y,theta_goal)
         return goal2D
 
+
     def navigation_feedback(self, msg : MoveBaseFeedback):
         self.position = msg.base_position.pose.position
         self.orientation = msg.base_position.pose.orientation
@@ -244,77 +243,8 @@ class TestTaskPlanner:
             rospy.logdebug(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.position))
             rospy.logdebug(f"[{rospy.get_name()}]:" +"Current orientation: {}".format(self.orientation))
 
-    def get_initial_rtabmap_pose(self,):
-        """Returns the initial pose of the base in /rtabmap/odom frame """
 
-        pose_dir = os.path.join(self.data_config_dir,"pose")
-        assert os.path.exists(pose_dir), "Pose directory not found at {}".format(pose_dir)
-        pose_list = sorted(os.listdir(pose_dir), key=lambda x: int(x.split("_")[-1].split(".")[0]))
-        pose_list = [os.path.join(pose_dir, x) for x in pose_list]
-
-        pos, rot = load_pose(pose_list[0])
-        
-        base_pose = np.eye(4)
-        base_pose[:3, :3] = rot
-        base_pose[:3, 3] = pos.reshape(-1)
-
-        return base_pose
-    
-    def get_tf_base2cam(self,):
-        """Returns the transformation matrix from base to camera frame"""
-
-        add_params_dir = os.path.join(self.data_config_dir, "add_params")
-        assert os.path.exists(add_params_dir), "Additional params directory not found at {}".format(add_params_dir)
-        tf_base2cam_path = os.path.join(add_params_dir, "rosbag_data_0tf_base2cam.txt")
-        tf_base2cam = load_tf(tf_base2cam_path)
-        return tf_base2cam
-    
-    def transform_to_world_frame(self, pos_des_cam_frame: np.ndarray):
-        """Transforms the desired position from camera frame to world frame"""
-
-        # ensure that file exists
-        initial_pose_path = os.path.join(self.data_config_dir, 'amcl_pose.json')
-        assert os.path.exists(initial_pose_path), "Initial pose json file not found at {}".format(initial_pose_path)
-        
-        f = open(initial_pose_path)
-        initial_pose_dict = json.load(f)
-        pos = initial_pose_dict['position']
-        pos = np.array([pos['x'],pos['y'],pos['z']])
-        rot = initial_pose_dict['orientation']
-        rot = np.array([rot['x'],rot['y'],rot['z'],rot['w']])
-
-        tf_world2rtabmap = np.eye(4)
-        tf_world2rtabmap[:3,:3] = R.from_quat(rot).as_matrix()
-        tf_world2rtabmap[:3,3] = np.array(pos)
-
-        tf_rtabmap2base = self.get_initial_rtabmap_pose()
-        tf_camera_optical2pcd = get_tf_camera_optical2pcd()
-        tf_base2cam = self.get_tf_base2cam()
-
-        # Position in world frame
-        pos_des_world_frame = tf_world2rtabmap @ tf_rtabmap2base @ \
-                                tf_base2cam @ tf_camera_optical2pcd @ pos_des_cam_frame
-        assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
-
-        return pos_des_world_frame
-
-    def convert_vlmap_id_to_world_frame(self, x,y):
-        
-        # Vlmap to rtabmap world coordinate
-        YY =0 # 2d navigation
-        XX,ZZ = grid_id2pos(self.gs,self.cs,x,y)
-        print("XX,YY,ZZ: ", XX,YY,ZZ)
-        pos_des_cam_frame = np.array([XX,YY,ZZ,1]).reshape(-1,1)
-
-        # Position in world frame
-        pos_des_world_frame = self.transform_to_world_frame(pos_des_cam_frame)
-        assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
-
-        X, Y ,Z = pos_des_world_frame[:3,0]
-
-        return X,Y,Z
-
-    def get_2D_goal_rtabmap(self,results:dict,label:str, safe: True)-> tuple:
+    def get_2D_goal_rtabmap(self,results:dict,label:str, safe: bool= True)-> tuple:
         """Returns a single 2D goal from the vlmap in map frame"""
 
         ########### WARNING: This is a hacky way to get the initial pose of the robot. Get Tfs from VLMaps ros action server instead ###########
@@ -325,7 +255,7 @@ class TestTaskPlanner:
         ### Get the largest bbox and find the centroid of the bbox
         mask = results[label]['mask'].astype(np.uint8)
         x,y  = find_best_centroid(results[label]['bboxes'])
-        X, Y ,Z = self.convert_vlmap_id_to_world_frame(x,y)
+        X, Y ,Z = convert_vlmap_id_to_world_frame(self.data_config_dir,x,y,self.cs,self.gs)
         print("X,Y,Z (unfiltered): ", X,Y,Z)
 
         if(safe):
@@ -337,7 +267,8 @@ class TestTaskPlanner:
         goal2D = (X,Y,theta)
 
         return goal2D
-    
+
+
     def get_locations_dict_rtabmap(self,results:dict,label:str)-> tuple:
         """Returns the 2D locations of all labels bboxes from the vlmap in 2D map frame"""
         res={}
@@ -354,7 +285,10 @@ class TestTaskPlanner:
 
         # Vlmap to rtabmap world coordinate
         for i in range(res['x_locs'].shape[0]):
-            X,Y,Z = self.convert_vlmap_id_to_world_frame(centroids_dict['x_locs'][i],centroids_dict['y_locs'][i])
+            X,Y,Z = convert_vlmap_id_to_world_frame(self.data_config_dir,
+                                                    centroids_dict['x_locs'][i],
+                                                    centroids_dict['y_locs'][i],
+                                                    self.cs, self.gs)
             theta=0
             res['x_locs'].append(X)
             res['y_locs'].append(Y)
@@ -363,62 +297,84 @@ class TestTaskPlanner:
             res['areas'].append(centroids_dict['areas'][i])
 
         return res
-    
-    def navigate_to_location(self, goal:MoveBaseGoal):
-        """Navigates to the given location"""
-        self.navigation_client.send_goal(goal, feedback_cb = self.navigation_feedback)
-        wait = self.navigation_client.wait_for_result()
 
-        if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
-            rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
-            # cancel navigation
-            self.navigation_client.cancel_goal()
-            return False
-        
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
-       
-        return True
-    
-    def show_vlmaps_results(self, mask_list, outputs, labels):
-
-        crop_res = False # Set to true for visualizing zoomed in results
-        obstacles = load_map(self.obstacles_save_path)
-        xmin = 0; xmax = obstacles.shape[0]-1; ymin = 0; ymax = obstacles.shape[1]-1
-        x_indices, y_indices = np.where(obstacles == 0)
-
-        if not x_indices.shape[0] or not y_indices.shape[0]:
-            rospy.logwarn("No obstacles found in the map. Please run the generate_vlmap function first.")
-            x_indices,y_indices = np.where(obstacles)
-
-        if(crop_res):
-            xmin = np.min(x_indices)
-            xmax = np.max(x_indices)
-            ymin = np.min(y_indices)
-            ymax = np.max(y_indices)
-  
-        # Free space mask
-        no_map_mask = obstacles[xmin:xmax+1, ymin:ymax+1] > 0
-
-        # Visualize label masks
-        show_label_masks(mask_list,labels)
-
-        # Visualize all bounding boxes over masks
-        show_bounding_boxes(outputs,labels)
-        
-        seg, patches = get_colored_seg_mask(labels,self.clip_model,self.clip_feat_dim,
-                                self.grid_save_path, obstacles,
-                                xmin, xmax, ymin, ymax) 
-
-        # More visualizations
-        color_top_down = load_map(self.color_top_down_save_path)
-        show_color_top_down(color_top_down,obstacles=obstacles)
-        show_seg_mask(seg, patches)
-        show_obstacle_map(obstacles)
 
     def start(self):
         """Starts the action server"""
         self.action_server.start()
         rospy.loginfo(f"[{rospy.get_name()}] " + " VLMaps Server Started")
+
+## Utility functions
+
+def convert_vlmap_id_to_world_frame(data_config_dir:str,x,y,cs=0.01,gs=1000):
+    
+    # Vlmap to rtabmap world coordinate
+    YY =0 # 2d navigation
+    XX,ZZ = grid_id2pos(gs,cs,x,y)
+    print("XX,YY,ZZ: ", XX,YY,ZZ)
+    pos_des_cam_frame = np.array([XX,YY,ZZ,1]).reshape(-1,1)
+
+    # Position in world frame
+    pos_des_world_frame = transform_to_world_frame(data_config_dir, pos_des_cam_frame)
+    assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
+
+    X, Y ,Z = pos_des_world_frame[:3,0]
+
+    return X,Y,Z
+    
+def transform_to_world_frame(data_config_dir: str, pos_des_cam_frame: np.ndarray):
+    """Transforms the desired position from camera frame to world frame"""
+
+    # ensure that file exists
+    initial_pose_path = os.path.join(data_config_dir, 'amcl_pose.json')
+    assert os.path.exists(initial_pose_path), "Initial pose json file not found at {}".format(initial_pose_path)
+    
+    f = open(initial_pose_path)
+    initial_pose_dict = json.load(f)
+    pos = initial_pose_dict['position']
+    pos = np.array([pos['x'],pos['y'],pos['z']])
+    rot = initial_pose_dict['orientation']
+    rot = np.array([rot['x'],rot['y'],rot['z'],rot['w']])
+
+    tf_world2rtabmap = np.eye(4)
+    tf_world2rtabmap[:3,:3] = R.from_quat(rot).as_matrix()
+    tf_world2rtabmap[:3,3] = np.array(pos)
+
+    tf_rtabmap2base = get_initial_rtabmap_pose(data_config_dir)
+    tf_camera_optical2pcd = get_tf_camera_optical2pcd()
+    tf_base2cam = get_tf_base2cam(data_config_dir)
+
+    # Position in world frame
+    pos_des_world_frame = tf_world2rtabmap @ tf_rtabmap2base @ \
+                            tf_base2cam @ tf_camera_optical2pcd @ pos_des_cam_frame
+    assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
+
+    return pos_des_world_frame
+
+def get_initial_rtabmap_pose(data_config_dir: str)-> np.ndarray:
+        """Returns the initial pose of the base in /rtabmap/odom frame """
+
+        pose_dir = os.path.join(data_config_dir,"pose")
+        assert os.path.exists(pose_dir), "Pose directory not found at {}".format(pose_dir)
+        pose_list = sorted(os.listdir(pose_dir), key=lambda x: int(x.split("_")[-1].split(".")[0]))
+        pose_list = [os.path.join(pose_dir, x) for x in pose_list]
+
+        pos, rot = load_pose(pose_list[0])
+        
+        base_pose = np.eye(4)
+        base_pose[:3, :3] = rot
+        base_pose[:3, 3] = pos.reshape(-1)
+
+        return base_pose
+
+def get_tf_base2cam(data_config_dir: str):
+    """Returns the transformation matrix from base to camera frame"""
+
+    add_params_dir = os.path.join(data_config_dir, "add_params")
+    assert os.path.exists(add_params_dir), "Additional params directory not found at {}".format(add_params_dir)
+    tf_base2cam_path = os.path.join(add_params_dir, "rosbag_data_0tf_base2cam.txt")
+    tf_base2cam = load_tf(tf_base2cam_path)
+    return tf_base2cam
 
 def find_best_centroid(bboxes: np.ndarray):
     """Finds the centroid of the mask"""

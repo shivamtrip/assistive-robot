@@ -235,7 +235,7 @@ if __name__ == "__main__":
                         help="Filter out depth values greater than this value")
     parser.add_argument("--depth_sample_rate", type=int, default=100,
                         help="Determine the step size while sampling points. Lower-> More dense sampling")
-    parser.add_argument("--use_self_built_map", type=bool, default=False)
+    parser.add_argument("--use_self_built_map", type=bool, default=True)
     parser.add_argument("--map_save_dir", type=str, default="map_correct")
     parser.add_argument("--save_video", type=bool, default=False)
     parser.add_argument("--inference", type=bool, default=False)
@@ -252,6 +252,10 @@ if __name__ == "__main__":
     if(params["data_dir"] is None):
         data_dir = os.path.join(params["root_dir"], "data", "rosbag_data/")
         params["data_dir"] = data_dir
+    
+    else:
+        # Ensure path exists
+        assert os.path.exists(params["data_dir"]), "Data directory not found at {}".format(params["data_dir"])
 
     vlmaps = VLMaps(params=params)
 
@@ -262,7 +266,7 @@ if __name__ == "__main__":
     else:
         # LABELS = "big flat counter, sofa, floor, chair, wash basin, other" # @param {type: "string"}
         # LABELS = "table, chair, floor, sofa, bed, other"
-        LABELS = "kitchen, sink, refrigerator, other"
+        LABELS = "table, kitchen, floor, sofa, sink, refrigerator, other"
         # LABELS = "television, chair, floor, sofa, refrigerator, other"
         LABELS = LABELS.split(",")
         vlmaps.inference_labels(labels=LABELS)

@@ -24,7 +24,7 @@ class VLMapsGenerator():
         rospy.init_node('vlmaps_node', anonymous=True)
 
         self.action_server = actionlib.SimpleActionServer(
-            'vlmaps_server', VLMapsAction, execute_cb=self.execute_cb, auto_start=False)
+            'lseg_server', VLMapsAction, execute_cb=self.execute_cb, auto_start=False)
         self.bridge = CvBridge()
 
         self.root_dir = rospy.get_param('/vlmaps_brain/root_dir')
