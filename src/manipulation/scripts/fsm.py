@@ -77,12 +77,12 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
     
     def send_feedback(self, info):
-        feedback = TriggerFeedback()
-        feedback.curState = self.state.value
-        feedback.curStateInfo = json.dumps(info)
-        rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
-        self.server.publish_feedback(feedback)
-
+        # feedback = TriggerFeedback()
+        # feedback.curState = self.state.value
+        # feedback.curStateInfo = json.dumps(info)
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
+        # self.server.publish_feedback(feedback)
+        pass
     def reset(self):
         self.state = States.IDLE
         self.grasp = None
@@ -150,13 +150,19 @@ class ManipulationFSM:
         
     def open_drawer(self):
         isLive = False
-        while not isLive:
-            (angleToGo, x, y, z, radius), isLive = self.scene_parser.get_latest_observation()
-            rospy.sleep(0.5)
-        if isLive:
-            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
+        self.scene_parser.clear_observations()
+        # while not isLive:
+        #     (x, y, z, r, p, y, confidence, pred_time), isLive = self.scene_parser.get_latest_observation()
+        #     rospy.sleep(0.5)
+        
+        # angleToGo, 
+        rospy.sleep(3)
+        [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
+        print(x, y, z, angleToGo)
+        if success:
+            # self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
             self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
-            self.drawer_location = (x, y, z, angleToGo)
+            self.drawer_location = (x, y, z, 0)
             return True
         return False
     
@@ -289,11 +295,11 @@ class ManipulationFSM:
         while not rospy.is_shutdown():
             if self.state == States.IDLE:
                 self.state = States.VISUAL_SERVOING
-                if objectManipulationState == States.PLACE:
-                    self.send_feedback({'msg' : "Trigger Request received. Placing"})
-                    self.state = States.PLACE
-                else:
-                    self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
+                # if objectManipulationState == States.PLACE:
+                #     self.send_feedback({'msg' : "Trigger Request received. Placing"})
+                #     self.state = States.PLACE
+                # else:
+                #     self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
             
             elif self.state == States.VISUAL_SERVOING:
                 success = self.basicServoing.main()
@@ -308,7 +314,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
-                self.state = States.COMPLETE
+                self.state = States.OPEN_DRAWER
             elif self.state == States.OPEN_DRAWER:
                 self.state = States.WAITING_FOR_GRASP_AND_PLANE
                 self.send_feedback({'msg' : "moving to pregrasp pose"})
@@ -357,7 +363,7 @@ class ManipulationFSM:
                 break
 
         self.reset()
-        self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
+        self.server.set_succeeded(result = DrawerTriggerResult(success = True))
 
 
 if __name__ == '__main__':

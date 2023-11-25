@@ -73,9 +73,9 @@ class AlignToObjectAdvanced:
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
         self.trajectoryClient.wait_for_server()
         
-        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
-        self.navigation_client.wait_for_server()
+        # self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        # self.navigation_client.wait_for_server()
         
         self.switch_to_navigation_mode = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
         self.switch_to_navigation_mode.wait_for_service()

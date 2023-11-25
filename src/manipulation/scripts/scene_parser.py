@@ -35,6 +35,7 @@ class SceneParser:
         self.request_clear_object = False
         
         self.objectLocArr = []
+        self.shot_object_loc_array = []
         self.objectId = None
         
         self.current_detection = None
@@ -61,8 +62,9 @@ class SceneParser:
             "distortion_coefficients" : np.array(msg.D).reshape(5,1),
         }
         
-        self.dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
-        self.arucoParams = cv2.aruco.DetectorParameters_create()
+        self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        # self.arucoParams = cv2.aruco.DetectorParameters_create()
+        self.arucoParams =  cv2.aruco.DetectorParameters()
         
         
         cam = o3d.camera.PinholeCameraIntrinsic()
@@ -223,14 +225,30 @@ class SceneParser:
             for rvec, tvec, id in zip(rvecs, tvecs, ids):
                 if id == self.objectId: # looking only for a single ID please.
       
-                    quat = cv2.Rodrigues(rvec)[0]
-                    quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
-                    quaternion = quaternion/np.linalg.norm(quaternion)
-                    self.tf_broadcaster.sendTransform((tvec[0][0], tvec[0][1], tvec[0][2]),quaternion,rospy.Time.now(),"aruco_pose" + str(id),"camera_color_optical_frame")
+                    # quat = cv2.Rodrigues(rvec)[0]
+                    # quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
+                    # quaternion = quaternion/np.linalg.norm(quaternion)
+                    transform_mat = np.zeros((4, 4))
+                    transform_mat[3, 3] = 1.0
+                    transform_mat[:3, 3] = tvec[0]
+                    transform_mat[:3, :3], _ = cv2.Rodrigues(rvec)
                     
-                    roll, pitch, yaw = tf.transformations.euler_from_quaternion(quaternion)
-                    x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
+                    quaternion = tf.transformations.quaternion_from_matrix(transform_mat)
+                    self.tf_broadcaster.sendTransform(
+                        tvec[0], 
+                        quaternion,
+                        rospy.Time.now(),
+                        "aruco_pose" + str(id),
+                        "camera_color_optical_frame"
+                    )
+                    
+                    tf_aruco_to_base = self.get_transform("base_link", "aruco_pose" + str(id))
+                    
+                    x, y, z = tf_aruco_to_base[:3, 3]
+                    roll, pitch, yaw = tf.transformations.euler_from_matrix(tf_aruco_to_base)
+                    # x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
                     self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
+                    print(np.rad2deg(roll), np.rad2deg(pitch), np.rad2deg(yaw))
                     self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
                     
 
@@ -256,7 +274,7 @@ class SceneParser:
             return False # no object id set
         
         if self.parse_mode == "ARUCO":
-            self.parse_aruco(rgb)
+            self.parse_aruco(self.color_image)
         elif self.parse_mode == "YOLO":
             self.parse_detections(detection)
         
@@ -307,8 +325,10 @@ class SceneParser:
                 continue
     
     
-    def estimate_object_location(self):
+    def estimate_object_location(self, from_live = True):
         objectLocs = np.array(self.objectLocArr)
+        if not from_live:
+            objectLocs = np.array(self.shot_object_loc_array)
         
         if len(objectLocs) == 0:
             return [np.inf, np.inf, np.inf, np.inf, np.inf], False
@@ -318,10 +338,16 @@ class SceneParser:
         x = np.average(objectLocs[:, 0], weights = weights)
         y = np.average(objectLocs[:, 1], weights = weights)
         z = np.average(objectLocs[:, 2], weights = weights)
-        
-        if self.mode ==  "ARUCO":
-            angleToGo = np.average(objectLocs[:, 5], weights = weights)
-        elif self.mode == "YOLO":
+        avg_r = np.average(objectLocs[:, 3], weights = weights)
+        avg_p = np.average(objectLocs[:, 4], weights = weights)
+        avg_y = np.average(objectLocs[:, 5], weights = weights)
+        if self.parse_mode ==  "ARUCO":
+            # angleToGo = -np.average(objectLocs[:, 3], weights = weights)
+            # angleToGo = -np.median(objectLocs[:, 4])
+            angleToGo = avg_y - np.pi/2            
+            # angleToGo = np.arctan2(y, x)s
+
+        elif self.parse_mode == "YOLO":
             angleToGo = np.arctan2(y, x) #orient to face the aruco
         radius = np.sqrt(x**2 + y**2)
         
@@ -354,6 +380,10 @@ class SceneParser:
             frame
         )
         
+    def capture_detection(self, publish = False):
+        if len(self.objectLocArr) == 0:
+            return
+        self.shot_object_loc_array.append(self.objectLocArr[-1])
     
     def capture_shot(self, publish = False):
         
