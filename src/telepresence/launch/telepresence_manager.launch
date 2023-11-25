@@ -1,3 +1,6 @@
 <launch>
     <node name="telepresence_manager" pkg="telepresence" type="telepresence_manager.py" output="screen" />  
+
+    <include file="$(find yolo)/launch/object_detector.launch" pass_all_args="true"/>
+
 </launch>

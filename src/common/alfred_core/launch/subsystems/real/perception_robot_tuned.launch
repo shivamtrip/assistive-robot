@@ -58,7 +58,7 @@
                pointcloud are enabled."
                https://github.com/intel-ros/realsense -->
           <arg name="enable_sync" value="true"/>
-          <arg name="filters" value="spatial,pointcloud,decimation"/>
+          <arg name="filters" value="spatial,pointcloud"/>
           <!-- <arg name="enable_pointcloud"         default="true"/> -->
           <!-- "You can have a full depth to pointcloud, coloring the
                regions beyond the texture with zeros..." -->

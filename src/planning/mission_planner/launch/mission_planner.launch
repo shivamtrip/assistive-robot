@@ -7,12 +7,14 @@
     <include file="$(find manipulation)/launch/robot_manipulation.launch" pass_all_args="true"/>
     <include file="$(find alfred_navigation)/launch/navigation_no_driver.launch" pass_all_args="true"/>
     <include file="$(find telepresence)/launch/telepresence_manager.launch" pass_all_args="true"/>
-    <include file="$(find yolo)/launch/object_detector.launch" pass_all_args="true"/>
     <include file="$(find alfred_core)/launch/subsystems/real/perception_robot_tuned.launch" pass_all_args="true"/> -->
 
 
     <rosparam command="load" file="$(find mission_planner)/config/config.yaml" /> <!--Load parameters from config files-->
     <node name="mission_planner_node" pkg="mission_planner" type="mission_planner.py" output="screen" respawn = "true"></node>
 
+    
+    <!-- <include file="$(find alfred_core)/launch/subsystems/real/perception_robot_tuned.launch" pass_all_args="true"/>
+    <include file="$(find yolo)/launch/object_detector.launch" pass_all_args="true"/> -->
     
 </launch>
