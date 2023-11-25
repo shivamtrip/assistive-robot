@@ -24,8 +24,8 @@ import actionlib
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult, MoveBaseFeedback
-from visualization_msgs.msg import PoseArray, Marker
-from geometry_msgs.msg import Pose
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Pose, PoseArray
 import os
 import json
 from enum import Enum
@@ -170,7 +170,7 @@ class TestTaskPlanner:
 
         ##### Publish to Rviz for debugging #####
         if(self.show_vis):
-            self.publish_markers(goals_vis)
+            publish_markers(goals_vis)
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Published markers to rviz. Now exiting...")
             # self.show_vlmaps_results(mask_list,outputs,self.labels)
             return
@@ -489,11 +489,12 @@ def convertToMovebaseGoals(goals2D: tuple)-> MoveBaseGoal:
 
     return goal
 
-def get_marker(pose: Pose):
+def get_marker(pose: Pose, marker_id:int = 0):
     """Creates a marker message for visualization in rviz"""
 
     # Create a Marker message and set its properties
     marker = Marker()
+    marker.id = marker_id
     marker.header.frame_id = "map"
     marker.type = Marker.SPHERE
     marker.action = Marker.ADD
@@ -502,16 +503,16 @@ def get_marker(pose: Pose):
     marker.scale.y = 0.2
     marker.scale.z = 0.2
     marker.color.a = 1.0
-    marker.color.r = 1.0
-    marker.color.g = 0.0
-    marker.color.b = 0.0
+    marker.color.r = ((marker_id+1)%3)/2
+    marker.color.g = ((marker_id+2)%3)/2
+    marker.color.b = (((marker_id+3))%3)/2
     return marker
 
 def publish_markers(goals2D: list):
     """Publishes markers for visualization in rviz"""
+    marker_pub = rospy.Publisher('/markers', Marker, queue_size=10)
 
-    pose_array = PoseArray()
-    for goal in goals2D:
+    for idx,goal in enumerate(goals2D):
 
         x,y,yaw = goal
         z, roll, pitch = 0, 0,0
@@ -523,16 +524,12 @@ def publish_markers(goals2D: list):
         pose.position.z = z
         pose.orientation = Quaternion(*quaternion)
 
-        marker = get_marker(pose)
-        pose_array.poses.append(pose)
-        pose_array.markers.append(marker)
+        marker = get_marker(pose,marker_id=idx)
 
-    pose_array_pub = rospy.Publisher('/markers', PoseArray, queue_size=10)
-    rate = rospy.Rate(5)  # 1 Hz
-    while not rospy.is_shutdown():
-        pose_array_pub.publish(pose_array)
-        rate.sleep()
-
+        for i in range(10):
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing marker for goal {}".format(goal))
+            marker_pub.publish(marker)
+            rospy.sleep(0.5)
 
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
