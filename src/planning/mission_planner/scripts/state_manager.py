@@ -39,10 +39,12 @@ class GlobalStates(Enum):
     NAVIGATION_TO_PLACE = 7
     MANIPULATION_TO_PICK = 6
     MANIPULATION_TO_PLACE = 9
+    ALIGN_TO_USER = 8
     VIDEOCALL = 5
     
 
 class ObjectOfInterest(Enum): 
+    USER = 0
     BOTTLE = 39
     
 

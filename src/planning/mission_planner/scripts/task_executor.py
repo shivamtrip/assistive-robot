@@ -9,7 +9,7 @@ from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, Trig
 import rospkg
 import os
 import json
-
+# from visual_servoing import AlignToObject
 
 
 class TaskExecutor:
@@ -24,7 +24,7 @@ class TaskExecutor:
         locations_path = os.path.join(base_dir, locations_file)
 
         self.goal_locations = json.load(open(locations_path))
-
+        # self.visualServoing = AlignToObject(-1)
 
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
@@ -39,6 +39,7 @@ class TaskExecutor:
 
         self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
         self.manipulation_client = actionlib.SimpleActionClient('manipulation_manager', TriggerAction)
+        self.telepresence_client = actionlib.SimpleActionClient('telepresence_manager', TriggerAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
         self.navigation_client.wait_for_server()
@@ -46,6 +47,8 @@ class TaskExecutor:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Manipulation Manager server...")
         self.manipulation_client.wait_for_server()
 
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Telepresence Manager server...")
+        self.telepresence_client.wait_for_server()
 
         self.heightOfObject = 0.84 # change this to a local variable later on 
 
@@ -123,6 +126,22 @@ class TaskExecutor:
         return result.success
 
 
+
+
+    def align_to_user(self, user_id):
+        
+        self.startManipService()
+
+        goal = TriggerGoal()
+        goal.objectId = user_id
+        self.telepresence_client.send_goal(goal, feedback_cb = self.dummy_cb)
+        print("Task Executor has sent goal to Telepresence Manager")
+        self.manipulation_client.wait_for_result()
+        print("Task Executor received result from Telepresence Manager")
+        result: TriggerResult = self.manipulation_client.get_result()
+
+        if(result.success):
+            rospy.loginfo("Manipulation complete")
 
 
 

@@ -1,0 +1,3 @@
+<launch>
+    <node name="telepresence_manager" pkg="telepresence" type="telepresence_manager.py" output="screen" />  
+</launch>

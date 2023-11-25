@@ -17,7 +17,7 @@ global_costmap:
     track_unknown_space: true
   rgbd_obstacle_layer:
     track_unknown_space: true
-    voxel_decay: 45   #15
+    voxel_decay: 10   #15
   inflated_layer:
     inflation_radius: 8.0 #4.0      # 1.75 #8.0 worked really well
     cost_scaling_factor: 2.58

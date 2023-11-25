@@ -107,9 +107,9 @@ class Mission_Planner():
             self.current_task_location_1 = ObjectOfInterest.BOTTLE.name # object pickup location / Enum name (string)
             self.current_task_location_2 = self.current_task_room  # / Enum of room_number name (string)
 
-        # elif self.current_task_type = "videocall":
-        #     self.current_task_location_1 = next_task.room_number
-        #     self.current_task_location_2 = next_task.room_number
+        elif self.current_task_type == TaskType.VIDEOCALL.name:
+            self.current_task_location_1 = self.current_task_room 
+            # self.current_task_location_2 = next_task.room_number
 
         # elif self.current_task_type == "return_home":
         #     self.current_task_location_1 = # home base location
@@ -120,10 +120,9 @@ class Mission_Planner():
 
     def execute_task(self):
 
-        print(f"Executing next task! Remaing queue size is {len(self.task_queue)}")
+        print(f"Executing next task of type {self.current_task_type}! Remaing queue size is {len(self.task_queue)}")
 
         if self.current_task_type == TaskType.DELIVERY.name:
-
             
             # Navigate to Pick-up Location            
             self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
@@ -159,12 +158,31 @@ class Mission_Planner():
 
             print("Placed object")
 
-        # elif self.current_task_type == "videocall":
-        #     navigate_to_location()      # In front of door
-        #     wait_for_door_open()
-        #     navigate_to_location()      # At videocall spot in room 
-        #     align_to_user()
-        #     start_videocall()
+        elif self.current_task_type == TaskType.VIDEOCALL.name:
+
+            # Navigate to Outside Room Location (in front of door, same as delivery location)            
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
+            if not navSuccess:
+                return
+
+            print("Reached User location")
+
+            # self.update_mission_status(GlobalStates.ALIGN_TO_USER)
+            # align_success = self.TaskExecutor.align_to_user(ObjectOfInterest.USER.value)
+            # if not align_success:
+            #     return
+
+            print("Aligned to User")
+    
+            self.update_mission_status(GlobalStates.VIDEOCALL, mode = OperationModes.TELEOPERATION)
+
+
+            # navigate_to_location()      # In front of door
+            # wait_for_door_open()
+            # navigate_to_location()      # At videocall spot in room 
+            # align_to_user()
+            # start_videocall()
 
         # elif self.current_task_type == "return_to_home_base":
         #     pass
