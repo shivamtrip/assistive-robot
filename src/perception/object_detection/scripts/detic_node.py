@@ -15,16 +15,17 @@ import sys
 sys.path.append('/usr/local/lib/detic_det_env/Detic/')
 sys.path.append('/usr/local/lib/detic_det_env/detectron2/')
 sys.path.insert(0, '/usr/local/lib/detic_det_env/Detic/third_party/CenterNet2/')
+
 from detic.predictor import VisualizationDemo
 from detic.modeling.utils import reset_cls_test
 from detic.modeling.text.text_encoder import build_text_encoder
 from detic.config import add_detic_config
-from detectron2.engine import DefaultPredictor
-
-from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog, DatasetCatalog
 
 from centernet.config import add_centernet_config
+
+from detectron2.engine import DefaultPredictor
+from detectron2.config import get_cfg
+from detectron2.data import MetadataCatalog, DatasetCatalog
 
 
 class DeticNode:
@@ -87,7 +88,6 @@ class DeticNode:
         if rospy.get_param('/object_detection/detic/custom_vocab'):
             metadata = MetadataCatalog.get("__unused")
             metadata.thing_classes = rospy.get_param('/object_detection/detic/class_list')
-            
             classifier = self.get_clip_embeddings(metadata.thing_classes)
             print("Using custom vocab")
         else:
@@ -158,7 +158,7 @@ class DeticNode:
         return seg_mask, boxes, class_indices, scores
             
     def callback(self, msg):
-        
+        starttime = time.time()
         ros_rgb_image = msg.image
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'bgr8')
         rotated_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
@@ -198,7 +198,7 @@ class DeticNode:
         vizimg = cv2.rotate(vizimg, cv2.ROTATE_90_CLOCKWISE)
         self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(vizimg, 'bgr8'))
         
-
+        rospy.loginfo(f"[{rospy.get_name()}] " + f"DETIC ran in {time.time() - starttime} seconds.")
         return response
 
     
