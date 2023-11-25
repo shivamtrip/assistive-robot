@@ -1,6 +1,6 @@
 
 base_model: 'yolov8n.pt'
-custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/sodacan_tissue.pt'
+custom_model: '/home/praveen/alfred-autonomy/src/perception/object_detection/model/custom_model/sodacan_tissue.pt'
 
 # subscribe_topic: '/camera/color/small_image'
 subscribe_topic: '/camera/color/image_raw'
@@ -29,16 +29,25 @@ class_list:
 
 detic:
   annotation_topic: /camera/color/detic_annotated
-  config_path: /usr/local/lib/obj_det_env/Detic/configs/detectron/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.yaml
   device: 'cuda:2'
-  weight_path: 'https://dl.fbaipublicfiles.com/detic/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.pth'
+  # config_path: /usr/local/lib/detic_det_env/Detic/configs/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.yaml
+  # weight_path: 'https://dl.fbaipublicfiles.com/detic/Detic_LCOCOI21k_CLIP_SwinB_896b32_4x_ft4x_max-size.pth'
+
+  config_path: /usr/local/lib/detic_det_env/Detic/configs/Detic_LI_CLIP_SwinB_896b32_4x_ft4x_max-size.yaml
+  weight_path: 'https://dl.fbaipublicfiles.com/detic/Detic_LI_CLIP_SwinB_896b32_4x_ft4x_max-size.pth'
+
+  # config_path: /usr/local/lib/detic_det_env/Detic/configs/Detic_LCOCOI21k_CLIP_R18_640b32_4x_ft4x_max-size.yaml
+  # weight_path: 'https://dl.fbaipublicfiles.com/detic/Detic_LCOCOI21k_CLIP_R18_640b32_4x_ft4x_max-size.pth'
   
   vocab_name : 'lvis'
   
   custom_vocab: true
   class_list: [
       "toothbrush", "toothpaste",
-      "keys", 
+      "tissue box",
+      "bunch of keys", 
       "remote control", "cell phone", "watch",
-      "apple", "orange"
+      "apple", "orange", "drawer",
+      "marker",
+      "necktie"
   ]

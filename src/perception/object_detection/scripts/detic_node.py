@@ -1,9 +1,10 @@
+#!/usr/local/lib/detic_det_env/bin/python3
 import cv2
 
 
 import numpy as np
 import rospy
-from yolo.msg import DeticDetectionsRequest, DeticDetectionsResponse
+from yolo.srv import DeticDetections, DeticDetectionsResponse
 import message_filters
 from cv_bridge import CvBridge
 import time
@@ -11,17 +12,18 @@ from sensor_msgs.msg import Image
 import torch
 import json
 import sys
-
+sys.path.append('/usr/local/lib/detic_det_env/Detic/')
+sys.path.append('/usr/local/lib/detic_det_env/detectron2/')
+sys.path.insert(0, '/usr/local/lib/detic_det_env/Detic/third_party/CenterNet2/')
 from detic.predictor import VisualizationDemo
 from detic.modeling.utils import reset_cls_test
 from detic.modeling.text.text_encoder import build_text_encoder
 from detic.config import add_detic_config
 from detectron2.engine import DefaultPredictor
 
-
 from detectron2.config import get_cfg
 from detectron2.data import MetadataCatalog, DatasetCatalog
-sys.path.insert(0, '/usr/local/lib/obj_det_env/Detic/third_party/CenterNet2/')
+
 from centernet.config import add_centernet_config
 
 
@@ -33,21 +35,34 @@ class DeticNode:
         self.annotated_image_pub = rospy.Publisher(rospy.get_param('/object_detection/detic/annotation_topic'), Image, queue_size=1)
         self.cv_bridge = CvBridge()
         
-        self.upscale_fac = 1 # we will send full size images to detic.
+        # self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio') # we will send full size images to detic.
+        self.upscale_fac = 1
 
         self.setup_detectron()
         self.warmup()
+
+        # self.image_sub = rospy.Subscriber('/camera/color/image_raw', Image, self.image_callback, queue_size=1)
         
-        self.server = rospy.Service('detic_predictions', DeticNode, self.callback)
+        self.server = rospy.Service('detic_predictions', DeticDetections, self.callback)
 
         rospy.loginfo(f"[{rospy.get_name()}] " + "Detic Ready...")
 
+    def image_callback(self, msg):
+        mmsg = DeticDetections()
+        mmsg.image = msg
+        starttime = time.time()
+        response = self.callback(mmsg)
+        rospy.loginfo("Took" + str(time.time() - starttime) + " seconds...")
+
+
+
     def setup_detectron(self):
+        rospy.loginfo("Building model.")
         BUILDIN_CLASSIFIER = {
-            'lvis': 'datasets/metadata/lvis_v1_clip_a+cname.npy',
-            'objects365': 'datasets/metadata/o365_clip_a+cnamefix.npy',
-            'openimages': 'datasets/metadata/oid_clip_a+cname.npy',
-            'coco': 'datasets/metadata/coco_clip_a+cname.npy',
+            'lvis': '/usr/local/lib/detic_det_env/Detic/datasets/metadata/lvis_v1_clip_a+cname.npy',
+            'objects365': '/usr/local/lib/detic_det_env/Detic/datasets/metadata/o365_clip_a+cnamefix.npy',
+            'openimages': '/usr/local/lib/detic_det_env/Detic/datasets/metadata/oid_clip_a+cname.npy',
+            'coco': '/usr/local/lib/detic_det_env/Detic/datasets/metadata/coco_clip_a+cname.npy',
         }
 
         BUILDIN_METADATA_PATH = {
@@ -66,6 +81,7 @@ class DeticNode:
         cfg.MODEL.ROI_BOX_HEAD.ZEROSHOT_WEIGHT_PATH = 'rand'
         cfg.MODEL.ROI_HEADS.ONE_CLASS_PER_PROPOSAL = False # For better visualization purpose. Set to False for all classes.
         cfg.MODEL.DEVICE= rospy.get_param('/object_detection/detic/device')
+        cfg.MODEL.ROI_BOX_HEAD.CAT_FREQ_PATH = '/usr/local/lib/detic_det_env/Detic/datasets/metadata/lvis_v1_train_cat_info.json'
         self.predictor = DefaultPredictor(cfg)
         
         if rospy.get_param('/object_detection/detic/custom_vocab'):
@@ -73,21 +89,24 @@ class DeticNode:
             metadata.thing_classes = rospy.get_param('/object_detection/detic/class_list')
             
             classifier = self.get_clip_embeddings(metadata.thing_classes)
+            print("Using custom vocab")
         else:
             vocabulary = rospy.get_param('/object_detection/detic/vocab_name')
             metadata = MetadataCatalog.get(BUILDIN_METADATA_PATH[vocabulary])
             classifier = BUILDIN_CLASSIFIER[vocabulary]
+
         
         num_classes = len(metadata.thing_classes)
+        self.class_list = metadata.thing_classes
         reset_cls_test(self.predictor.model, classifier, num_classes)
         
         self.class_names = self.predictor.metadata.get("thing_classes", None)
         
 
     def warmup(self):
-        rospy.loginfo(f"[{rospy.get_name()}] " + "Warming up...")
+        rospy.loginfo(f"[{rospy.get_name()}]" + "Warming up...")
         img = np.zeros((640, 480, 3), dtype=np.uint8)
-        for i in range(10):
+        for i in range(3):
             starttime = time.time()
             self.run_model(img)
             rospy.loginfo(f"Time taken: {time.time() - starttime}")
@@ -101,13 +120,13 @@ class DeticNode:
         return emb
 
     def run_model(self, img):
-        predictions = self.predictor.predictor(img)
+        predictions = self.predictor(img)
         instances = predictions['instances'].to(torch.device("cpu"))
         
-        pred_masks = list(instances.pred_masks)
-        scores = instances.scores.tolist()
-        class_indices = instances.pred_classes.tolist()
-        boxes = instances.pred_boxes.tensor.tolist()
+        pred_masks = np.array(instances.pred_masks)
+        scores = np.array(instances.scores)
+        class_indices = np.array(instances.pred_classes)
+        boxes = np.array(instances.pred_boxes.tensor)
         
         h, w = img.shape[:2]
         
@@ -125,7 +144,7 @@ class DeticNode:
             b = [x_new1, y_new1, x_new2, y_new2]
             new_boxes.append(b)
             
-        boxes = new_boxes.copy()
+        boxes = np.array(new_boxes.copy())
         
         seg_mask = np.zeros((img.shape[0], img.shape[1]), dtype=np.int32)
 
@@ -141,25 +160,44 @@ class DeticNode:
     def callback(self, msg):
         
         ros_rgb_image = msg.image
-        rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
+        rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'bgr8')
         rotated_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
         seg_mask, boxes, classes, confs = self.run_model(rotated_image)
+
+        vizimg = np.array(rgb_image).copy()
+        for i in range(len(boxes)):
+            b = boxes[i] / self.upscale_fac
+            cls = classes[i]
+            vizimg = cv2.rectangle(vizimg, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
+            
+            vizimg = cv2.putText(vizimg, str(self.class_list[cls]),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.5, (0,0,255), 1, cv2.LINE_AA)
+
         
         classes = classes.flatten()
         boxes = boxes.flatten()
         confs = confs.flatten().astype(np.float32)
         nPredictions = len(classes)
 
-        seg_mask = cv2.resize(seg_mask, (0, 0), fx = 0.5, fy = 0.5)
-        self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(seg_mask))
-
-
         response = DeticDetectionsResponse()
-        response.seg_mask = self.cv_bridge.cv2_to_imgmsg(seg_mask)
+        response.seg_mask = self.cv_bridge.cv2_to_imgmsg(seg_mask, )
         response.nPredictions  = nPredictions
         response.box_bounding_boxes = boxes.tolist()
         response.box_classes = classes.tolist()
         response.confidences = confs.tolist()
+
+
+        # seg_mask = seg_mask.astype(np.float32)
+        # seg_mask /= seg_mask.max()
+        # seg_mask *= 255
+        # seg_mask = seg_mask.astype(np.uint8)
+        # seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # vizimg[:, :, 2][seg_mask != 0] = seg_mask.copy()[seg_mask != 0]
+
+
+        vizimg = cv2.rotate(vizimg, cv2.ROTATE_90_CLOCKWISE)
+        self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(vizimg, 'bgr8'))
+        
 
         return response
 
