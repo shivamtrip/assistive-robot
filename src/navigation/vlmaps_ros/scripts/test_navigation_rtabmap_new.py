@@ -243,8 +243,6 @@ class TestTaskPlanner:
         goal2D = (X,Y,theta_goal)
         return goal2D
 
-
-
     def navigation_feedback(self, msg : MoveBaseFeedback):
         self.position = msg.base_position.pose.position
         self.orientation = msg.base_position.pose.orientation
