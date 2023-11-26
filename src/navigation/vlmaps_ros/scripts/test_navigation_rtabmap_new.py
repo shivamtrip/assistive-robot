@@ -1,5 +1,5 @@
-#Author: Abhinav Gupta
 #!/usr/local/lib/robot_env/bin/python3
+#Author: Abhinav Gupta
 
 #
 # Copyright (C) 2023 Auxilio Robotics
@@ -24,7 +24,8 @@ import actionlib
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult, MoveBaseFeedback
-
+from visualization_msgs.msg import Marker, MarkerArray
+from geometry_msgs.msg import Pose, PoseArray
 import os
 import json
 from enum import Enum
@@ -58,7 +59,7 @@ class TestTaskPlanner:
         self.inference = rospy.get_param('/vlmaps_robot/inference')
         self.cuda_device = rospy.get_param('/vlmaps_robot/cuda_device')
         self.show_vis = rospy.get_param('/vlmaps_robot/show_vis')
-        self.data_config_dir = os.path.join(self.data_dir, "config/data_configs")
+        self.data_config_dir = os.path.join(self.root_dir, "config/data_configs")
 
         # Stores update time
         self.last_update_time = time.time()
@@ -80,7 +81,10 @@ class TestTaskPlanner:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
 
-        self.labels= "table, chair, floor, sofa, bed, sink, other"
+        # self.labels= "table, chair, refrigerator, potted plant, floor, sofa, bed, sink, other"
+
+        self.labels= "table,chair,refrigerator,potted plant,floor,sofa,bed,sink,other"
+
         self.labels = self.labels.split(",")
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
@@ -93,8 +97,8 @@ class TestTaskPlanner:
         rospy.sleep(0.5)
 
         # Implement navigation primitive - go_to_object(obj A)
-        # self.go_to_object(" sofa")
-        self.move_between_objects(" sofa", " sink")
+        # self.go_to_object("sofa")
+        self.move_between_objects("sofa", "sink")
 
         navSuccess = self.navigate_to_location(self.navigationGoal)
         if not navSuccess:
@@ -136,6 +140,7 @@ class TestTaskPlanner:
         assert obj1 in self.labels, "Object not in vlmaps labels"
         assert obj2 in self.labels, "Object not in vlmaps labels"
         goals2D = []
+        goals_vis = []
 
         # Call vlmaps
         self.vlmaps_caller.send_goal(self.labels)
@@ -148,7 +153,9 @@ class TestTaskPlanner:
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
         for label in [obj1, obj2]:
-            goals2D.append(list(self.get_2D_goal_rtabmap(outputs,label=label,safe= False)))
+            goal2D = list(self.get_2D_goal_rtabmap(outputs,label=label,safe= False))
+            goals2D.append(goal2D)
+            goals_vis.append(goal2D)
         
         goals2D = np.mean(goals2D, axis=0,keepdims=False)
         theta = goals2D[2]
@@ -160,29 +167,34 @@ class TestTaskPlanner:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed safe goal point: {}, {}, {}".format(x,y,z))
             safe_goal2D = (x,y,theta)
         else:
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed goal mean point is safe")
             safe_goal2D = (goals2D[0],goals2D[1],theta)
 
-        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
+        goals_vis.append(safe_goal2D)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+        ##### Publish to Rviz for debugging #####
+        if(self.show_vis):
+            publish_markers(goals_vis)
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Published markers to rviz. Now exiting...")
+            # self.show_vlmaps_results(mask_list,outputs,self.labels)
+            return
         
-        # Send goal to movebase
-        # self.navigate_to_location(safe_movebase_goal)
+        else:
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+            safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+            self.navigate_to_location(safe_movebase_goal)
         
-        if (self.show_vis):
-            self.show_vlmaps_results(mask_list,outputs,self.labels)
-
     def move_object_closest_to(self, obj1, obj2):
         """ Navigates to the object of category 'obj1' 
         that is closest to the object of category 'obj2' """
 
-        for obj in zip(obj1, obj2):
+        for obj in [obj1, obj2]:
+            print("Object=",obj)
             if not obj in self.labels:
                 rospy.logwarn(f"[{rospy.get_name()}]:" +"Object {} not in vlmaps labels".format(obj))
                 rospy.loginfo(f"[{rospy.get_name()}]:" +"Adding {} to vlmaps labels".format(obj))
-                self.labels.append(" " + obj)
+                self.labels.append(obj)
 
         # Call vlmaps
         self.vlmaps_caller.send_goal(self.labels)
@@ -200,7 +212,7 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
+        # self.navigate_to_location(safe_movebase_goal)
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)
@@ -216,11 +228,11 @@ class TestTaskPlanner:
         mask1 = results[obj1]['mask'].astype(np.uint8)
         mask2 = results[obj2]['mask'].astype(np.uint8)
         res = self.get_locations_dict_rtabmap(results,obj1)
-        goal2d_obj2 = self.get_2D_goal_rtabmap(results,obj2)
+        goal2d_obj2 = self.get_2D_goal_rtabmap(results,obj2,safe=False)
         X2,Y2,theta2 = goal2d_obj2
         dist_min = 100000
 
-        for i in range(res['x_locs'].shape[0]):
+        for i in range(len(res['x_locs'])):
             area = res['areas'][i]
             if(area < self.area_threshold_to_match):
                 continue
@@ -236,6 +248,14 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
         theta_goal =0
         goal2D = (X,Y,theta_goal)
+
+        # Publish markers
+        if(self.show_vis):
+            goals_vis = []
+            goals_vis.append(goal2D)
+            goals_vis.append(goal2d_obj2)
+            publish_markers(goals_vis)
+           
         return goal2D
 
     def navigation_feedback(self, msg : MoveBaseFeedback):
@@ -317,7 +337,7 @@ class TestTaskPlanner:
 
         return X,Y,Z
 
-    def get_2D_goal_rtabmap(self,results:dict,label:str, safe: True)-> tuple:
+    def get_2D_goal_rtabmap(self,results:dict,label:str, safe: bool = True)-> tuple:
         """Returns a single 2D goal from the vlmap in map frame"""
 
         ########### WARNING: This is a hacky way to get the initial pose of the robot. Get Tfs from VLMaps ros action server instead ###########
@@ -329,15 +349,16 @@ class TestTaskPlanner:
         mask = results[label]['mask'].astype(np.uint8)
         x,y  = find_best_centroid(results[label]['bboxes'])
         X, Y ,Z = self.convert_vlmap_id_to_world_frame(x,y)
-        print("X,Y,Z (unfiltered): ", X,Y,Z)
 
         if(safe):
             X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
-            rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
+            rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
 
         # set 2d goal
         theta=0 # 2d navigation
         goal2D = (X,Y,theta)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed goal point: {}, {}, {} for label{}".format(X,Y,Z,label))
 
         return goal2D
     
@@ -356,7 +377,7 @@ class TestTaskPlanner:
         centroids_dict  = find_centroids(results[label]['bboxes'])
 
         # Vlmap to rtabmap world coordinate
-        for i in range(res['x_locs'].shape[0]):
+        for i in range(len(centroids_dict['x_locs'])):
             X,Y,Z = self.convert_vlmap_id_to_world_frame(centroids_dict['x_locs'][i],centroids_dict['y_locs'][i])
             theta=0
             res['x_locs'].append(X)
@@ -364,6 +385,7 @@ class TestTaskPlanner:
             res['z_locs'].append(Z)
             res['theta'].append(theta)
             res['areas'].append(centroids_dict['areas'][i])
+            rospy.loginfo(f"[{rospy.get_name()}]:" +" Area of mask: {}".format(centroids_dict['areas'][i]))
 
         return res
     
@@ -480,11 +502,61 @@ def convertToMovebaseGoals(goals2D: tuple)-> MoveBaseGoal:
 
     return goal
 
+def get_marker(pose: Pose, marker_id:int = 0):
+    """Creates a marker message for visualization in rviz"""
+
+    # Create a Marker message and set its properties
+    marker = Marker()
+    marker.id = marker_id
+    marker.header.frame_id = "map"
+    marker.type = Marker.SPHERE
+    marker.action = Marker.ADD
+    marker.pose = pose
+    marker.scale.x = 0.2
+    marker.scale.y = 0.2
+    marker.scale.z = 0.2
+    marker.color.a = 1.0
+    marker.color.r = ((marker_id+1)%3)/2
+    marker.color.g = ((marker_id+2)%3)/2
+    marker.color.b = (((marker_id+3))%3)/2
+    return marker
+
+def publish_markers(goals2D: list):
+    """Publishes markers array for visualization in rviz"""
+    marker_array_pub = rospy.Publisher('/markersarray', MarkerArray, queue_size=10)
+    marker_array_msg = MarkerArray()
+
+    for idx,goal in enumerate(goals2D):
+
+        x,y,yaw = goal
+        z, roll, pitch = 0, 0,0
+        quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+
+        pose = Pose()
+        pose.position.x = x
+        pose.position.y = y
+        pose.position.z = z
+        pose.orientation = Quaternion(*quaternion)
+
+        marker = get_marker(pose,marker_id=idx)
+        marker_array_msg.markers.append(marker)
+
+    # Publish 10 times for visualization
+    for i in range(20):
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing marker for all goals {}".format(goals2D))
+        marker_array_pub.publish(marker_array_msg)
+        rospy.sleep(0.5)
+
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
     # go to object
-    task_planner.go_to_object(" sofa")
+    # task_planner.go_to_object("sofa")
+    # task_planner.move_between_objects("sofa", "refrigerator")
+    # task_planner.move_between_objects("sofa", "potted plant")
+    # task_planner.move_between_objects("potted plant", "table")
+    # task_planner.move_between_objects("table", "sink")
+    task_planner.move_object_closest_to("table", "sofa")
 
     # rospy.sleep(2)
     try:

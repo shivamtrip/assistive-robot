@@ -11,8 +11,8 @@ depth_image_topic: '/camera/aligned_depth_to_color/image_raw'
 color_image_topic: "/camera/color/image_raw"
 
 # Directory paths
-root_dir: '/home/hello-robot/FVD/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros'
-data_dir: '/home/hello-robot/FVD/alfred-autonomy-VLMaps/src/navigation/vlmaps_ros/rosbag_data_nov11'
+root_dir: '/home/hello-robot/FVD/alfred-autonomy/src/navigation/vlmaps_ros'
+data_dir: '/home/abhinav/FVD/alfred-autonomy/src/navigation/vlmaps_ros/data/rosbag_data_nov11'
 map_save_dir: 'map_correct'
 
 # Map parameters
@@ -22,10 +22,10 @@ camera_height: 1.3
 max_depth_value: 5
 depth_sample_rate: 30
 use_self_built_map: True
-area_threshold_to_match: 10
+area_threshold_to_match: 2000
 
 # Other parameters
 inference: True
 save_video: False
-show_vis: False
+show_vis: True
 cuda_device: 'cuda:1'
