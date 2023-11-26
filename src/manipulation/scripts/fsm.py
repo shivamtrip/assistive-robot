@@ -17,6 +17,8 @@ from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
 from scene_parser import SceneParser
 from planner.planner import Planner
+from drawer_manip import DrawerManager
+from pick import PickManager
 class States(Enum):
     IDLE = 0
     VISUAL_SERVOING = 1
@@ -51,10 +53,6 @@ class ManipulationFSM:
         self.n_max_pick_attempts = rospy.get_param('/manipulation/n_max_pick_attempts')
 
         self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.manipulate_object, auto_start=False)
-        self.drawer_server = actionlib.SimpleActionServer('drawer_fsm', DrawerTriggerAction, execute_cb=self.manipulate_drawer, auto_start=False)
-        
-        
-        
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
@@ -72,7 +70,9 @@ class ManipulationFSM:
         self.basicServoing = AlignToObject(self.scene_parser, self.planner)
         self.manipulationMethods = ManipulationMethods()
         
-        self.drawer_server.start()
+        self.drawer_manager = DrawerManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
+        self.pick_manager = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
+        
         self.server.start() # start server only after everything under this is initialized
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
     
@@ -83,50 +83,13 @@ class ManipulationFSM:
         # rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
         # self.server.publish_feedback(feedback)
         pass
+    
     def reset(self):
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
 
-    def pick(self, isPublish = True):
-        self.scene_parser.set_parse_mode("YOLO", self.goal.objectId)
-        rospy.loginfo("Picking object" + str(self.goal.objectId))
-        self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-
-        # ee_pose = self.manipulationMethods.getEndEffectorPose()
-        # self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-        
-        #converts depth image into point cloud
-        self.scene_parser.set_point_cloud(publish = isPublish, use_detic = True) 
-        grasp = self.scene_parser.get_grasp(publish = isPublish)
-        plane = self.scene_parser.get_plane(publish = isPublish)
-        
-        
-        self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-        ee_pose = self.manipulationMethods.getEndEffectorPose()
-        self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-        
-        
-        
-        if grasp:
-            grasp_center, grasp_yaw = grasp
-
-            if plane:
-                plane_height = plane[1]
-                self.heightOfObject = abs(grasp_center[2] - plane_height)
-            else:
-                self.heightOfObject = 0.2 #default height of object if plane is not detected
-            
-            offsets = self.offset_dict[self.label2name[self.goal.objectId]]
-            grasp = (grasp_center + np.array(offsets)), grasp_yaw
-            self.manipulationMethods.pick(
-                self.trajectoryClient, 
-                grasp,
-                moveUntilContact = self.isContactDict[self.label2name[self.goal.objectId]]
-            ) 
-            success = self.scene_parser.is_grasp_success()
-            return success
-        return False
+    
     
     def place(self, fixed_place = True, location = None, is_rotate = True):
         
@@ -190,12 +153,13 @@ class ManipulationFSM:
         objectManipulationState = States.PICK
 
         # self.scene_parser.set_object_id(goal.objectId)
-        self.scene_parser.set_parse_mode("YOLO", goal.objectId)
-        
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
+            success = self.pick_manager.pick()
+            self.server.set_succeeded(result = TriggerResult(success = success, heightOfObject = self.heightOfObject))
+            return success
         else:
             rospy.loginfo("Received place request.")
             objectManipulationState = States.PLACE

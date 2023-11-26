@@ -9,7 +9,8 @@ from tf import TransformListener, TransformBroadcaster
 from visualization_msgs.msg import Marker
 from scipy.spatial.transform import Rotation as R
 
-
+import sys
+sys.path.append('/home/praveenvnktsh/alfred-autonomy/src/manipulation/scripts/planner')
 
 # ROS action finite state machine
 import std_msgs
@@ -23,6 +24,9 @@ from sensor_msgs.msg import JointState
 from control_msgs.msg import FollowJointTrajectoryAction
 from geometry_msgs.msg import PointStamped
 
+from planner.astar_planner import AStarPlanner
+from planner.naive_planner import NaivePlanner
+
 class ManipulationMethods:
     """Methods for object manipulation
     """
@@ -31,13 +35,12 @@ class ManipulationMethods:
         # rospy.init_node("manipulation_methods")
         self.listener : tf.TransformListener = tf.TransformListener()
         self.grip_dist_sub  = rospy.Subscriber('/manipulation/distance', std_msgs.msg.Int32, self.get_grip_dist)
-
+        self.marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
         self.grip_dist=None
         self.contact_threshold = {
             'joint_lift' : 7,
             'joint_arm' : 13,
         }
-        self.av_effort = 20
         self.av_effort_window_size = 3
         
         self.states = {
@@ -145,87 +148,6 @@ class ManipulationMethods:
         point = self.listener.transformPoint('base_link', base_point).point
         return [point.x, point.y, point.z]
 
-    
-    def pick_with_feedback(self, trajectoryClient, x, y, z, theta):
-        """
-        DEPRECATED
-        Uses laser TOF sensor to pick up object
-        """
-        
-
-        print("Extending to ", x, y, z, theta)
-        print("EXECUTING GRASP")
-
-        move_to_pose(trajectoryClient, {
-            "wrist_yaw;to" : 180,
-        })
-
-        rospy.sleep(3)
-        
-        move_to_pose(trajectoryClient, {
-            "lift;to": z,
-        })
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "stretch_gripper;to": 100,
-        })
-
-        move_to_pose(trajectoryClient, {
-            "wrist_yaw;to" : 0,
-        })
-        rospy.sleep(3)
-
-        move_to_pose(trajectoryClient, {
-            "arm;to": y-0.1,
-        })
-        rospy.sleep(7)
-
-        mount_angle= np.pi/4
-        mount_height = 0.025
-        offset_gripper  = 0.12 #measured
-        object_width = 0.03
-
-        #equation when object is mounted 6cm above gripper abd 12cm away from gripper center
-        step = mount_height*np.sin(mount_angle) + ((self.grip_dist/1000.)  - offset_gripper)*np.cos(mount_angle) + object_width
-
-        print(" y - 10 reached, moving to ", step)
-
-        move_to_pose(trajectoryClient, {
-            "arm;by": step,
-        })
-        rospy.sleep(4)
-
-        print("Alignment complete")
-        
-        move_to_pose(trajectoryClient, {
-            "stretch_gripper;to": -40,
-        })
-
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": z + 0.10,
-        })
-        rospy.sleep(3)
-# 
-        move_to_pose(trajectoryClient, {
-           "arm;to" : 0,
-           
-        })
-        move_to_pose(trajectoryClient, {
-            "wrist_yaw;to" : np.pi,
-           
-        })
-        rospy.sleep(5)
-        move_to_pose(trajectoryClient, {
-            "lift;to": z - 0.3,
-        })
-        rospy.sleep(3)
-
-    def get_grip_dist(self,msg):
-        """Subscribes to the /manipulation/distance topic and stores the gripper distance from object"""
-
-        print("reading distance",msg.data)
-        self.grip_dist = msg.data
         
     def reorient_base(self, trajectoryClient, angle):
         
@@ -276,7 +198,7 @@ class ManipulationMethods:
         })
         
         
-        return self.states['joint_arm'][-1]
+        return True
     
     
     def close_drawer(self, trajectoryClient, x, y, z):
@@ -354,11 +276,54 @@ class ManipulationMethods:
             'lift;to': curz + move_up,
         })
 
+    def plan_and_pick(self, trajectoryClient, grasp, cloud, moveUntilContact = False):
+        # self.pick(trajectoryClient, grasp)
+        
+        # (x, y, z), theta = grasp
+        
+        # x, y, theta, z, phi, ext
+        curstate = self.cur_robot_state
+        
+        (x_g, y_g, z_g), grasp_yaw = grasp
+        offset_z = 0.0 # difference between lift and the end effector height.
+        offset_y = 0.2 # difference between arm and the end effector height.
+        
+        goal_state = np.array([
+            curstate[0] + x_g,
+            curstate[1],
+            curstate[2],
+            z_g + offset_z,
+            int((grasp_yaw / np.pi) * 10)/10.0,
+            abs(y_g) - offset_y - 0.3,
+        ])
+        
+        planner = NaivePlanner(curstate, goal_state, cloud)
+        plan, success = planner.plan()
+        
+        if not success:
+            planner = AStarPlanner(curstate, goal_state, cloud)
+            plan, success = planner.plan()
+        
+        
+        if success:
+            self.execute_trajectory(plan, visualize = True, planner = planner)        
+            
+            self.pick(
+                trajectoryClient,
+                ((0, y_g, z_g), grasp_yaw),
+                moveUntilContact
+            )
+            
+            return True
+        return False
+        
+        
 
     def pick(self, trajectoryClient, grasp, moveUntilContact = False):
         """ Called after the pregrasp pose is reached"""
 
         (x_g, y_g, z_g), grasp_yaw = grasp
+        # x_g -= 0.02 # offset from poor gripper calibration.
         
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
         
@@ -369,25 +334,22 @@ class ManipulationMethods:
         else:
             move_to_pose(trajectoryClient, {
                 "lift;to": z_g + 0.1,
-            }
-            )
+            })
             # rospy.sleep(5)
         
-        print(grasp_yaw)
         if moveUntilContact:
             move_to_pose(trajectoryClient, {
                 'wrist_yaw;to' : grasp_yaw
             })
         else:
             move_to_pose(trajectoryClient, {
-                    'wrist_yaw;to': 0
-                })
+                'wrist_yaw;to': 0
+            })
+            
         rospy.sleep(5)
         
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
-
         
-        # if abs(x_g - ee_x) > 0.02:
         move_to_pose(trajectoryClient, {
             'base_translate;by' : x_g - ee_x
         })
@@ -417,7 +379,6 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "lift;by": 0.1,
             "arm;to" : 0,
-            "wrist_yaw;to" : np.pi,
         })
         
         # rospy.sleep(5)
@@ -533,14 +494,12 @@ class ManipulationMethods:
             ori = np.array(box.R)
             
             quat = R.from_matrix(ori).as_quat()
-            
-            
-            
+
             marker.pose.orientation.x = quat[0]
             marker.pose.orientation.y = quat[1]
             marker.pose.orientation.z = quat[2]
             marker.pose.orientation.w = quat[3]
-            marker_pub.publish(marker)    
+            self.marker_pub.publish(marker)    
     
     def execute_trajectory(self, plan, visualize = False, planner = None):
         """
@@ -554,7 +513,7 @@ class ManipulationMethods:
                 if planner is None:
                     return 
                 boxes, centers = planner.get_collision_boxes(waypoint)
-                visualize_boxes_rviz(boxes, centers)     
+                self.visualize_boxes_rviz(boxes, centers)     
             rospy.loginfo("Sending waypoint")
             idx_to_move = 0
             for j in range(len(waypoint)):
@@ -576,7 +535,84 @@ class ManipulationMethods:
             "arm|;to" : waypoint[5],
             "wrist_yaw|;to": waypoint[4],
         })
-            
+    def pick_with_feedback(self, trajectoryClient, x, y, z, theta):
+        """
+        DEPRECATED
+        Uses laser TOF sensor to pick up object
+        """
+        print("Extending to ", x, y, z, theta)
+        print("EXECUTING GRASP")
+
+        move_to_pose(trajectoryClient, {
+            "wrist_yaw;to" : 180,
+        })
+
+        rospy.sleep(3)
+        
+        move_to_pose(trajectoryClient, {
+            "lift;to": z,
+        })
+        rospy.sleep(5)
+        move_to_pose(trajectoryClient, {
+            "stretch_gripper;to": 100,
+        })
+
+        move_to_pose(trajectoryClient, {
+            "wrist_yaw;to" : 0,
+        })
+        rospy.sleep(3)
+
+        move_to_pose(trajectoryClient, {
+            "arm;to": y-0.1,
+        })
+        rospy.sleep(7)
+
+        mount_angle= np.pi/4
+        mount_height = 0.025
+        offset_gripper  = 0.12 #measured
+        object_width = 0.03
+
+        #equation when object is mounted 6cm above gripper abd 12cm away from gripper center
+        step = mount_height*np.sin(mount_angle) + ((self.grip_dist/1000.)  - offset_gripper)*np.cos(mount_angle) + object_width
+
+        print(" y - 10 reached, moving to ", step)
+
+        move_to_pose(trajectoryClient, {
+            "arm;by": step,
+        })
+        rospy.sleep(4)
+
+        print("Alignment complete")
+        
+        move_to_pose(trajectoryClient, {
+            "stretch_gripper;to": -40,
+        })
+
+        rospy.sleep(5)
+        move_to_pose(trajectoryClient, {
+            "lift;to": z + 0.10,
+        })
+        rospy.sleep(3)
+# 
+        move_to_pose(trajectoryClient, {
+           "arm;to" : 0,
+           
+        })
+        move_to_pose(trajectoryClient, {
+            "wrist_yaw;to" : np.pi,
+           
+        })
+        rospy.sleep(5)
+        move_to_pose(trajectoryClient, {
+            "lift;to": z - 0.3,
+        })
+        rospy.sleep(3)
+
+    def get_grip_dist(self,msg):
+        """Subscribes to the /manipulation/distance topic and stores the gripper distance from object"""
+
+        print("reading distance",msg.data)
+        self.grip_dist = msg.data
         
     
 if __name__=='__main__':

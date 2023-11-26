@@ -51,7 +51,7 @@ class DeticNode:
         rospy.loginfo(f"[{rospy.get_name()}] " + "Detic Ready...")
 
     def image_callback(self, msg):
-        mmsg = DeticDetections()
+        mmsg = DeticDetectionsActionGoal()
         mmsg.image = msg
         starttime = time.time()
         response = self.callback(mmsg)
@@ -162,8 +162,10 @@ class DeticNode:
     def callback(self, msg: DeticDetectionsActionGoal):
         starttime = time.time()
         ros_rgb_image = msg.image
+        
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'passthrough')
         rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+        
         rotated_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
         seg_mask, boxes, classes, confs = self.run_model(rotated_image)
 
@@ -182,6 +184,7 @@ class DeticNode:
         confs = confs.flatten().astype(np.float32)
         nPredictions = len(classes)
         seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        
         response = DeticDetectionsActionResult()
         response.seg_mask = self.cv_bridge.cv2_to_imgmsg(seg_mask, )
         response.nPredictions  = nPredictions
@@ -196,6 +199,7 @@ class DeticNode:
         # seg_mask = seg_mask.astype(np.uint8)
         # seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
         # vizimg[:, :, 2][seg_mask != 0] = seg_mask.copy()[seg_mask != 0]
+        
         print(response.box_classes)
         print(response.box_bounding_boxes)
 

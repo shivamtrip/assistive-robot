@@ -19,8 +19,8 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
-
-from yolo.msg import DeticDetections, DeticDetectionsResponse
+import actionlib
+from yolo.msg import DeticDetectionsAction, DeticDetectionsActionGoal, DeticDetectionsActionResult, DeticDetectionsFeedback, DeticDetectionsGoal, DeticDetectionsResult, DeticDetectionsActionFeedback
 
 class ObjectLocation:
     
@@ -116,14 +116,13 @@ class SceneParser:
         self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
         
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for DETIC service...")
-        self.detic_service = rospy.ServiceProxy('/detic_predictions', DeticDetections)
-        self.detic_service.wait_for_service()
+        self.detic_action = actionlib.SimpleActionClient('detic_predictions', DeticDetectionsAction)
+        self.detic_action.wait_for_server()
 
         
         self.obtained_initial_images = False
         self.request_clear_object = False
         
-        # self.objectLocArr = []
         self.object = ObjectLocation(time_diff_for_realtime = self.time_diff_for_realtime)
         self.objectId = None
         
@@ -279,7 +278,6 @@ class SceneParser:
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
-                # self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
                 self.current_detection = [x1, y1, x2, y2]
                 self.object.add_observation(
                     x = x,
@@ -315,7 +313,6 @@ class SceneParser:
                     
                     roll, pitch, yaw = tf.transformations.euler_from_quaternion(quaternion)
                     x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
-                    # self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
                     self.object.add_observation(
                         x = x,
                         y = y,
@@ -424,13 +421,6 @@ class SceneParser:
             
         return pcd
     
-    def publish_point(self, point, euler = (0, 0, 0), name = "point", frame = "base_link"):
-        self.tf_broadcaster.sendTransform(point,
-            tf.transformations.quaternion_from_euler(*euler),
-            rospy.Time.now(),
-            name,
-            frame
-        )
     
     def get_marker(
         self, 
@@ -488,13 +478,12 @@ class SceneParser:
         return marker
     
     def capture_shot(self, publish = False):
-        
         rospy.sleep(0.1)
         extrinsics = self.get_transform('camera_color_optical_frame', 'base_link')
         extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
         object_properties, isLive = self.get_latest_observation()
         if isLive:
-            x, y, z, confidence, _ = object_properties
+            x, y, z = object_properties['x'], object_properties['y'], object_properties['z']
             detection = [x, y, z]
             marker = self.get_marker(
                 id = 10, 
@@ -517,12 +506,16 @@ class SceneParser:
                 extrinsics)
     
     def get_detic_detections(self):
-        req = DeticDetectionsRequest(
+        req = DeticDetectionsActionGoal(
             image = self.bridge.cv2_to_imgmsg(self.color_image, encoding="passthrough"),
         )
-        rospy.loginfo("Requested detic")
-        detection : DeticDetectionsResponse = self.detic_service(req)
-        rospy.loginfo("Got from detic")
+        rospy.loginfo("Requested DETIC for results")
+        starttime = time.time()
+        self.detic_action.send_goal(req)
+        wait = self.detic_action.wait_for_result()
+        detection : DeticDetectionsActionResult = self.detic_action.get_result()
+        rospy.loginfo("Got from DETIC in {} seconds".format(time.time() - starttime))
+        
         num_detections = detection.nPredictions
         msg = {
             "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
@@ -563,7 +556,7 @@ class SceneParser:
         
             point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
             x, y, z = point.x, point.y, point.z
-            # print(x, y, z)
+
             self.tf_broadcaster.sendTransform((x, y, z),
                 tf.transformations.quaternion_from_euler(0, 0, 0),
                 rospy.Time.now(),
@@ -571,12 +564,10 @@ class SceneParser:
                 "base_link"
             )
             
-            
             radius = np.sqrt(x**2 + y**2)
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
-                
                 return [x1, y1, x2, y2], mask, True
                 
         return None, None, False
