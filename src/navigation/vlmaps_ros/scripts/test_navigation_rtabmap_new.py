@@ -80,7 +80,7 @@ class TestTaskPlanner:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
 
-        self.labels= "table, chair, floor, sofa, bed, other"
+        self.labels= "table, chair, floor, sofa, bed, sink, other"
         self.labels = self.labels.split(",")
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
@@ -93,7 +93,8 @@ class TestTaskPlanner:
         rospy.sleep(0.5)
 
         # Implement navigation primitive - go_to_object(obj A)
-        self.go_to_object(" sofa")
+        # self.go_to_object(" sofa")
+        self.move_between_objects(" sofa", " sink")
 
         navSuccess = self.navigate_to_location(self.navigationGoal)
         if not navSuccess:
@@ -166,7 +167,9 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
+        # self.navigate_to_location(safe_movebase_goal)
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)

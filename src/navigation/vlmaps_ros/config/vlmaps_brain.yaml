@@ -12,7 +12,7 @@ color_image_topic: "/camera/color/image_raw"
 
 # Directory paths
 root_dir: '/home/abhinav/FVD/alfred-autonomy/src/navigation/vlmaps_ros/'
-data_dir: '/home/abhinav/FVD/alfred-autonomy/src/navigation/vlmaps_ros/data/rosbag_data'
+data_dir: '/home/abhinav/FVD/alfred-autonomy/src/navigation/vlmaps_ros/data/rosbag_data_nov11'
 map_save_dir: 'map_correct'
 
 # Map parameters
