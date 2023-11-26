@@ -24,6 +24,7 @@ class_list:
   - 'bottle'
   - 'cup'
   - 'teddy_bear'
+  - 'marker'
 
 
 
@@ -42,12 +43,14 @@ detic:
   vocab_name : 'lvis'
   
   custom_vocab: true
-  class_list: [
-      "toothbrush", "toothpaste",
-      "tissue box",
-      "bunch of keys", 
-      "remote control", "cell phone", "watch",
-      "apple", "orange", "drawer",
-      "marker",
-      "necktie"
-  ]
+
+  
+  # [
+  #     "toothbrush", "toothpaste",
+  #     "tissue box",
+  #     "bunch of keys", 
+  #     "remote control", "cell phone", "watch",
+  #     "apple", "orange", "drawer",
+  #     "marker",
+  #     "necktie"
+  # ]

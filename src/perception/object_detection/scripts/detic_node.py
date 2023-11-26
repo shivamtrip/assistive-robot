@@ -87,7 +87,7 @@ class DeticNode:
         
         if rospy.get_param('/object_detection/detic/custom_vocab'):
             metadata = MetadataCatalog.get("__unused")
-            metadata.thing_classes = rospy.get_param('/object_detection/detic/class_list')
+            metadata.thing_classes = rospy.get_param('/object_detection/class_list')
             classifier = self.get_clip_embeddings(metadata.thing_classes)
             print("Using custom vocab")
         else:
@@ -154,13 +154,14 @@ class DeticNode:
             mask = pred_masks[i]
             # label 0 is reserved for background label, so starting from 1
             seg_mask[mask] = (i + 1)
-            
+        
         return seg_mask, boxes, class_indices, scores
             
     def callback(self, msg):
         starttime = time.time()
         ros_rgb_image = msg.image
-        rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'bgr8')
+        rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'passthrough')
+        rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
         rotated_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
         seg_mask, boxes, classes, confs = self.run_model(rotated_image)
 
@@ -178,7 +179,7 @@ class DeticNode:
         boxes = boxes.flatten()
         confs = confs.flatten().astype(np.float32)
         nPredictions = len(classes)
-
+        seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
         response = DeticDetectionsResponse()
         response.seg_mask = self.cv_bridge.cv2_to_imgmsg(seg_mask, )
         response.nPredictions  = nPredictions
@@ -193,10 +194,11 @@ class DeticNode:
         # seg_mask = seg_mask.astype(np.uint8)
         # seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
         # vizimg[:, :, 2][seg_mask != 0] = seg_mask.copy()[seg_mask != 0]
-
+        print(response.box_classes)
+        print(response.box_bounding_boxes)
 
         vizimg = cv2.rotate(vizimg, cv2.ROTATE_90_CLOCKWISE)
-        self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(vizimg, 'bgr8'))
+        self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(vizimg, 'passthrough'))
         
         rospy.loginfo(f"[{rospy.get_name()}] " + f"DETIC ran in {time.time() - starttime} seconds.")
         return response

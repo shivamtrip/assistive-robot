@@ -1,6 +1,4 @@
 <launch>
-    <group ns="object_detection">
-        <rosparam file="$(find yolo)/config/object_detection_params.yaml" />
-    </group>
-    <node name="object_detection" pkg="yolo" type="detic_node.py" output="screen" />
+    <rosparam file="$(find yolo)/config/object_detection_params.yaml" ns = "object_detection"/>
+    <node name="detic_node" pkg="yolo" type="detic_node.py" output="screen" />
 </launch>
