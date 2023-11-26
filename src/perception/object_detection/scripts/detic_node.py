@@ -4,7 +4,8 @@ import cv2
 
 import numpy as np
 import rospy
-from yolo.srv import DeticDetections, DeticDetectionsResponse
+# from yolo.srv import DeticDetections, DeticDetectionsResponse
+from yolo.msg import DeticDetectionsAction, DeticDetectionsActionFeedback, DeticDetectionsActionResult, DeticDetectionsFeedback, DeticDetectionsGoal, DeticDetectionsResult, DeticDetectionsActionGoal
 import message_filters
 from cv_bridge import CvBridge
 import time
@@ -12,6 +13,7 @@ from sensor_msgs.msg import Image
 import torch
 import json
 import sys
+import actionlib
 sys.path.append('/usr/local/lib/detic_det_env/Detic/')
 sys.path.append('/usr/local/lib/detic_det_env/detectron2/')
 sys.path.insert(0, '/usr/local/lib/detic_det_env/Detic/third_party/CenterNet2/')
@@ -38,14 +40,14 @@ class DeticNode:
         
         # self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio') # we will send full size images to detic.
         self.upscale_fac = 1
+        self.server = actionlib.SimpleActionServer('detic_predictions', DeticDetectionsAction, self.callback, auto_start=False)
 
         self.setup_detectron()
         self.warmup()
 
         # self.image_sub = rospy.Subscriber('/camera/color/image_raw', Image, self.image_callback, queue_size=1)
-        
-        self.server = rospy.Service('detic_predictions', DeticDetections, self.callback)
-
+        # self.server = rospy.Service('detic_predictions', DeticDetections, self.callback)
+        self.server.start()
         rospy.loginfo(f"[{rospy.get_name()}] " + "Detic Ready...")
 
     def image_callback(self, msg):
@@ -157,7 +159,7 @@ class DeticNode:
         
         return seg_mask, boxes, class_indices, scores
             
-    def callback(self, msg):
+    def callback(self, msg: DeticDetectionsActionGoal):
         starttime = time.time()
         ros_rgb_image = msg.image
         rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image, 'passthrough')
@@ -201,7 +203,8 @@ class DeticNode:
         self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(vizimg, 'passthrough'))
         
         rospy.loginfo(f"[{rospy.get_name()}] " + f"DETIC ran in {time.time() - starttime} seconds.")
-        return response
+        
+        self.server.set_succeeded(result=response)
 
     
 if __name__ == "__main__":
