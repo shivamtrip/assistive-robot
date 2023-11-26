@@ -125,6 +125,7 @@ class AlignToObject:
         self.scene_parser.clear_observations()
         while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
+                
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })

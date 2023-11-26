@@ -284,27 +284,23 @@ class ManipulationMethods:
             'base_translate;by' : x
         })
         move_to_pose(trajectoryClient, {
-            'arm;to' : y,
+            'arm;to' : 0.02,
         })
-        self.move_until_contact_lift(trajectoryClient, {
-            'lift;to' : z - 0.01
+        move_to_pose(trajectoryClient, {
+            'lift;to' : 0.72,
+            'wrists_yaw;to' : np.pi/2,
         })
-        
         self.move_until_contact_arm(trajectoryClient, {
             'arm;to' : 1,
         })
-        
         move_to_pose(trajectoryClient, {
-            'lift;by' : 0.02,
-        })
-        
+            'arm;to' : 0.02,
+        }
+        )
         move_to_pose(trajectoryClient, {
-            "arm;to" : 0.02,
             "lift;to" : 0.4,
             'wrist_yaw;to' : np.pi
         })
-        
-        rospy.sleep(1)
         
         
     def move_until_contact_arm(self, trajectory_client, pose):

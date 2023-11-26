@@ -95,7 +95,7 @@ class ManipulationFSM:
         self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
         
         #converts depth image into point cloud
-        self.scene_parser.set_point_cloud(publish = isPublish) 
+        self.scene_parser.set_point_cloud(publish = isPublish, use_detic = True) 
         grasp = self.scene_parser.get_grasp(publish = isPublish)
         plane = self.scene_parser.get_plane(publish = isPublish)
         
@@ -151,16 +151,10 @@ class ManipulationFSM:
     def open_drawer(self):
         isLive = False
         self.scene_parser.clear_observations()
-        # while not isLive:
-        #     (x, y, z, r, p, y, confidence, pred_time), isLive = self.scene_parser.get_latest_observation()
-        #     rospy.sleep(0.5)
-        
-        # angleToGo, 
         rospy.sleep(3)
         [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
-        print(x, y, z, angleToGo)
         if success:
-            # self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
+            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
             self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
             self.drawer_location = (x, y, z, 0)
             return True
@@ -182,7 +176,6 @@ class ManipulationFSM:
         self.scene_parser.set_parse_mode("YOLO", goal.objectId)
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        # self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
@@ -215,7 +208,6 @@ class ManipulationFSM:
                         self.send_feedback({'msg' : "Servoing failed. Aborting."})
                         self.reset()
                         return TriggerResult(success = False)
-                    
                     self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
                 self.state = States.COMPLETE
@@ -236,7 +228,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
                     self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
+                    # self.stow_robot_service()
                     
                     self.state =  States.VISUAL_SERVOING
 
@@ -254,7 +246,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
                     self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
+                    # self.stow_robot_service()
                     
                     self.state = States.PLACE
                     
@@ -279,7 +271,7 @@ class ManipulationFSM:
         if goal.to_open:
             rospy.loginfo("Received open drawer request.")
             objectManipulationState = States.OPEN_DRAWER
-            self.stow_robot_service()
+            # self.stow_robot_service()
         else:
             rospy.loginfo("Received close drawer request.")
             objectManipulationState = States.CLOSE_DRAWER
