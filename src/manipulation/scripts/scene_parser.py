@@ -17,6 +17,8 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
+from yolo.srv import DeticDetections, DeticDetectionsResponse, DeticDetectionsRequest
+
 
 class SceneParser:
     def __init__(self):
@@ -66,6 +68,7 @@ class SceneParser:
         # self.arucoParams = cv2.aruco.DetectorParameters_create()
         self.arucoParams =  cv2.aruco.DetectorParameters()
         
+        self.is_moving = False
         
         cam = o3d.camera.PinholeCameraIntrinsic()
         cam.intrinsic_matrix = self.intrinsics
@@ -77,7 +80,9 @@ class SceneParser:
         rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
 
         self.parse_mode = ("YOLO", None)
-        
+        rospy.loginfo("Waiting for DETIC to load.")
+        self.detic_service = rospy.ServiceProxy('detic_predictions', DeticDetections)
+        self.detic_service.wait_for_service()
         
         starttime = time.time()
         while not self.obtained_initial_images:
@@ -152,7 +157,6 @@ class SceneParser:
     
     def parse_detections(self, detection):
         # get object detections
-        
 
         num_detections = (detection.nPredictions)
         msg = {
@@ -180,35 +184,32 @@ class SceneParser:
             
             # TODO publish point cloud here instead of saving image like this.
              
-            if time.time() - self.prevtime > 1:
-                viz = self.color_image.copy().astype(np.float32)
-                viz /= np.max(viz)
-                viz *= 255
-                viz = viz.astype(np.uint8)
-                cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
-                viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
-                cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
-                self.prevtime = time.time()
+            # if time.time() - self.prevtime > 1:
+            #     viz = self.color_image.copy().astype(np.float32)
+            #     viz /= np.max(viz)
+            #     viz *= 255
+            #     viz = viz.astype(np.uint8)
+            #     cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            #     cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
+            #     viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
+            #     cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/cropped.png', viz)
+            #     self.prevtime = time.time()
             
             point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
             x, y, z = point.x, point.y, point.z
             # print(x, y, z)
-            self.tf_broadcaster.sendTransform((x, y, z),
-                tf.transformations.quaternion_from_euler(0, 0, 0),
-                rospy.Time.now(),
-                "object_pose",
-                "base_link"
-            )
-            
-            
+            # self.tf_broadcaster.sendTransform((x, y, z),
+            #     tf.transformations.quaternion_from_euler(0, 0, 0),
+            #     rospy.Time.now(),
+            #     "object_pose",
+            #     "base_link"
+            # )
             radius = np.sqrt(x**2 + y**2)
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
                 # print(x, y, z, x_f, y_f, z_f)
                 self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
-                
                 self.current_detection = [x1, y1, x2, y2]
 
     def parse_aruco(self, image):
@@ -228,28 +229,39 @@ class SceneParser:
                     # quat = cv2.Rodrigues(rvec)[0]
                     # quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
                     # quaternion = quaternion/np.linalg.norm(quaternion)
-                    transform_mat = np.zeros((4, 4))
-                    transform_mat[3, 3] = 1.0
-                    transform_mat[:3, 3] = tvec[0]
-                    transform_mat[:3, :3], _ = cv2.Rodrigues(rvec)
-                    
-                    quaternion = tf.transformations.quaternion_from_matrix(transform_mat)
-                    self.tf_broadcaster.sendTransform(
-                        tvec[0], 
-                        quaternion,
-                        rospy.Time.now(),
-                        "aruco_pose" + str(id),
-                        "camera_color_optical_frame"
-                    )
-                    
-                    tf_aruco_to_base = self.get_transform("base_link", "aruco_pose" + str(id))
-                    
-                    x, y, z = tf_aruco_to_base[:3, 3]
-                    roll, pitch, yaw = tf.transformations.euler_from_matrix(tf_aruco_to_base)
-                    # x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
-                    self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
-                    print(np.rad2deg(roll), np.rad2deg(pitch), np.rad2deg(yaw))
-                    self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
+                    tf_aruco_to_cam = np.zeros((4, 4))
+                    tf_aruco_to_cam[3, 3] = 1.0
+                    tf_aruco_to_cam[:3, 3] = tvec[0]
+                    tf_aruco_to_cam[:3, :3], _ = cv2.Rodrigues(rvec)
+                    if not self.is_moving:
+                        quaternion = tf.transformations.quaternion_from_matrix(tf_aruco_to_cam)
+                        self.tf_broadcaster.sendTransform(
+                            tvec[0], 
+                            quaternion,
+                            rospy.Time.now(),
+                            "aruco_pose" + str(id),
+                            "camera_color_optical_frame"
+                        )
+                        tf_cam_to_base = self.get_transform("base_link", "camera_color_optical_frame")
+                        tf_cam_to_base = np.vstack((tf_cam_to_base, np.array([0, 0, 0, 1])))
+                        tf_aruco_to_base = np.matmul(tf_cam_to_base, tf_aruco_to_cam)
+                        
+                        x, y, z = tf_aruco_to_base[:3, 3]
+                        roll, pitch, yaw = tf.transformations.euler_from_matrix(tf_aruco_to_base)
+                        quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+                        
+                        self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
+                        
+                        self.tf_broadcaster.sendTransform(
+                            [x, y, z], 
+                            quaternion,
+                            rospy.Time.now(),
+                            "aruco_pose_1" + str(id),
+                            "base_link"
+                        )
+                        
+                        self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
+                    break
                     
 
     def parse_scene(self, depth, rgb , detection):
@@ -268,6 +280,7 @@ class SceneParser:
         if self.request_clear_object:
             self.request_clear_object = False
             self.objectLocArr = []
+            self.shot_object_loc_array = []
         
         
         if self.objectId is None:
@@ -342,15 +355,12 @@ class SceneParser:
         avg_p = np.average(objectLocs[:, 4], weights = weights)
         avg_y = np.average(objectLocs[:, 5], weights = weights)
         if self.parse_mode ==  "ARUCO":
-            # angleToGo = -np.average(objectLocs[:, 3], weights = weights)
-            # angleToGo = -np.median(objectLocs[:, 4])
-            angleToGo = avg_y - np.pi/2            
-            # angleToGo = np.arctan2(y, x)s
+            angleToGo = np.median(objectLocs[:, 5]) - np.pi/2   
 
         elif self.parse_mode == "YOLO":
-            angleToGo = np.arctan2(y, x) #orient to face the aruco
+            angleToGo = np.arctan2(y, x) #orient to face the object
         radius = np.sqrt(x**2 + y**2)
-        
+        print("Estimated object location", x, y, z, np.rad2deg(angleToGo), radius)
         return (angleToGo, x, y, z, radius), True
     
     
@@ -384,6 +394,19 @@ class SceneParser:
         if len(self.objectLocArr) == 0:
             return
         self.shot_object_loc_array.append(self.objectLocArr[-1])
+        x, y, z, r, p, yaw, confidence, pred_time = self.objectLocArr[-1]
+        if time.time() - pred_time > self.time_diff_for_realtime:
+            return 
+        print("Captured detection", x, y, z, r, p, yaw)
+        print("Captured", self.objectLocArr[-1])
+        quat = tf.transformations.quaternion_from_euler(r, p, yaw)
+        self.tf_broadcaster.sendTransform(
+            [x, y, z], 
+            quat,
+            rospy.Time.now(),
+            "aruco_pose_stable",
+            "base_link"
+        )
     
     def capture_shot(self, publish = False):
         
@@ -596,10 +619,79 @@ class SceneParser:
             msg = pcl2.create_cloud_xyz32(header, points)
             self.obj_cloud_pub.publish(msg)
             
+    def get_detic_detections(self):
+        req = DeticDetectionsRequest(
+            image = self.bridge.cv2_to_imgmsg(self.color_image, encoding="passthrough"),
+        )
+        rospy.loginfo("Requested detic")
+        detection : DeticDetectionsResponse = self.detic_service(req)
+        rospy.loginfo("Got from detic")
+        num_detections = detection.nPredictions
+        msg = {
+            "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
+            "box_classes" : np.array(detection.box_classes).reshape(num_detections),
+            'confidences' : np.array(detection.confidences).reshape(num_detections),
+            # 'instances' : np.array(detection.instance_id).reshape(num_detections),
+        }
+
+        loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
+        if len(loc) > 0:
+            loc = loc[0]
+            box = np.squeeze(msg['boxes'][loc]).astype(int)
+            confidence = np.squeeze(msg['confidences'][loc])
+            x1, y1, x2, y2 =  box
+            crop = self.depth_image[y1 : y2, x1 : x2]
+            
+            instance_id = loc + 1
+            
+            mask = self.bridge.imgmsg_to_cv2(detection.seg_mask, desired_encoding="passthrough")
+            mask = np.array(mask).copy()
+            
+            mask[mask != instance_id] = 0
+            mask[mask == instance_id] = 1
+            z_f = np.median(crop[crop != 0])/1000.0
+            
+            x_f = (x1 + x2)/2
+            y_f = (y1 + y2)/2
+            
+            viz = self.color_image.copy().astype(np.float32)
+            viz /= np.max(viz)
+            viz *= 255
+            viz = viz.astype(np.uint8)
+            cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
+            viz[:, :, 0][mask != 0] = 255
+            viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
+            cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/detic.png', viz)
+            self.prevtime = time.time()
+        
+            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
+            x, y, z = point.x, point.y, point.z
+            # print(x, y, z)
+            self.tf_broadcaster.sendTransform((x, y, z),
+                tf.transformations.quaternion_from_euler(0, 0, 0),
+                rospy.Time.now(),
+                "object_pose",
+                "base_link"
+            )
+            
+            
+            radius = np.sqrt(x**2 + y**2)
+            confidence /= radius
+            
+            if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
+                # print(x, y, z, x_f, y_f, z_f)
+                # self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
+                
+                return [x1, y1, x2, y2], mask, True
+                
+        return [np.inf, np.inf, np.inf, np.inf], None, False
+        
+        
         
         
     
-    def set_point_cloud(self, visualize = False, publish = False):
+    def set_point_cloud(self, visualize = False, publish = False, use_detic = False):
         rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
         
         depthimg = self.depth_image.copy()
@@ -607,23 +699,32 @@ class SceneParser:
         # loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
         # box = np.squeeze(detection['boxes'][loc]).astype(int)
         # print(box)
-        if self.current_detection:
-            x1, y1, x2, y2 =  self.current_detection
-        else:
-            x1 = 0
-            y1 = 0
-            x2 = self.cameraParams['width']
-            y2 = self.cameraParams['height']
+        success = False
+        if use_detic:           
+            result, seg_mask, success = self.get_detic_detections()
 
-        self.ws_mask = np.zeros_like(self.depth_image)
-        self.ws_mask[y1 : y2, x1 : x2] = 1
+        if not success:
+            if self.current_detection:
+                x1, y1, x2, y2 =  np.array(self.current_detection).astype(int)
+            else:
+                x1 = 0
+                y1 = 0
+                x2 = self.cameraParams['width']
+                y2 = self.cameraParams['height']
+            self.ws_mask = np.zeros_like(self.depth_image)
+            self.ws_mask[y1 : y2, x1 : x2] = 1
+        else:
+            x1, y1, x2, y2 =  result
+            self.ws_mask = seg_mask
         
+            
         self.object_points, self.object_colors = self.get_point_cloud_from_image(depthimg, rgbimg, self.ws_mask)
         self.scene_points, self.scene_colors = self.get_point_cloud_from_image(depthimg, rgbimg, np.ones_like(self.depth_image))
         
         rospy.loginfo(f"[{rospy.get_name()}]: Point cloud generated.")
         
         if publish:
+            rospy.loginfo("Publishing cloud")
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id

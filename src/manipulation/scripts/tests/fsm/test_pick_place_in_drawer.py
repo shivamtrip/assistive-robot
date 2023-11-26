@@ -14,6 +14,7 @@ import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
+from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerTriggerResult, DrawerTriggerGoal
 import json
 from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
@@ -36,7 +37,18 @@ from fsm import ManipulationFSM
 #   - 'cup' #9
 #   - 'teddy bear' #10
 #   - 'remote' #11
-
+# #input  
+# bool to_open 
+# int64 aruco_id
+# float32[] saved_position
+# ---
+# #output
+# bool success
+# float32[] saved_position
+# ---
+# #feedback
+# int64 curState
+# string curStateInfo
 
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
@@ -46,12 +58,30 @@ if __name__ == '__main__':
     class_list = rospy.get_param('/object_detection/class_list')
     
     node = ManipulationFSM()
-    goal = TriggerGoal()
-    goal.objectId = 12
-    goal.isPick = True
+    goal = DrawerTriggerGoal()
+    goal.to_open = True
+    goal.aruco_id = 0
+    node.manipulate_drawer(goal)
     
+    
+    goal = TriggerGoal()
+    goal.objectId = 9
+    goal.isPick = True
     node.goal = goal
+    node.scene_parser.set_parse_mode('YOLO', goal.objectId)
     node.pick()
+    
+    goal = TriggerGoal()
+    goal.objectId = 9
+    goal.isPick = False
+    node.goal = goal
+    loc = node.drawer_location
+    print("PLACING LOCATION", loc)
+    node.place(is_rotate = False, location = [-0.02, loc[1] + 0.1, loc[2] + 0.25])
+    
+    
+    node.close_drawer()
+    
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 
