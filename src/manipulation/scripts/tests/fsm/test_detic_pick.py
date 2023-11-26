@@ -58,16 +58,19 @@ if __name__ == '__main__':
     class_list = rospy.get_param('/object_detection/class_list')
     
     node = ManipulationFSM()
-    goal = DrawerTriggerGoal()
-    goal.to_open = True
-    goal.aruco_id = 0
-    node.manipulate_drawer(goal)
+    # goal = DrawerTriggerGoal()
+    # goal.to_open = True
+    # goal.aruco_id = 0
+    # node.manipulate_drawer(goal)
     
     
     goal = TriggerGoal()
-    goal.objectId = 3
+    goal.objectId = 6
     goal.isPick = True
-    node.manipulate_object(goal)
+    node.goal = goal
+    node.pick(True)
+    # node.manipulate_object(goal)
+    # node.goal = goal
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 

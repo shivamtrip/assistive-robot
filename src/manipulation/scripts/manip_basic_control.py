@@ -81,7 +81,7 @@ class ManipulationMethods:
                 av_effort = np.mean(self.efforts[k])
                 if av_effort < self.contact_threshold[k]:
                     self.isContact = True
-                    print("Lift effort is too low: {}, there is contact".format(av_effort))
+                    rospy.logdebug("Lift effort is too low: {}, there is contact".format(av_effort))
                 else:
                     self.isContact = False
                     
@@ -103,7 +103,7 @@ class ManipulationMethods:
         # print("arm avg effort = ", av_effort)
         if av_effort > self.contact_threshold['joint_arm']:
             self.isContact = True
-            print("Arm effort is too high: {}, there is contact".format(av_effort))
+            rospy.logdebug("Arm effort is too high: {}, there is contact".format(av_effort))
 
         transform = self.get_transform('link_arm_l4', 'link_arm_l0')
         self.states['joint_arm'].append(self.cur_robot_state[5])
@@ -245,7 +245,7 @@ class ManipulationMethods:
         })
         
         move_to_pose(trajectory_client, {
-            "stretch_gripper;to" : -30,
+            "stretch_gripper;to" : -80,
         })
         
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
@@ -271,7 +271,7 @@ class ManipulationMethods:
         
         move_to_pose(trajectory_client, {
             'arm;to' : 0.0,
-            'lift;to' : 0.4,
+            # 'lift;to' : 0.4,
             'wrist_yaw;to' : np.pi
         })
         
@@ -284,11 +284,16 @@ class ManipulationMethods:
             'base_translate;by' : x
         })
         move_to_pose(trajectoryClient, {
-            'arm;to' : 0.02,
+            'arm;to' : 0.01,
         })
         move_to_pose(trajectoryClient, {
             'lift;to' : 0.72,
-            'wrists_yaw;to' : np.pi/2,
+            'wrist_yaw;to' : np.pi/2,
+        })
+        rospy.sleep(2)
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+        move_to_pose(trajectoryClient, {
+            'arm;by' : 0.2,
         })
         self.move_until_contact_arm(trajectoryClient, {
             'arm;to' : 1,
@@ -324,7 +329,7 @@ class ManipulationMethods:
             rospy.sleep(0.05)
 
         move_to_pose(trajectory_client, { # moving up slightly so that the grasp is accurate
-            'arm;by': -0.015,
+            'arm;by': -0.02,
         })    
     
     def move_until_contact_lift(self, trajectory_client, pose, move_up = 0.02):
@@ -389,7 +394,7 @@ class ManipulationMethods:
         rospy.sleep(3)
         
         print("Extending to ", x_g, y_g, z_g, grasp_yaw)
-        print(" end effector pose ", ee_x, ee_y, ee_z)
+        print("end effector pose ", ee_x, ee_y, ee_z)
             
         move_to_pose(trajectoryClient, {
             "arm;by": abs(y_g - ee_y),
@@ -417,10 +422,10 @@ class ManipulationMethods:
         
         # rospy.sleep(5)
 
-        move_to_pose(trajectoryClient, {
-            "lift;to": 0.4,
-            "head_pan;to": 0,
-        })
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to": 0.4,
+        #     "head_pan;to": 0,
+        # })
         # rospy.sleep(5)
 
             
@@ -438,8 +443,6 @@ class ManipulationMethods:
         
         ee_x, ee_y, ee_z = self.getEndEffectorPose()
         
-        
-        
         move_to_pose(trajectoryClient, {
             "lift;by": z - ee_z,
         })
@@ -448,15 +451,20 @@ class ManipulationMethods:
         move_to_pose(trajectoryClient, {
             "wrist_yaw;to": 0,
         })
-        
-        rospy.sleep(2)
-        
-        move_to_pose(trajectoryClient, {
-            'base_translate;by' : (x - ee_x)
-            }
-        )
         rospy.sleep(3)
-
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
+        
+        
+        # move_to_pose(trajectoryClient, {
+        #     'base_translate;by' : (x - ee_x)
+        #     }
+        # )
+        # rospy.sleep(3)
+        
+        
+        rospy.loginfo("EE_pose is {}".format(ee_y))
+        rospy.loginfo("Extending by {}".format(y - ee_y))
+        rospy.loginfo("Placing location is {}".format(y))
         move_to_pose(trajectoryClient, {
             "arm;by": abs(y - ee_y),
             }

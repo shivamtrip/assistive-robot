@@ -89,10 +89,12 @@ class ManipulationFSM:
         self.planeOfGrasp = None
 
     def pick(self, isPublish = True):
+        self.scene_parser.set_parse_mode("YOLO", self.goal.objectId)
+        rospy.loginfo("Picking object" + str(self.goal.objectId))
         self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
 
-        ee_pose = self.manipulationMethods.getEndEffectorPose()
-        self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
+        # ee_pose = self.manipulationMethods.getEndEffectorPose()
+        # self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
         
         #converts depth image into point cloud
         self.scene_parser.set_point_cloud(publish = isPublish, use_detic = True) 
@@ -119,16 +121,21 @@ class ManipulationFSM:
             return success
         return False
     
-    def place(self, fixed_place = True):
+    def place(self, fixed_place = True, location = None, is_rotate = True):
         
         self.heightOfObject = self.goal.heightOfObject
         
+        if is_rotate:
+            base_rotate = np.pi/2
+        else:
+            base_rotate = 0
+            
         move_to_pose(
             self.trajectoryClient,
             {
                 'head_pan;to' : -np.pi/2,
                 'head_tilt;to' : - 30 * np.pi/180,
-                'base_rotate;by': np.pi/2,
+                'base_rotate;by': base_rotate,
             }
         )
         
@@ -136,12 +143,15 @@ class ManipulationFSM:
         self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
         plane = self.scene_parser.get_plane(publish = True)
         if plane:
-            if not fixed_place:
-                placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+            if location is not None:
+                placingLocation = location
             else:
-                placingLocation = np.array([
-                    0.0, 0.7, 0.9
-                ])
+                if not fixed_place:
+                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                else:
+                    placingLocation = np.array([
+                        0.0, 0.7, 0.9
+                    ])
             success = self.manipulationMethods.place(self.trajectoryClient, placingLocation)
             self.stow_robot_service()
             return success
@@ -154,11 +164,11 @@ class ManipulationFSM:
         rospy.sleep(3)
         [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
         if success:
-            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
+            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo + np.pi/2)
             self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
-            self.drawer_location = (x, y, z, 0)
-            return True
-        return False
+            self.drawer_location = (x, y, 0.72, 0)
+            return self.drawer_location, True
+        return None, False
     
     def close_drawer(self):
         if self.drawer_location:
@@ -271,7 +281,7 @@ class ManipulationFSM:
         if goal.to_open:
             rospy.loginfo("Received open drawer request.")
             objectManipulationState = States.OPEN_DRAWER
-            # self.stow_robot_service()
+            self.stow_robot_service()
         else:
             rospy.loginfo("Received close drawer request.")
             objectManipulationState = States.CLOSE_DRAWER
@@ -294,7 +304,7 @@ class ManipulationFSM:
                 #     self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
             
             elif self.state == States.VISUAL_SERVOING:
-                success = self.basicServoing.main()
+                success = self.basicServoing.main_drawer()
                 if success:
                     self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
                     self.state = objectManipulationState
@@ -349,9 +359,6 @@ class ManipulationFSM:
             elif self.state == States.COMPLETE:
                 # self.send_feedback({'msg' : "Work complete successfully."})
                 rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
-                move_to_pose(self.trajectoryClient, {
-                    "head_pan;to" : 0,
-                })
                 break
 
         self.reset()

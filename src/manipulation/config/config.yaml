@@ -42,6 +42,7 @@ offsets:
   orange: [-0.0, 0.0, 0.0]
   cup: [-0.0, -0.01, 0.0]
   teddy bear: [-0.0, -0.02, 0.0]
+  marker : [0, 0, 0]
 
 contact: 
   bottle: false
@@ -56,6 +57,7 @@ contact:
   orange: false
   cup: false
   teddy bear: false
+  marker : true
 
 
 # FSM params
