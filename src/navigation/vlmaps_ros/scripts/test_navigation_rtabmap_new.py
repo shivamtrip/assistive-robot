@@ -24,7 +24,7 @@ import actionlib
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionResult, MoveBaseResult, MoveBaseFeedback
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Pose, PoseArray
 import os
 import json
@@ -81,7 +81,10 @@ class TestTaskPlanner:
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
 
-        self.labels= "table, chair, refrigerator, floor, sofa, bed, sink, other"
+        # self.labels= "table, chair, refrigerator, potted plant, floor, sofa, bed, sink, other"
+
+        self.labels= "table,chair,refrigerator,potted plant,floor,sofa,bed,sink,other"
+
         self.labels = self.labels.split(",")
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
@@ -164,6 +167,7 @@ class TestTaskPlanner:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed safe goal point: {}, {}, {}".format(x,y,z))
             safe_goal2D = (x,y,theta)
         else:
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed goal mean point is safe")
             safe_goal2D = (goals2D[0],goals2D[1],theta)
 
         goals_vis.append(safe_goal2D)
@@ -185,11 +189,12 @@ class TestTaskPlanner:
         """ Navigates to the object of category 'obj1' 
         that is closest to the object of category 'obj2' """
 
-        for obj in zip(obj1, obj2):
+        for obj in [obj1, obj2]:
+            print("Object=",obj)
             if not obj in self.labels:
                 rospy.logwarn(f"[{rospy.get_name()}]:" +"Object {} not in vlmaps labels".format(obj))
                 rospy.loginfo(f"[{rospy.get_name()}]:" +"Adding {} to vlmaps labels".format(obj))
-                self.labels.append(" " + obj)
+                self.labels.append(obj)
 
         # Call vlmaps
         self.vlmaps_caller.send_goal(self.labels)
@@ -207,7 +212,7 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
+        # self.navigate_to_location(safe_movebase_goal)
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)
@@ -223,11 +228,11 @@ class TestTaskPlanner:
         mask1 = results[obj1]['mask'].astype(np.uint8)
         mask2 = results[obj2]['mask'].astype(np.uint8)
         res = self.get_locations_dict_rtabmap(results,obj1)
-        goal2d_obj2 = self.get_2D_goal_rtabmap(results,obj2)
+        goal2d_obj2 = self.get_2D_goal_rtabmap(results,obj2,safe=False)
         X2,Y2,theta2 = goal2d_obj2
         dist_min = 100000
 
-        for i in range(res['x_locs'].shape[0]):
+        for i in range(len(res['x_locs'])):
             area = res['areas'][i]
             if(area < self.area_threshold_to_match):
                 continue
@@ -243,6 +248,14 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
         theta_goal =0
         goal2D = (X,Y,theta_goal)
+
+        # Publish markers
+        if(self.show_vis):
+            goals_vis = []
+            goals_vis.append(goal2D)
+            goals_vis.append(goal2d_obj2)
+            publish_markers(goals_vis)
+           
         return goal2D
 
     def navigation_feedback(self, msg : MoveBaseFeedback):
@@ -336,7 +349,6 @@ class TestTaskPlanner:
         mask = results[label]['mask'].astype(np.uint8)
         x,y  = find_best_centroid(results[label]['bboxes'])
         X, Y ,Z = self.convert_vlmap_id_to_world_frame(x,y)
-        print("X,Y,Z (unfiltered): ", X,Y,Z)
 
         if(safe):
             X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
@@ -365,7 +377,7 @@ class TestTaskPlanner:
         centroids_dict  = find_centroids(results[label]['bboxes'])
 
         # Vlmap to rtabmap world coordinate
-        for i in range(res['x_locs'].shape[0]):
+        for i in range(len(centroids_dict['x_locs'])):
             X,Y,Z = self.convert_vlmap_id_to_world_frame(centroids_dict['x_locs'][i],centroids_dict['y_locs'][i])
             theta=0
             res['x_locs'].append(X)
@@ -373,6 +385,7 @@ class TestTaskPlanner:
             res['z_locs'].append(Z)
             res['theta'].append(theta)
             res['areas'].append(centroids_dict['areas'][i])
+            rospy.loginfo(f"[{rospy.get_name()}]:" +" Area of mask: {}".format(centroids_dict['areas'][i]))
 
         return res
     
@@ -509,8 +522,9 @@ def get_marker(pose: Pose, marker_id:int = 0):
     return marker
 
 def publish_markers(goals2D: list):
-    """Publishes markers for visualization in rviz"""
-    marker_pub = rospy.Publisher('/markers', Marker, queue_size=10)
+    """Publishes markers array for visualization in rviz"""
+    marker_array_pub = rospy.Publisher('/markersarray', MarkerArray, queue_size=10)
+    marker_array_msg = MarkerArray()
 
     for idx,goal in enumerate(goals2D):
 
@@ -525,18 +539,24 @@ def publish_markers(goals2D: list):
         pose.orientation = Quaternion(*quaternion)
 
         marker = get_marker(pose,marker_id=idx)
+        marker_array_msg.markers.append(marker)
 
-        for i in range(10):
-            rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing marker for goal {}".format(goal))
-            marker_pub.publish(marker)
-            rospy.sleep(0.5)
+    # Publish 10 times for visualization
+    for i in range(20):
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing marker for all goals {}".format(goals2D))
+        marker_array_pub.publish(marker_array_msg)
+        rospy.sleep(0.5)
 
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
     # go to object
-    # task_planner.go_to_object(" sofa")
-    task_planner.move_between_objects(" sofa", " refrigerator")
+    # task_planner.go_to_object("sofa")
+    # task_planner.move_between_objects("sofa", "refrigerator")
+    # task_planner.move_between_objects("sofa", "potted plant")
+    # task_planner.move_between_objects("potted plant", "table")
+    # task_planner.move_between_objects("table", "sink")
+    task_planner.move_object_closest_to("table", "sofa")
 
     # rospy.sleep(2)
     try:

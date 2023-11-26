@@ -39,6 +39,9 @@ class ProcessCostmap():
             self.LOADED_COSTMAP = True
             rospy.loginfo("Costmap loaded!!")
 
+        # Make unkown regions as obstacles
+        self.costmap[self.costmap == -1] = 100
+
         if(self.LOADED_COSTMAP):
             rospy.loginfo("unregistering costmap subscriber!!")
             self.costmap_sub.unregister()
@@ -102,27 +105,28 @@ class ProcessCostmap():
 
         return None
 
-    def isSafe(self,x,y,z):
+    def isSafe(self,x,y,z, ref_cost_min=10, ref_cost_max=50):
 
         """ Given world coordinates, return whether the cell is safe or not. It helps dowstream in determining whether path exists or not"""
 
         assert self.LOADED_COSTMAP ," Empty costmap!! Please load costmap first!!"
 
-        ref_cost = 10
-
         if self.LOADED_COSTMAP:
             row, col = self.get_cell_indices(x, y)
             assert self.isValidRowCol(row,col), "Computed cell indices out of bounds!! Given x,y,z: {},{},{} are bad points!".format(x,y,z)
+            cost = self.costmap[row,col]
+
+            rospy.loginfo("Cost of the cell is {}".format(cost))
 
             if row is not None and col is not None:
-                if np.isclose(self.costmap[row,col],0) or self.costmap[row,col] <=10:
+                if np.isclose(cost,0) or cost <=ref_cost_min:
                     rospy.logdebug("Computed Cell is safe!! Row: {}, Col: {}".format(row,col))
                     return True
-                elif self.costmap[row,col]> 10 and self.costmap[row,col] < ref_cost:
-                    rospy.logdebug("Computed Cell Row: {}, Col: {} has significant cost {}".format(row,col,self.costmap[row,col]))
+                elif cost> 10 and cost < ref_cost_max:
+                    rospy.logdebug("Computed Cell Row: {}, Col: {} has significant cost {}".format(row,col,cost))
                     return True
                 else:
-                    rospy.logdebug("Computed Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,self.costmap[row,col]))
+                    rospy.logdebug("Computed Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,cost))
                     return False
             else:
                 rospy.logwarn("No cell indices computed!!")
