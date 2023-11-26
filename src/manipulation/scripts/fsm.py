@@ -77,21 +77,27 @@ class ManipulationFSM:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
     
     def send_feedback(self, info):
-        feedback = TriggerFeedback()
-        feedback.curState = self.state.value
-        feedback.curStateInfo = json.dumps(info)
-        rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
-        self.server.publish_feedback(feedback)
-
+        # feedback = TriggerFeedback()
+        # feedback.curState = self.state.value
+        # feedback.curStateInfo = json.dumps(info)
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
+        # self.server.publish_feedback(feedback)
+        pass
     def reset(self):
         self.state = States.IDLE
         self.grasp = None
         self.planeOfGrasp = None
 
     def pick(self, isPublish = True):
+        self.scene_parser.set_parse_mode("YOLO", self.goal.objectId)
+        rospy.loginfo("Picking object" + str(self.goal.objectId))
+        self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
+
+        # ee_pose = self.manipulationMethods.getEndEffectorPose()
+        # self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
         
         #converts depth image into point cloud
-        self.scene_parser.set_point_cloud(publish = isPublish)
+        self.scene_parser.set_point_cloud(publish = isPublish, use_detic = True) 
         grasp = self.scene_parser.get_grasp(publish = isPublish)
         plane = self.scene_parser.get_plane(publish = isPublish)
         
@@ -122,16 +128,21 @@ class ManipulationFSM:
             return success
         return False
     
-    def place(self, fixed_place = True):
+    def place(self, fixed_place = True, location = None, is_rotate = True):
         
         self.heightOfObject = self.goal.heightOfObject
         
+        if is_rotate:
+            base_rotate = np.pi/2
+        else:
+            base_rotate = 0
+            
         move_to_pose(
             self.trajectoryClient,
             {
                 'head_pan;to' : -np.pi/2,
                 'head_tilt;to' : - 30 * np.pi/180,
-                'base_rotate;by': np.pi/2,
+                'base_rotate;by': base_rotate,
             }
         )
         
@@ -139,12 +150,15 @@ class ManipulationFSM:
         self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
         plane = self.scene_parser.get_plane(publish = True)
         if plane:
-            if not fixed_place:
-                placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+            if location is not None:
+                placingLocation = location
             else:
-                placingLocation = np.array([
-                    0.0, 0.7, 0.9
-                ])
+                if not fixed_place:
+                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                else:
+                    placingLocation = np.array([
+                        0.0, 0.7, 0.9
+                    ])
             success = self.manipulationMethods.place(self.trajectoryClient, placingLocation)
             self.stow_robot_service()
             return success
@@ -153,15 +167,15 @@ class ManipulationFSM:
         
     def open_drawer(self):
         isLive = False
-        while not isLive:
-            (angleToGo, x, y, z, radius), isLive = self.scene_parser.get_latest_observation()
-            rospy.sleep(0.5)
-        if isLive:
-            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo)
+        self.scene_parser.clear_observations()
+        rospy.sleep(3)
+        [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
+        if success:
+            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo + np.pi/2)
             self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
-            self.drawer_location = (x, y, z, angleToGo)
-            return True
-        return False
+            self.drawer_location = (x, y, 0.72, 0)
+            return self.drawer_location, True
+        return None, False
     
     def close_drawer(self):
         if self.drawer_location:
@@ -179,7 +193,6 @@ class ManipulationFSM:
         self.scene_parser.set_parse_mode("YOLO", goal.objectId)
         
         rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        # self.stow_robot_service()
         if goal.isPick:
             rospy.loginfo("Received pick request.")
             objectManipulationState = States.PICK
@@ -212,7 +225,6 @@ class ManipulationFSM:
                         self.send_feedback({'msg' : "Servoing failed. Aborting."})
                         self.reset()
                         return TriggerResult(success = False)
-                    
                     self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
                 self.state = States.COMPLETE
@@ -233,7 +245,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
                     self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
+                    # self.stow_robot_service()
                     
                     self.state =  States.VISUAL_SERVOING
 
@@ -251,7 +263,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
                     self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
+                    # self.stow_robot_service()
                     
                     self.state = States.PLACE
                     
@@ -292,14 +304,14 @@ class ManipulationFSM:
         while not rospy.is_shutdown():
             if self.state == States.IDLE:
                 self.state = States.VISUAL_SERVOING
-                if objectManipulationState == States.PLACE:
-                    self.send_feedback({'msg' : "Trigger Request received. Placing"})
-                    self.state = States.PLACE
-                else:
-                    self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
+                # if objectManipulationState == States.PLACE:
+                #     self.send_feedback({'msg' : "Trigger Request received. Placing"})
+                #     self.state = States.PLACE
+                # else:
+                #     self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
             
             elif self.state == States.VISUAL_SERVOING:
-                success = self.basicServoing.main()
+                success = self.basicServoing.main_drawer()
                 if success:
                     self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
                     self.state = objectManipulationState
@@ -311,7 +323,7 @@ class ManipulationFSM:
                     
                     self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
                     self.nServoTriesAttempted += 1
-                self.state = States.COMPLETE
+                self.state = States.OPEN_DRAWER
             elif self.state == States.OPEN_DRAWER:
                 self.state = States.WAITING_FOR_GRASP_AND_PLANE
                 self.send_feedback({'msg' : "moving to pregrasp pose"})
@@ -354,13 +366,10 @@ class ManipulationFSM:
             elif self.state == States.COMPLETE:
                 # self.send_feedback({'msg' : "Work complete successfully."})
                 rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
-                move_to_pose(self.trajectoryClient, {
-                    "head_pan;to" : 0,
-                })
                 break
 
         self.reset()
-        self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
+        self.server.set_succeeded(result = DrawerTriggerResult(success = True))
 
 
 if __name__ == '__main__':

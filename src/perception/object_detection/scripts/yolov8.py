@@ -165,7 +165,6 @@ class ObjectDetectionNode:
         nPredictions = len(classes)
 
         msg = Detections()
-        print(image_time)
         msg.header.stamp = image_time
         msg.nPredictions  = nPredictions
         msg.box_bounding_boxes = boxes.tolist()
@@ -177,6 +176,7 @@ class ObjectDetectionNode:
         if self.visualize:
             annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
             rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+            annotated_img = cv2.rotate(annotated_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(annotated_img))
 
 

@@ -80,10 +80,41 @@ class AlignToObject:
         rospy.loginfo(f"[{self.node_name}]: Node initialized")
         self.prevtime = time.time()
         
+    # def joint_servo(self):
+        
+    #     rospy.loginfo(f"[{self.node_name}]: Joint servoing")
+    #     move_to_pose(self.trajectoryClient, {
+    #         'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
+    #         'head_pan;to' : self.vs_range[0],
+    #     })
+        
+    #     self.scene_parser.clear_observations()
+    #     while not rospy.is_shutdown():
+    #         for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
+    #             move_to_pose(self.trajectoryClient, {
+    #                 'head_pan;to' : angle,
+    #             })
+    #             rospy.sleep(self.vs_range[3]) #settling time.
+    #             self.scene_parser.capture_detection()
+    #             rospy.sleep(0.5)
+                
+    #         # self.objectLocation = [x, y, z]
+    #         # rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
+    #         move_to_pose(self.trajectoryClient, {
+    #             'base_translate;vel' :0.0,
+    #             'base_rotate;vel' : 0.1,
+    #         })
+            
+            
+
     
     def findAndOrientToObject(self):
         
         rospy.loginfo(f"[{self.node_name}]: Finding and orienting to object")
+        if self.scene_parser.parse_mode == "ARUCO":
+            self.head_tilt_angle_search = 30
+        else:
+            self.head_tilt_angle_search = 10
         
         move_to_pose(self.trajectoryClient, {
             'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
@@ -91,23 +122,39 @@ class AlignToObject:
         })
         rospy.sleep(2)
         nRotates = 0
+        self.scene_parser.clear_observations()
         while not rospy.is_shutdown():
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
+                self.scene_parser.is_moving = True
                 move_to_pose(self.trajectoryClient, {
                     'head_pan;to' : angle,
                 })
-                rospy.sleep(self.vs_range[3]) #settling time.
+                rospy.sleep(0.5) #settling time.
+                self.scene_parser.is_moving = False
+                rospy.sleep(0.5)
+                self.scene_parser.capture_detection()
+                rospy.sleep(1)
 
-            [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location()
-            self.scene_parser.clear_observations()
+            [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = False)
+            
             if success:
                 self.objectLocation = [x, y, z]
-                rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
+                rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(np.rad2deg(angleToGo), (x, y, z), radius))
+                # angleToGo = np.arctan2(y, x)
                 move_to_pose(self.trajectoryClient, {
-                    'base_rotate;by' : angleToGo,
                     'head_pan;to' : 0,
                 })
-                
+                move_to_pose(self.trajectoryClient, {
+                    'base_rotate;by' : angleToGo,
+                })
+                rospy.sleep(3)
+                self.scene_parser.clear_observations()
+                [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
+                if success:
+                    move_to_pose(self.trajectoryClient, {
+                        'base_rotate;by' : angleToGo
+                    })
+                rospy.sleep(3)
                 return True
             else:
                 rospy.loginfo("Object not found, rotating base.")
@@ -146,7 +193,7 @@ class AlignToObject:
             'head_tilt;to' : - self.head_tilt_angle_grasp * np.pi/180,
         })
         rospy.sleep(1)
-        if not self.scene_parser.clearAndWaitForNewObject():
+        if not self.scene_parser.clearAndWaitForNewObject(5):
             return False
 
         maxGraspableDistance = self.max_graspable_distance
@@ -179,7 +226,6 @@ class AlignToObject:
                         'base_translate;vel' : 0.0,
                     })          
                     return True
-            # if distanceMoved >= distanceToMove - 0.3:
             else:
                 if time.time() - lastDetectedTime > intervalBeforeRestart:
                     rospy.loginfo("Lost track of the object. Going back to search again.")
@@ -267,6 +313,61 @@ class AlignToObject:
         
         return True
 
+    def main_drawer(self):
+        rospy.loginfo("Triggered Visual Servoing")
+        
+        while not rospy.is_shutdown():
+            if self.state == State.SEARCH:
+                success = self.findAndOrientToObject()                
+                if not success:
+                    rospy.loginfo("Object not found. Exiting visual servoing")
+                    self.reset()
+                    return False
+                self.state = State.MOVE_TO_OBJECT
+
+            elif self.state == State.MOVE_TO_OBJECT:
+                success = self.moveTowardsObject()
+                if not success:
+                    rospy.loginfo("Object not found. Exiting visual servoing")
+                    self.reset()
+                    return False
+                self.state = State.ROTATE_90
+
+            elif self.state == State.ROTATE_90:
+                success = self.alignObjectForManipulation()
+                self.scene_parser.clear_observations()
+                rospy.sleep(3)
+                [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
+                if success:
+                    move_to_pose(self.trajectoryClient, {
+                        'base_rotate;by' : angleToGo + np.pi/2
+                    })
+                    rospy.sleep(2)
+                if not success:
+                    rospy.loginfo("Object not found. Exiting visual servoing")
+                    self.reset()
+                    return False
+                self.state = State.ALIGN_HORIZONTAL
+
+            elif self.state == State.ALIGN_HORIZONTAL:
+                if self.scene_parser.parse_mode == "ARUCO":
+                    offset = 0.08
+                else:
+                    offset = 0.0
+                success = self.alignObjectHorizontal(ee_pose_x = offset)
+                if not success:
+                    rospy.loginfo("Object not found. Exiting visual servoing")
+                    self.reset()
+                    return False
+                self.state = State.COMPLETE
+
+            elif self.state == State.COMPLETE:
+                break
+            rospy.sleep(0.5)
+        rospy.loginfo("Visual servoing is complete!")
+        self.reset()
+        return True
+    
     def main(self):
         rospy.loginfo("Triggered Visual Servoing")
         
@@ -293,10 +394,14 @@ class AlignToObject:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
                     return False
-                self.state = State.COMPLETE
+                self.state = State.ALIGN_HORIZONTAL
 
             elif self.state == State.ALIGN_HORIZONTAL:
-                success = self.alignObjectHorizontal()
+                if self.scene_parser.parse_mode == "ARUCO":
+                    offset = 0.08
+                else:
+                    offset = 0.0
+                success = self.alignObjectHorizontal(ee_pose_x = offset)
                 if not success:
                     rospy.loginfo("Object not found. Exiting visual servoing")
                     self.reset()
