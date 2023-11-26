@@ -89,15 +89,18 @@ class ManipulationFSM:
         self.planeOfGrasp = None
 
     def pick(self, isPublish = True):
+        
+        #converts depth image into point cloud
+        self.scene_parser.set_point_cloud(publish = isPublish)
+        grasp = self.scene_parser.get_grasp(publish = isPublish)
+        plane = self.scene_parser.get_plane(publish = isPublish)
+        
+        
         self.manipulationMethods.move_to_pregrasp(self.trajectoryClient)
-
         ee_pose = self.manipulationMethods.getEndEffectorPose()
         self.basicServoing.alignObjectHorizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
         
-        #converts depth image into point cloud
-        self.scene_parser.set_point_cloud(publish = isPublish) 
-        grasp = self.scene_parser.get_grasp(publish = isPublish)
-        plane = self.scene_parser.get_plane(publish = isPublish)
+        
         
         if grasp:
             grasp_center, grasp_yaw = grasp

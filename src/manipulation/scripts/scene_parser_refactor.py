@@ -6,6 +6,8 @@ import message_filters
 from yolo.msg import Detections
 import rospy
 import time
+import random
+import colorsys
 import tf
 from visualization_msgs.msg import Marker
 
@@ -20,6 +22,82 @@ import sensor_msgs.point_cloud2 as pcl2
 
 from yolo.msg import DeticDetections, DeticDetectionsResponse
 
+class ObjectLocation:
+    
+    def __init__(self, time_diff_for_realtime):
+        
+        self.time_diff_for_realtime = time_diff_for_realtime
+        self.clear()
+
+    def clear(self):
+        self.positions = []
+        self.orientations = []
+        self.times = []
+        self.confidences = []
+        self.n_items = 0
+        
+    def add_observation(self, x, y, z, roll, pitch, yaw, confidence, t):
+        self.positions.append([x, y, z])
+        self.orientations.append([roll, pitch, yaw])
+        self.times.append(t)
+        self.confidences.append(confidence)
+        self.n_items += 1
+    
+    def get_estimate(self):
+
+        if self.n_items == 0:
+            return None, False
+        
+        weights = np.array(self.confidences)
+
+        positions = np.array(self.positions)
+        orientations = np.array(self.orientations)
+        x = np.average(positions[:, 0], weights = weights)
+        y = np.average(positions[:, 1], weights = weights)
+        z = np.average(positions[:, 2], weights = weights)
+        avg_roll = np.average(orientations[:, 0], weights = weights)
+        avg_pitch = np.average(orientations[:, 1], weights = weights)
+        avg_yaw = np.average(orientations[:, 2], weights = weights)
+                
+        angleToGo = np.arctan2(y, x) #orient to face the aruco
+        radius = np.sqrt(x**2 + y**2)
+        
+        dic = {
+            'x' : x,
+            'y' : y,
+            'z' : z,
+            'angleToGo' : angleToGo,
+            'radius' : radius,
+            'roll' : avg_roll,
+            'pitch' : avg_pitch,
+            'yaw' : avg_yaw,
+        }
+        
+        return dic, True
+
+    def get_latest_observation(self):
+        if self.n_items == 0:
+            return None, False
+        isLive = False
+        latest_position = self.positions[-1]
+        latest_orientation = self.orientations[-1]
+        latest_time = self.times[-1]
+        latest_confidence = self.confidences[-1]
+        dic = {
+            'x' : latest_position[0],
+            'y' : latest_position[1],
+            'z' : latest_position[2],
+            'roll' : latest_orientation[0],
+            'pitch' : latest_orientation[1],
+            'yaw' : latest_orientation[2],
+            'confidence' : latest_confidence,
+            'time' : latest_time,
+        }
+        if time.time() - latest_time < self.time_diff_for_realtime:
+            isLive = True
+        return dic, isLive
+
+
 class SceneParser:
     def __init__(self):
 
@@ -33,6 +111,10 @@ class SceneParser:
         self.marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
         
         
+        self.class_list  = rospy.get_param('/object_detection/class_list')
+        self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
+        self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
+        
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for DETIC service...")
         self.detic_service = rospy.ServiceProxy('/detic_predictions', DeticDetections)
         self.detic_service.wait_for_service()
@@ -41,12 +123,13 @@ class SceneParser:
         self.obtained_initial_images = False
         self.request_clear_object = False
         
-        self.objectLocArr = []
+        # self.objectLocArr = []
+        self.object = ObjectLocation(time_diff_for_realtime = self.time_diff_for_realtime)
         self.objectId = None
         
         self.current_detection = None
-        self.scene_points = None
-        self.object_points = None
+        self.scene_no_object_cloud = None
+        self.object_cloud = None
         self.prevtime = time.time()
         
         self.tsdf_volume = None
@@ -92,9 +175,7 @@ class SceneParser:
                 rospy.loginfo("Failed to obtain images. Please check the camera node.")
                 exit()
         
-        self.class_list  = rospy.get_param('/object_detection/class_list')
-        self.time_diff_for_realtime = rospy.get_param('/manipulation/time_diff_for_realtime', 0.2)
-        self.object_filter = rospy.get_param('/manipulation/object_filter', {'height' : 0.7, 'radius' : 2.5})
+
         
         self.listener = tf.TransformListener()
         self.tf_ros = tf.TransformerROS()
@@ -120,32 +201,22 @@ class SceneParser:
             
     def clearAndWaitForNewObject(self, numberOfCopies = 10):
         rospy.loginfo("Clearing object location array")
-        self.request_clear_object = True
-        while self.request_clear_object:
-            rospy.sleep(0.1)
-            
+        self.clear_observations(wait = True)
         rospy.loginfo("Object location array cleared. Waiting for new object location")
         startTime = time.time()
-        while len(self.objectLocArr) <= numberOfCopies:
-            rospy.loginfo(f"Accumulated copies = {len(self.objectLocArr)} ")
+        while self.object.n_items <= numberOfCopies:
+            rospy.loginfo(f"Accumulated copies = {self.object.n_items} ")
             if time.time() - startTime >= 10:
-                rospy.loginfo("Object not found :(")
+                rospy.loginfo("Timed out waiting to detect object..")
                 return False
             rospy.sleep(0.5)
-
         return True
     
     def get_latest_observation(self):
-        if len(self.objectLocArr) == 0:
-            return [np.inf, np.inf, np.inf, np.inf, np.inf], False
-        object_properties = self.objectLocArr[-1]
-        x, y, z, r, p, yaw, confidence, pred_time = object_properties
-        isLive = False
-        
-        if time.time() - pred_time < self.time_diff_for_realtime:
-            isLive = True
-        
-        return object_properties, isLive
+        return self.object.get_latest_observation()
+    
+    def estimate_object_location(self):
+        return self.object.get_estimate()
     
     def is_grasp_success(self):
         """Checks if the grasp was successful or not
@@ -158,8 +229,6 @@ class SceneParser:
     
     def parse_detections(self, detection):
         # get object detections
-        
-
         num_detections = (detection.nPredictions)
         msg = {
             "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
@@ -182,7 +251,6 @@ class SceneParser:
             
             x_f = (x1 + x2)/2
             y_f = (y1 + y2)/2
-            # z_f = self.depth_image[int(y_f), int(x_f)]/1000.0
             
             # TODO publish point cloud here instead of saving image like this.
              
@@ -207,15 +275,24 @@ class SceneParser:
                 "base_link"
             )
             
-            
             radius = np.sqrt(x**2 + y**2)
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
-                # print(x, y, z, x_f, y_f, z_f)
-                self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
-                
+                # self.objectLocArr.append((x, y, z, 0, 0, 0, confidence, time.time()))
                 self.current_detection = [x1, y1, x2, y2]
+                self.object.add_observation(
+                    x = x,
+                    y = y,
+                    z = z,
+                    roll = 0,
+                    pitch = 0,
+                    yaw = 0,
+                    confidence = confidence,
+                    t = time.time()
+                )
+                
+                
 
     def parse_aruco(self, image):
         
@@ -238,14 +315,24 @@ class SceneParser:
                     
                     roll, pitch, yaw = tf.transformations.euler_from_quaternion(quaternion)
                     x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
-                    self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
+                    # self.objectLocArr.append((x, y, z, roll, pitch, yaw, 1.0, time.time()))
+                    self.object.add_observation(
+                        x = x,
+                        y = y,
+                        z = z,
+                        roll = roll,
+                        pitch = pitch,
+                        yaw = yaw,
+                        confidence = 1.0,
+                        t = time.time()
+                    )
                     self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
                     
 
     def parse_scene(self, depth, rgb , detection):
         self.obtained_initial_images = True
+
         # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
-        
         # self.prevtime = time.time()
         
         # convert images to numpy arrays
@@ -257,7 +344,7 @@ class SceneParser:
         
         if self.request_clear_object:
             self.request_clear_object = False
-            self.objectLocArr = []
+            self.object.clear()
         
         
         if self.objectId is None:
@@ -311,30 +398,8 @@ class SceneParser:
                 return transform_mat
                 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                print("Not found transform sorry.")
+                rospy.loginfo("Transform not found between " + target_frame + " and " + source_frame + " at " + str(rospy.Time.now()))
                 continue
-    
-    
-    def estimate_object_location(self):
-        objectLocs = np.array(self.objectLocArr)
-        
-        if len(objectLocs) == 0:
-            return [np.inf, np.inf, np.inf, np.inf, np.inf], False
-
-        weights = objectLocs[:, 6]
-        # x, y, z, r, p, y, conf, time
-        x = np.average(objectLocs[:, 0], weights = weights)
-        y = np.average(objectLocs[:, 1], weights = weights)
-        z = np.average(objectLocs[:, 2], weights = weights)
-        
-        if self.mode ==  "ARUCO":
-            angleToGo = np.average(objectLocs[:, 5], weights = weights)
-        elif self.mode == "YOLO":
-            angleToGo = np.arctan2(y, x) #orient to face the aruco
-        radius = np.sqrt(x**2 + y**2)
-        
-        return (angleToGo, x, y, z, radius), True
-    
     
     def reset_tsdf(self, resolution = 0.05):
         self.tsdf_volume = o3d.pipelines.integration.ScalableTSDFVolume(
@@ -347,21 +412,80 @@ class SceneParser:
         pcd = self.tsdf_volume.extract_point_cloud()
         points = np.array(pcd.points)
         points = points[points[:, 2] < 1.6]
-        header = Header()
-        header.stamp = rospy.Time.now()
-        header.frame_id = "base_link"  # Set your desired frame_id
-        msg = pcl2.create_cloud_xyz32(header, points)
-        self.obj_cloud_pub.publish(msg)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+        
+        if publish:
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, points)
+            self.obj_cloud_pub.publish(msg)
+            
         return pcd
     
-    def publish_point(self, point, name = "point", frame = "base_link"):
-        self.tf_broadcaster.sendTransform((point[0], point[1], point[2]),
-            tf.transformations.quaternion_from_euler(0, 0, 0),
+    def publish_point(self, point, euler = (0, 0, 0), name = "point", frame = "base_link"):
+        self.tf_broadcaster.sendTransform(point,
+            tf.transformations.quaternion_from_euler(*euler),
             rospy.Time.now(),
             name,
             frame
         )
+    
+    def get_marker(
+        self, 
+        id,
+        frame = 'base_link', 
+        center = [0, 0, 0],
+        mtype = "CUBE",
+        extents = [0.05, 0.05, 0.05],
+        color = None,
+        alpha = 1,
+        euler_angles = [0, 0, 0]
+    ):
+        marker = Marker()
+        marker.header.frame_id = frame
+        marker.header.stamp = rospy.Time.now()
+        marker.header.stamp = rospy.Time.now()
+
+        types = ["ARROW", "CUBE", "SPHERE", "CYLINDER"]
+        mtype = types.index(mtype.upper())
         
+        # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
+        marker.type = mtype
+        marker.id = id
+
+        # Set the scale of the marker
+        marker.scale.x = extents[0]
+        marker.scale.y = extents[1]
+        marker.scale.z = extents[2]
+
+        # Set the color
+        
+        
+        if color is None:
+            # generate bright random color unique to the uid
+            random.seed(id)
+            h,s,l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
+            color = [int(256*i) for i in colorsys.hls_to_rgb(h,l,s)]
+            
+        marker.color.r = color[0]
+        marker.color.g = color[1]
+        marker.color.b = color[2]
+        marker.color.a = alpha
+
+        # Set the pose of the marker
+        marker.pose.position.x = center[0]
+        marker.pose.position.y = center[1]
+        marker.pose.position.z = center[2]
+        quat = R.from_euler('xyz', euler_angles).as_quat()
+
+        marker.pose.orientation.x = quat[0]
+        marker.pose.orientation.y = quat[1]
+        marker.pose.orientation.z = quat[2]
+        marker.pose.orientation.w = quat[3]
+        
+        return marker
     
     def capture_shot(self, publish = False):
         
@@ -372,39 +496,11 @@ class SceneParser:
         if isLive:
             x, y, z, confidence, _ = object_properties
             detection = [x, y, z]
-            marker = Marker()
-            marker.header.frame_id = "base_link"
-            marker.header.stamp = rospy.Time.now()
-            marker.header.stamp = rospy.Time.now()
-
-            # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
-            marker.type = 2
-            marker.id = 10
-
-            # Set the scale of the marker
-            marker.scale.x = 0.05
-            marker.scale.y = 0.05
-            marker.scale.z = 0.05
-
-            # Set the color
-            color=  [1, 0, 0]
-            center = detection
-            marker.color.r = color[0]
-            marker.color.g = color[1]
-            marker.color.b = color[2]
-            marker.color.a = 1
-
-            # Set the pose of the marker
-            marker.pose.position.x = center[0]
-            marker.pose.position.y = center[1]
-            marker.pose.position.z = center[2]
-            
-            quat = R.from_matrix(np.eye(3)).as_quat()
-            
-            marker.pose.orientation.x = quat[0]
-            marker.pose.orientation.y = quat[1]
-            marker.pose.orientation.z = quat[2]
-            marker.pose.orientation.w = quat[3]
+            marker = self.get_marker(
+                id = 10, 
+                center = detection,
+                mtype = "sphere"
+            )
             self.marker_pub.publish(marker)
 
         depthimg = self.depth_image.copy()
@@ -419,12 +515,79 @@ class SceneParser:
                 rgbd_image,
                 self.o3d_cam,
                 extrinsics)
+    
+    def get_detic_detections(self):
+        req = DeticDetectionsRequest(
+            image = self.bridge.cv2_to_imgmsg(self.color_image, encoding="passthrough"),
+        )
+        rospy.loginfo("Requested detic")
+        detection : DeticDetectionsResponse = self.detic_service(req)
+        rospy.loginfo("Got from detic")
+        num_detections = detection.nPredictions
+        msg = {
+            "boxes" : np.array(detection.box_bounding_boxes).reshape(num_detections, 4),
+            "box_classes" : np.array(detection.box_classes).reshape(num_detections),
+            'confidences' : np.array(detection.confidences).reshape(num_detections),
+        }
+
+        loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
+        if len(loc) > 0:
+            loc = loc[0]
+            box = np.squeeze(msg['boxes'][loc]).astype(int)
+            confidence = np.squeeze(msg['confidences'][loc])
+            x1, y1, x2, y2 =  box
+            crop = self.depth_image[y1 : y2, x1 : x2]
+            
+            instance_id = loc + 1
+            
+            mask = self.bridge.imgmsg_to_cv2(detection.seg_mask, desired_encoding="passthrough")
+            mask = np.array(mask).copy()
+            
+            mask[mask != instance_id] = 0
+            mask[mask == instance_id] = 1
+            z_f = np.median(crop[crop != 0])/1000.0
+            
+            x_f = (x1 + x2)/2
+            y_f = (y1 + y2)/2
+            
+            viz = self.color_image.copy().astype(np.float32)
+            viz /= np.max(viz)
+            viz *= 255
+            viz = viz.astype(np.uint8)
+            cv2.rectangle(viz, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.circle(viz, (int(x_f), int(y_f)), 5, (255, 0, 0), -1)
+            viz[:, :, 0][mask != 0] = 255
+            viz = cv2.resize(viz, (0, 0), fx = 0.25, fy = 0.25)
+            cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/detic.png', viz)
+            self.prevtime = time.time()
         
+            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
+            x, y, z = point.x, point.y, point.z
+            # print(x, y, z)
+            self.tf_broadcaster.sendTransform((x, y, z),
+                tf.transformations.quaternion_from_euler(0, 0, 0),
+                rospy.Time.now(),
+                "object_pose",
+                "base_link"
+            )
+            
+            
+            radius = np.sqrt(x**2 + y**2)
+            confidence /= radius
+            
+            if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
+                
+                return [x1, y1, x2, y2], mask, True
+                
+        return None, None, False
     
     def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask):
         """
         workspace mask is a binary mask of the same size as depth image
         """
+        rospy.loginfo("Generating point cloud from image...")
+        starttime = time.time()
+        
         dimg = depth_image.copy()
         dimg *= workspace_mask
         dimg = dimg.astype(np.float32)
@@ -460,19 +623,16 @@ class SceneParser:
         
         points_cam_frame = np.vstack((xx, yy, zz, np.ones_like(xx))).T
         
-        # if transform is None:
-        #     transform = self.transform
-        # else:
         transform = self.get_transform("base_link", "camera_color_optical_frame")
 
         points_base_frame = np.matmul(transform, points_cam_frame.T).T
         points_cam_frame = points_cam_frame[:, :3]
         points_base_frame = points_base_frame[:, :3]
         
+        rospy.loginfo("Generated point cloud. Took {} seconds.".format(time.time() - starttime))
+        
         return points_base_frame, colors
         
-        
-    
     def get_plane(self, height_filter = 0.5, dist_filter = 1, publish = False):
         points = self.scene_points
         if points is None:
@@ -486,7 +646,12 @@ class SceneParser:
         
         
         if possible_plane_points.shape[0] < 1000:
+            rospy.loginfo("Too few points to fit plane. Aborting.")
             return None
+        
+        
+        rospy.loginfo("Fitting plane....")
+        starttime = time.time()
         
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(possible_plane_points)
@@ -495,13 +660,6 @@ class SceneParser:
                                                         num_iterations=2000)
         inlier_points = np.array(o3dpcd.select_by_index(inliers).points)
         
-        if publish:
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "base_link"  # Set your desired frame_id
-            msg = pcl2.create_cloud_xyz32(header, inlier_points)
-            self.plane_cloud_pub.publish(msg)
-            
         plane_bounds = [
             np.min(inlier_points[:, 0]), 
             np.max(inlier_points[:, 0]),
@@ -509,10 +667,23 @@ class SceneParser:
             np.max(inlier_points[:, 1]),
         ]
         plane_height = np.mean(inlier_points[:, 2])
+        
+        rospy.loginfo("Generated plane. Took {} seconds.".format(time.time() - starttime))
+        
+        if publish:
+            rospy.loginfo("Publishing plane cloud")
+            starttime = time.time()
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, inlier_points)
+            self.plane_cloud_pub.publish(msg)
+            rospy.loginfo("Published plane cloud. Took" + str(time.time() - starttime) + " seconds.")
             
         return plane_bounds, plane_height
     
     def get_placing_location(self, plane, height_of_object, publish = False):
+        rospy.loginfo("Generating point to palce")
         plane_bounds, plane_height = plane
         xmin, xmax, ymin, ymax = plane_bounds
         
@@ -527,7 +698,7 @@ class SceneParser:
             (ymin + ymax)/2,
             plane_height + height_of_object + 0.1
         ])
-        rospy.loginfo("Placing point generated)")
+        rospy.loginfo("Placing point generated...")
         if publish:
             rospy.loginfo("Publishing placing location")
             self.tf_broadcaster.sendTransform((placingLocation),
@@ -536,14 +707,24 @@ class SceneParser:
                 "placing_location",
                 "base_link"
             )
+            rospy.loginfo("Published transform for placing location")
+            
         return placingLocation
     
-    def get_point_cloud_for_planning(self, publish = False):
+    def get_point_cloud_o3d(self, ws_mask = None, downsample = None, publish = False):
+        starttime = time.time()
+        rospy.loginfo("Generating point cloud...")
+        
         depth = self.depth_image.copy()
         color_image = self.color_image.copy() 
         
         depth[depth < 150] = 0
         depth[depth > 3000] = 0
+        
+        if ws_mask is None:
+            ws_mask = np.ones_like(depth)
+            
+        depth *= ws_mask
         
         depth = o3d.geometry.Image(depth)
         color = o3d.geometry.Image(color_image.astype(np.uint8))
@@ -552,7 +733,7 @@ class SceneParser:
         extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
         
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            color, depth, depth_scale=1000, convert_rgb_to_intensity=False
+            color, depth, depth_scale=1000.0, convert_rgb_to_intensity=False
         )
         cam = o3d.camera.PinholeCameraIntrinsic()
         cam.intrinsic_matrix = self.intrinsics
@@ -563,65 +744,52 @@ class SceneParser:
             rgbd, cam, extrinsics
         )
         
-        cloud = cloud.voxel_down_sample(voxel_size=0.05)
+        if downsample is not None:
+            rospy.loginfo("Subsampling cloud")
+            cloud = cloud.voxel_down_sample(voxel_size=downsample)
+        
         points = np.array(cloud.points)
-        self.scene_o3d_cloud = cloud
-
+        rospy.loginfo("Point cloud generated in {} seconds.".format(time.time() - starttime))
+        
         if publish:
+            rospy.loginfo("Publishing point cloud")
+            starttime = time.time()
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
             msg = pcl2.create_cloud_xyz32(header, points)
             self.obj_cloud_pub.publish(msg)
+            rospy.loginfo("Published point cloud. Took" + str(time.time() - starttime) + "seconds.")
             
-        
+        return points
         
     
-    def set_point_cloud(self, visualize = False, publish = False):
-        rospy.loginfo(f"[{rospy.get_name()}]: Generating point cloud")
+    def set_point_cloud(self, visualize = False, use_detic = False, publish = False, get_object = True):
+        rospy.loginfo(f"[{rospy.get_name()}]: Setting point cloud")
         
-        depthimg = self.depth_image.copy()
-        rgbimg = self.color_image.copy()    
-        # loc = np.where(np.array(detection['box_classes']).astype(np.uint8) == self.objectId)[0]
-        # box = np.squeeze(detection['boxes'][loc]).astype(int)
-        # print(box)
-        if self.current_detection:
-            x1, y1, x2, y2 =  self.current_detection
-        else:
-            x1 = 0
-            y1 = 0
-            x2 = self.cameraParams['width']
-            y2 = self.cameraParams['height']
+        if get_object:
+            success = False
+            if use_detic:           
+                result, seg_mask, success = self.get_detic_detections()
+            
+            if not success:
+                if self.current_detection:
+                    x1, y1, x2, y2 =  np.array(self.current_detection).astype(int)
+                else:
+                    x1 = 0
+                    y1 = 0
+                    x2 = self.cameraParams['width']
+                    y2 = self.cameraParams['height']
+                self.ws_mask = np.zeros_like(self.depth_image)
+                self.ws_mask[y1 : y2, x1 : x2] = 1
+            else:
+                x1, y1, x2, y2 =  result
+                self.ws_mask = seg_mask
 
-        self.ws_mask = np.zeros_like(self.depth_image)
-        self.ws_mask[y1 : y2, x1 : x2] = 1
+        self.object_cloud = self.get_point_cloud_o3d(mask = self.ws_mask, publish = publish)
+        no_object_mask = np.ones_like(self.depth_image) - self.ws_mask
         
-        self.object_points, self.object_colors = self.get_point_cloud_from_image(depthimg, rgbimg, self.ws_mask)
-        self.scene_points, self.scene_colors = self.get_point_cloud_from_image(depthimg, rgbimg, np.ones_like(self.depth_image))
-        
-        rospy.loginfo(f"[{rospy.get_name()}]: Point cloud generated.")
-        
-        if publish:
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "base_link"  # Set your desired frame_id
-            fields = [
-                PointField('x', 0, PointField.FLOAT32, 1),
-                PointField('y', 4, PointField.FLOAT32, 1),
-                PointField('z', 8, PointField.FLOAT32, 1),
-                # rgb
-                PointField('r', 12, PointField.UINT8, 1),
-                PointField('g', 13, PointField.UINT8, 1),
-                PointField('b', 14, PointField.UINT8, 1),
-            ]
-            points = self.object_points
-            cols = self.object_colors * 255
-            # cols = cols.astype(np.uint8)
-            # inlier_points = np.hstack((points, cols))
-            # msg = pcl2.create_cloud(header, fields, inlier_points)
-            msg = pcl2.create_cloud_xyz32(header, points)
-            self.obj_cloud_pub.publish(msg)
-        
+        self.scene_no_object_cloud = self.get_point_cloud_o3d(mask = no_object_mask, publish = publish)
         
         if visualize:
             scene_pcd = o3d.geometry.PointCloud()
@@ -632,42 +800,35 @@ class SceneParser:
         
     
     def get_grasp(self, visualize = False, publish = False):
-        
-        
-        
-        
-        if self.object_points is None:
+        rospy.loginfo("Generating grasp")
+        starttime = time.time()
+        if self.object_cloud is None:
+            rospy.loginfo("No object cloud found, please set it first.")
             return None
         
-        # check if object is elongated on the table
-        
-        points = self.object_points
-        
+        points = self.object_cloud
         # segment out the object and remove things that are not part of the object using depth information
-        
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(points)
-        o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors)
-        
+
+        rospy.loginfo("Clustering object cloud")        
         labels = np.array(o3dpcd.cluster_dbscan(eps=0.01, min_points=50, print_progress=False))
         max_label = labels.max()
-        print(f"point cloud has {max_label + 1} clusters")
+        rospy.loginfo("Found {} clusters".format(max_label + 1))
 
-        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-        colors[labels < 0] = 0
+        # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+        # colors[labels < 0] = 0
         
         labels += 1
         
         cluster_sizes = np.bincount(labels)
         largest_cluster = np.argmax(cluster_sizes[1:]) + 1
         o3dpcd.points = o3d.utility.Vector3dVector(points[labels == largest_cluster])
-        o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors[labels == largest_cluster])
-        
-        
+        # o3dpcd.colors = o3d.utility.Vector3dVector(self.object_colors[labels == largest_cluster])
         points = np.array(o3dpcd.points)
         
         ori_bbox = o3dpcd.get_oriented_bounding_box()
-        axi_bbox = o3dpcd.get_axis_aligned_bounding_box()
+        # axi_bbox = o3dpcd.get_axis_aligned_bounding_box()
         
         box_angles = np.array(ori_bbox.R)
         extents = np.array(ori_bbox.extent)
@@ -676,19 +837,16 @@ class SceneParser:
         unit_vecs_bbox = box_angles.T
         axis_vec = unit_vecs_bbox[long_axis]
         
-        print(extents)
-        
-        
+        rospy.loginfo("Extents of the bounding box are {}".format(extents))
         
         grasp_center = np.array(ori_bbox.center)
         grasp_yaw = np.arctan2(axis_vec[1], axis_vec[0])
-        # grasp_yaw = np.mod(grasp_yaw + 2 * np.pi, 2 * np.pi) - np.pi
+
         if grasp_yaw < 0:
             grasp_yaw += np.pi/2
         else:
             grasp_yaw -= np.pi/2    
-        
-        quat = R.from_matrix(box_angles).as_quat()
+        rospy.loginfo("Generated grasp. Took {} seconds.".format(time.time() - starttime))
         
         if publish:
             rospy.loginfo("Publishing grasp pose")
@@ -698,39 +856,23 @@ class SceneParser:
                 "grasp_pose",
                 "base_link"
             )
-            # rospy.loginfo("Publishing grasp pose")
-            # self.tf_broadcaster.sendTransform((grasp_center),
-            #     quat,
-            #     rospy.Time.now(),
-            #     "grasp_pose",
-            #     "base_link"
-            # )
-            
-            header = Header()
-            header.stamp = rospy.Time.now()
-            header.frame_id = "base_link"  # Set your desired frame_id
-            fields = [
-                PointField('x', 0, PointField.FLOAT32, 1),
-                PointField('y', 4, PointField.FLOAT32, 1),
-                PointField('z', 8, PointField.FLOAT32, 1),
-                # rgb
-                PointField('r', 12, PointField.UINT8, 1),
-                PointField('g', 13, PointField.UINT8, 1),
-                PointField('b', 14, PointField.UINT8, 1),
-            ]
-            points = np.array(o3dpcd.points)
-            # cols = self.object_colors * 255
-            # cols = cols.astype(np.uint8)
-            # inlier_points = np.hstack((points, cols))
-            # msg = pcl2.create_cloud(header, fields, inlier_points)
-            msg = pcl2.create_cloud_xyz32(header, points)
-            self.obj_cloud_pub.publish(msg)
-        
+            box_marker = self.get_marker(
+                id = 30,
+                center = grasp_center,
+                mtype = "CUBE",
+                extents = extents,
+                euler_angles = R.from_matrix(box_angles).as_euler('xyz'),
+                frame = "base_link",
+                alpha = 0.3
+            )
+
+            self.marker_pub.publish(box_marker)
         
         if visualize:
             line_set = o3d.geometry.LineSet()
-            
+            h, w, l = extents
             lineLength = max(h, w, l) / 2
+            axis_ind = long_axis 
             line_set.points = o3d.utility.Vector3dVector(np.array(
                 [
                     grasp_center, 
@@ -784,7 +926,6 @@ class SceneParser:
                                                 line_set,
                                                 ori_bbox,
                                             ])
-            
         
         return [grasp_center, grasp_yaw]
     

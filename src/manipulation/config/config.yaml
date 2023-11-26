@@ -14,6 +14,8 @@ interval_till_restart : 3 # seconds
 head_tilt_angle_search : 10 # degrees
 head_tilt_angle_grasp : 30 # degrees
 
+# drawer
+head_tilt_angle_search_drawer : 30 # degrees
 
 
 moving_average_n : 25 # for PID settling time
