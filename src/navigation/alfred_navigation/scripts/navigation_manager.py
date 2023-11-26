@@ -8,6 +8,7 @@ from std_srvs.srv import Trigger, TriggerResponse
 from control_msgs.msg import FollowJointTrajectoryAction
 import threading
 import concurrent.futures
+from std_msgs.msg import Bool 
 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback, MoveBaseFeedback, MoveBaseActionResult, MoveBaseResult
 from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
@@ -28,6 +29,9 @@ class NavigationManager():
         self.nav_goal_theta = None
 
         self.nav_result = None
+
+
+        self.low_res_pcd_status_pub = rospy.Publisher("low_res_pcd_status", Bool, queue_size=10)
 
         self.navman_server = actionlib.SimpleActionServer('nav_man', NavManAction, self.update_goal, False)
         self.movebase_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
@@ -55,6 +59,8 @@ class NavigationManager():
     def update_goal(self, goal : NavManGoal):
         
         print("Navigation Manager received goal from Task Planner")
+
+        self.low_res_pcd_status_pub.publish(True)
 
         self.nav_goal_x = goal.x
         self.nav_goal_y = goal.y
@@ -138,6 +144,8 @@ class NavigationManager():
             # print("Navigation Manager will now DISABLE 3D Navigation")
             # self.navigation_dynamic_reconfigure(self.rgbd_layer_status)
             # print("Navigation Manager has disabled 3D Navigation")
+            
+            self.low_res_pcd_status_pub.publish(False)
 
             navman_result.success = True
             self.navman_server.set_succeeded(navman_result)

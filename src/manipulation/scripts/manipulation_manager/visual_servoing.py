@@ -44,7 +44,7 @@ class AlignToObject:
         self.objectLocArr = []
         self.isDepthMatters = False
         
-        self.horizontal_alignment_offset = 0.055
+        self.horizontal_alignment_offset = 0.05  #0.055
  
 
 

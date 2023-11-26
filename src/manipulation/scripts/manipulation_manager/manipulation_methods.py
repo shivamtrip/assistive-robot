@@ -103,7 +103,7 @@ class ManipulationMethods:
         rospy.sleep(2)
         
         self.move_to_pose(trajectoryClient, {
-            "arm;to": y - 0.08, # + 0.08 for cm offset from aruco with center of bottle
+            "arm;to": y - 0.09, # + 0.08 for cm offset from aruco with center of bottle
         })
 
         rospy.sleep(5)
@@ -123,11 +123,13 @@ class ManipulationMethods:
         # Begin STOW procedure
 
         self.move_to_pose(trajectoryClient, {
-           "arm;to" : 0,
+           "wrist_yaw;to" : np.pi,
         })
 
+        rospy.sleep(5)
+
         self.move_to_pose(trajectoryClient, {
-           "wrist_yaw;to" : np.pi,
+           "arm;to" : 0,
         })
 
         rospy.sleep(3)      # previously 10
@@ -168,7 +170,7 @@ class ManipulationMethods:
         rospy.sleep(3)
 
         self.move_to_pose(trajectoryClient, {
-            "arm;to": y + 0.025, # + 0.08 for cm offset from aruco with center of bottle
+            "arm;to": y + 0.03, # + 0.08 for cm offset from aruco with center of bottle
         })
         
         rospy.sleep(4)

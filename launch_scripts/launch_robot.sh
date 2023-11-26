@@ -41,8 +41,8 @@ else
     tmux send-keys -t 0 "sleep 2 && roslaunch interface_manager interface_manager.launch " C-m
     tmux send-keys -t 1 "sleep 4 && roslaunch mission_planner mission_planner.launch" C-m
     tmux send-keys -t 2 "sleep 6 && roslaunch alfred_navigation navigation.launch" C-m
-    tmux send-keys -t 3 "sleep 8 && roslaunch manipulation robot_manipulation.launch" C-m
-    tmux send-keys -t 4 "sleep 10 && roslaunch telepresence telepresence_manager.launch" C-m
+    tmux send-keys -t 3 "sleep 18 && roslaunch manipulation robot_manipulation.launch" C-m
+    tmux send-keys -t 4 "sleep 21 && roslaunch telepresence telepresence_manager.launch" C-m
     tmux send-keys -t 5 "htop" C-m
 
     # tmux send-keys -t 1 "sleep 10 && roslaunch alfred_core perception_robot_tuned.launch" C-m

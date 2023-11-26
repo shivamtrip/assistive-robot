@@ -14,6 +14,7 @@ import actionlib
 from visual_servoing import AlignToObject
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 from human_detection import HumanDetector
+from std_msgs.msg import Bool
 
 
 class State(Enum):
@@ -40,6 +41,8 @@ class TelepresenceManager():
 
         self.prev_state = None
         self.current_state = None
+
+        self.yolo_status_control_pub = rospy.Publisher("yolo_status_control", Bool, queue_size=10)
 
         startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         startManipService()
@@ -70,7 +73,10 @@ class TelepresenceManager():
         
         print("Telepresence Manager received goal from Mission Planner")
 
-        
+
+        self.yolo_status_control_pub.publish(True)      
+    
+
         self.human_detector.objectId = objectId
 
         self.current_state = State.SEARCH
@@ -101,6 +107,7 @@ class TelepresenceManager():
 
                 if self.num_retries > 5:
                     self.human_detector.objectId = None
+                    self.yolo_status_control_pub.publish(False)
                     return False
 
                 self.num_retries += 1
@@ -108,6 +115,7 @@ class TelepresenceManager():
 
         # Stop ArUco detector
         print("Stopping Alignment to User")
+        self.yolo_status_control_pub.publish(False)
         self.human_detector.objectId = None
         self.tele_man_result.success = True
         self.tele_man_server.set_succeeded(self.tele_man_result)
@@ -116,15 +124,15 @@ class TelepresenceManager():
 
 
 if __name__ == "__main__":
-    # switch_to_manipulation = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
-    # switch_to_manipulation.wait_for_service()
-    # switch_to_manipulation()
-    # rospy.init_node("align_to_object", anonymous=True)
-    # node = TelepresenceManager()
-    # node.main(0)
+    switch_to_manipulation = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+    switch_to_manipulation.wait_for_service()
+    switch_to_manipulation()
+    rospy.init_node("align_to_object", anonymous=True)
+    node = TelepresenceManager()
+    node.main(0)
 
-    rospy.init_node('telepresence_manager')
-    telepresence_manager = TelepresenceManager()
+    # rospy.init_node('telepresence_manager')
+    # telepresence_manager = TelepresenceManager()
     
     try:
         rospy.spin()

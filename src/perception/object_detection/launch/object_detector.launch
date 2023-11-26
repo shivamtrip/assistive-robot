@@ -2,5 +2,5 @@
     <group ns="object_detection">
         <rosparam file="$(find yolo)/config/object_detection_params.yaml" />
     </group>
-    <node name="object_detection" pkg="yolo" type="yolov8.py" output="log" />
+    <node name="object_detection" pkg="yolo" type="yolov8.py" output="screen" />
 </launch>

@@ -6,12 +6,15 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/passthrough.h>
+#include "std_msgs/Bool.h"
 
 float fx, fy, cx, cy;
 bool intrinsics_set = false;
 ros::Publisher point_cloud_pub;
 bool start_pub = false;
 int scale_factor = 3;
+bool process_pointcloud = false; 
+
 void convertDepthImageToPointcloud(const sensor_msgs::ImageConstPtr &depth_msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
 {
   // Assuming 16-bit unsigned short depth image
@@ -58,22 +61,27 @@ void convertDepthImageToPointcloud(const sensor_msgs::ImageConstPtr &depth_msg, 
 
 void imageCallback(const sensor_msgs::ImageConstPtr &msg)
 {
-  try
-  {
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    
 
-    convertDepthImageToPointcloud(msg, cloud);
-    sensor_msgs::PointCloud2 pc_msg;
-    pcl::toROSMsg(*cloud, pc_msg);
-    pc_msg.header = msg->header;
-    pc_msg.header.frame_id = "camera_color_optical_frame";
-    point_cloud_pub.publish(pc_msg);
+  if (process_pointcloud){
+    
+    try
+    {
+      pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    
+      convertDepthImageToPointcloud(msg, cloud);
+      sensor_msgs::PointCloud2 pc_msg;
+      pcl::toROSMsg(*cloud, pc_msg);
+      pc_msg.header = msg->header;
+      pc_msg.header.frame_id = "camera_color_optical_frame";
+      point_cloud_pub.publish(pc_msg);
+    }
+    catch (cv_bridge::Exception &e)
+    {
+      ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
+    }
   }
-  catch (cv_bridge::Exception &e)
-  {
-    ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
-  }
+
+
 }
 void infoCallback(const sensor_msgs::CameraInfoConstPtr &info_msg)
 {
@@ -89,6 +97,21 @@ void infoCallback(const sensor_msgs::CameraInfoConstPtr &info_msg)
   }
 }
 
+
+void pcd_status_control(const std_msgs::Bool::ConstPtr& msg){
+
+  if (msg->data == true){
+    process_pointcloud = true; 
+    std::cout << "PCD Publisher will START to publishing low-res pointclouds now!" << std::endl;
+  }
+  else{
+    process_pointcloud = false; 
+    std::cout << "PCD Publisher will STOP publishing low-res pointclouds now." << std::endl;
+  }
+
+}
+
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "pcd_pub");
@@ -103,5 +126,7 @@ int main(int argc, char **argv)
 
   image_transport::Subscriber sub = it.subscribe("/camera/aligned_depth_to_color/image_raw", 1, imageCallback);
   point_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("/low_res_pointcloud", 1);
+
+  ros::Subscriber pcd_status_control_sub = nh.subscribe("low_res_pcd_status", 1000, pcd_status_control);
   ros::spin();
 }
