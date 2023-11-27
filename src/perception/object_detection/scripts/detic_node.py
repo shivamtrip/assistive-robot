@@ -185,7 +185,7 @@ class DeticNode:
         nPredictions = len(classes)
         seg_mask = cv2.rotate(seg_mask, cv2.ROTATE_90_COUNTERCLOCKWISE)
         
-        response = DeticDetectionsActionResult()
+        response = DeticDetectionsResult()
         response.seg_mask = self.cv_bridge.cv2_to_imgmsg(seg_mask, )
         response.nPredictions  = nPredictions
         response.box_bounding_boxes = boxes.tolist()

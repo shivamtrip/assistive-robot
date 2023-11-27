@@ -24,6 +24,7 @@ class_list:
   - 'bottle'
   - 'cup'
   - 'teddy_bear'
+  - 'remote'
   - 'marker'
 
 

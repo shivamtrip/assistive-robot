@@ -172,7 +172,7 @@ class ObjectDetectionNode:
         msg.confidences = confs.tolist()
 
         self.data_pub.publish(msg)
-        rospy.loginfo("Time taken: " + str(time.time() - self.last_image_time) + " seconds.")
+        # rospy.loginfo("Time taken: " + str(time.time() - self.last_image_time) + " seconds.")
         
         if self.visualize:
             annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
