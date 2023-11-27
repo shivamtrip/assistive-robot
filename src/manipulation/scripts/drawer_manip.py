@@ -6,7 +6,7 @@ from scene_parser_refactor import SceneParser
 from visual_servoing import AlignToObject
 from manip_basic_control import ManipulationMethods
 import actionlib
-from manipulation.msg import DrawerTriggerAction, DrawerTriggerActionGoal, DrawerTriggerActionResult
+from manipulation.msg import DrawerTriggerAction, DrawerTriggerActionGoal, DrawerTriggerActionResult, DrawerTriggerResult
 from helpers import move_to_pose
 import time
 from enum import Enum
@@ -17,6 +17,7 @@ class States(Enum):
     REALIGNMENT = 3
     OPEN_DRAWER = 4
     CLOSE_DRAWER = 5
+    ALIGN_HORIZONTAL = 7
     COMPLETE = 6
 
 class DrawerManager():
@@ -32,7 +33,11 @@ class DrawerManager():
         
         self.head_tilt_angle_search = rospy.get_param('/manipulation/head_tilt_angle_search_drawer') 
         self.head_tilt_angle_grasp = rospy.get_param('/manipulation/head_tilt_angle_grasp')
+        self.mean_err_horiz_alignment = rospy.get_param('/manipulation/mean_err_horiz_alignment')
+        self.moving_avg_n = rospy.get_param('/manipulation/moving_average_n')
+
         
+        self.pid_gains = rospy.get_param('/manipulation/pid_gains')
         self.recoveries = rospy.get_param('/manipulation/recoveries')
         
         self.forward_vel = rospy.get_param('/manipulation/forward_velocity')
@@ -51,21 +56,21 @@ class DrawerManager():
         self.scene_parser.set_parse_mode("ARUCO", self.aruco_id)
 
         if goal.to_open:
-            location, success = self.open_drawer()
+            success = self.open_drawer()
         else:
             success = self.close_drawer()
             self.drawer_location = None
             
         if success:
-            self.drawer_location = location
-            response = DrawerTriggerActionResult()
-            response.success= True
-            response.saved_position = location
-            self.server.set_succeeded(response)
+            result = DrawerTriggerResult(
+                success = True,
+                saved_position = self.drawer_location
+            )
+            self.server.set_succeeded(result)
         else:
-            response = DrawerTriggerActionResult()
-            response.success= False
-            self.server.set_aborted(response)
+            result = DrawerTriggerResult()
+            result.success= False
+            self.server.set_aborted(result)
     
     def find_and_align_to_drawer(self):
         """
@@ -84,10 +89,10 @@ class DrawerManager():
                 move_to_pose(self.trajectory_client, {
                     'head_pan;to' : angle,
                 })
-                rospy.sleep(self.vs_range[3]) #settling time.
-                (x, y, z, r, p, angleToGo, confidence, pred_time), isLive = self.scene_parser.get_latest_observation()
+                rospy.sleep(1) #settling time.
+                object_properties, isLive = self.scene_parser.get_latest_observation()
                 if isLive:
-                    drawer_loc, success = self.realign_base_to_aruco(offset = -np.pi/2)
+                    drawer_loc, success = self.realign_base_to_aruco(offset = 0)
                     if success:
                         move_to_pose(self.trajectory_client, {
                             'head_pan;to' : 0,
@@ -172,28 +177,116 @@ class DrawerManager():
             rate.sleep()
         return False
 
-    def realign_base_to_aruco(self, offset = 0):
-        """
-            ensure that the aruco is visible in the camera frame
-        """
+    def get_drawer_loc(self):
         isLive = False
         starttime = time.time()
         while not isLive and not (time.time() - starttime > 5):
             object_properties, isLive = self.scene_parser.get_latest_observation()
             rospy.sleep(0.1)
 
+        return object_properties, isLive
+        
+        
+    
+    def realign_base_to_aruco(self, offset = 0):
+        """
+            ensure that the aruco is visible in the camera frame
+        """
+        
+        object_properties, isLive = self.get_drawer_loc()
         if not isLive:
             return None, False
         else:
-            angleToGo = object_properties['angle']  - np.pi/2 + offset
+            angleToGo = object_properties['yaw']  - np.pi/2 + offset
             x = object_properties['x']
             y = object_properties['y']
             z = object_properties['z']
             
             self.manipulationMethods.reorient_base(self.trajectory_client, angleToGo)
             return (x, y, z, angleToGo), True
+    
+    def alignObjectHorizontal(self, ee_pose_x = 0.0, debug_print = {}):
+        """
+        Visual servoing to align gripper with the object of interest.
+        """
+        
+        self.requestClearObject = True
+        if not self.scene_parser.clearAndWaitForNewObject(2):
+            return False
+
+        xerr = np.inf
+        rospy.loginfo("Aligning object horizontally")
+        
+        prevxerr = np.inf
+        moving_avg_n = self.moving_avg_n
+        moving_avg_err = []
+        mean_err = np.inf
+        
+        kp = self.pid_gains['kp']
+        kd = self.pid_gains['kd']
+        curvel = 0.0
+        prevsettime = time.time()
+        while len(moving_avg_err) <= moving_avg_n and  mean_err > self.mean_err_horiz_alignment:
+            # [x, y, z, r, p, y, conf, pred_time], isLive = self.scene_parser.get_latest_observation()
+            object_properties, isLive = self.scene_parser.get_latest_observation()
+            x = object_properties['x']
+            y = object_properties['y']
+            z = object_properties['z']
+            pred_time = object_properties['time']
+            # if isLive:
+            rospy.loginfo("Time since last detection = {}".format(time.time() - pred_time))
+            xerr = (x - ee_pose_x)
             
+                
+            moving_avg_err.append(xerr)
+            if len(moving_avg_err) > moving_avg_n:
+                moving_avg_err.pop(0)
+                
+            dxerr = (xerr - prevxerr)
+            vx = (kp * xerr + kd * dxerr)
+            prevxerr = xerr
+            
+            mean_err = np.mean(np.abs(np.array(moving_avg_err)))
+            debug_print["xerr"] = xerr
+            debug_print["mean_err"] = mean_err
+            debug_print["x, y, z"] = [x, y, z]
+            
+            print(debug_print)
+
+            move_to_pose(self.trajectory_client, {
+                    'base_translate;vel' : vx,
+            }, asynchronous= True) 
+            curvel = vx
+            prevsettime = time.time()
+            # else:
+            #     rospy.logwarn("Object not detected. Using open loop motions")
+            #     xerr = (x - curvel * (time.time() - prevsettime)) - ee_pose_x
+            
+            
+            rospy.sleep(0.1)
+        
+        move_to_pose(self.trajectory_client, {
+            'base_translate;vel' : 0.0,
+        }, asynchronous= True) 
+        
+        return True
+    
+    
+    def align_for_manipulation(self):
+        """
+        Rotates base to align manipulator for grasping
+        """
+        rospy.loginfo(f"[{self.node_name}]: Aligning object for manipulation")
+        move_to_pose(self.trajectory_client, {
+                'head_pan;to' : -np.pi/2,
+                'base_rotate;by' : np.pi/2,
+            }
+        )
+        rospy.sleep(3)
+        return True
+    
     def open_drawer(self):
+        starttime = time.time()
         ntries = 0
         ntries_max = 4
         
@@ -216,23 +309,42 @@ class DrawerManager():
                     self.state = States.REALIGNMENT
                     
             elif self.state == States.REALIGNMENT:
+                self.align_for_manipulation()
                 drawer_loc, success = self.realign_base_to_aruco(offset = np.pi/2)
                 if not success:
                     ntries += 1
                     rospy.loginfo(f"[{self.node_name}]: Failed to realign base. Retrying...")
                 else:
                     self.drawer_location = drawer_loc
+                    self.state = States.ALIGN_HORIZONTAL
+                    
+            elif self.state == States.ALIGN_HORIZONTAL:
+                success = self.alignObjectHorizontal(ee_pose_x = 0.08)
+                if not success:
+                    ntries += 1
+                    rospy.loginfo(f"[{self.node_name}]: Failed to align horizontally. Retrying...")
+                    self.state = States.ALIGNING
+                else:
                     self.state = States.OPEN_DRAWER
                     
             elif self.state == States.OPEN_DRAWER:
-                success = self.open_drawer()
+                object_properties, isLive = self.get_drawer_loc()
+                self.drawer_location = object_properties['x'], object_properties['y'], 0.76, object_properties['yaw']
+                
+                
+                success = self.manipulationMethods.open_drawer(
+                    self.trajectory_client,
+                    self.drawer_location[0],
+                    self.drawer_location[1],
+                    self.drawer_location[2],
+                )
                 if not success:
                     ntries += 1
                     rospy.loginfo(f"[{self.node_name}]: Failed to open drawer. Retrying...")
                 else:
                     self.state = States.COMPLETE
                     break
-                
+        rospy.loginfo("Drawer operation time = {}".format(time.time() - starttime))
         if self.state == States.COMPLETE:
             return True
     

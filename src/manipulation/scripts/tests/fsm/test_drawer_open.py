@@ -58,10 +58,14 @@ if __name__ == '__main__':
     class_list = rospy.get_param('/object_detection/class_list')
     
     node = ManipulationFSM()
+    # node.manipulate_drawer(goal)
+    client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
+    client.wait_for_server()
     goal = DrawerTriggerGoal()
     goal.to_open = True
     goal.aruco_id = 0
-    node.manipulate_drawer(goal)
+    client.send_goal(goal)
+    client.wait_for_result()
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 

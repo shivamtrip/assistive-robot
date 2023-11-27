@@ -15,10 +15,12 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
-from scene_parser import SceneParser
+# from scene_parser import SceneParser
+from scene_parser_refactor import SceneParser
 from planner.planner import Planner
 from drawer_manip import DrawerManager
 from pick import PickManager
+from place import PlaceManager
 class States(Enum):
     IDLE = 0
     VISUAL_SERVOING = 1
@@ -52,7 +54,6 @@ class ManipulationFSM:
         self.n_max_servo_attempts = rospy.get_param('/manipulation/n_max_servo_attempts')   
         self.n_max_pick_attempts = rospy.get_param('/manipulation/n_max_pick_attempts')
 
-        self.server = actionlib.SimpleActionServer('manipulation_fsm', TriggerAction, execute_cb=self.manipulate_object, auto_start=False)
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
@@ -72,8 +73,7 @@ class ManipulationFSM:
         
         self.drawer_manager = DrawerManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.pick_manager = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
-        
-        self.server.start() # start server only after everything under this is initialized
+        self.place_manager = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
     
     def send_feedback(self, info):

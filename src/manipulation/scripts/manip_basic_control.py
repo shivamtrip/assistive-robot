@@ -88,13 +88,13 @@ class ManipulationMethods:
                 else:
                     self.isContact = False
                     
-                self.cur_robot_state[3] += msg.position[i]
+                self.cur_robot_state[3] = msg.position[i]
             
             if 'arm' in k:
                 arm_efforts += abs(msg.effort[i])
                 
             if 'wrist' in k:
-                self.cur_robot_state[4] += msg.position[i]
+                self.cur_robot_state[4] = msg.position[i]
                 
             # if k == "joint_head_pan":
             #     final_state[2] -= msg.position[i]
@@ -287,32 +287,37 @@ class ManipulationMethods:
         (x_g, y_g, z_g), grasp_yaw = grasp
         offset_z = 0.0 # difference between lift and the end effector height.
         offset_y = 0.2 # difference between arm and the end effector height.
-        
+        if not moveUntilContact:
+            grasp_yaw = 0
         goal_state = np.array([
             curstate[0] + x_g,
             curstate[1],
             curstate[2],
             z_g + offset_z,
-            int((grasp_yaw / np.pi) * 10)/10.0,
+            grasp_yaw,
+            # int((grasp_yaw / np.pi) * 10)/10.0,
             abs(y_g) - offset_y - 0.3,
         ])
-        
+        rospy.loginfo("Current state is {}".format(curstate))
+        rospy.loginfo("Goal state is {}".format(goal_state))
         planner = NaivePlanner(curstate, goal_state, cloud)
         plan, success = planner.plan()
+        rospy.loginfo("Naive planner success = {}".format(success))
         
         if not success:
+            rospy.loginfo("Naive planner failed, using A*")
             planner = AStarPlanner(curstate, goal_state, cloud)
             plan, success = planner.plan()
         
-        
         if success:
-            self.execute_trajectory(plan, visualize = True, planner = planner)        
+            rospy.loginfo("Plan successful. Executing trajectory")
+            self.execute_trajectory(trajectoryClient, plan, visualize = True, planner = planner)        
             
-            self.pick(
-                trajectoryClient,
-                ((0, y_g, z_g), grasp_yaw),
-                moveUntilContact
-            )
+            # self.pick(
+            #     trajectoryClient,
+            #     ((0, y_g, z_g), grasp_yaw),
+            #     moveUntilContact
+            # )
             
             return True
         return False
@@ -355,9 +360,11 @@ class ManipulationMethods:
         })
         rospy.sleep(3)
         
-        print("Extending to ", x_g, y_g, z_g, grasp_yaw)
-        print("end effector pose ", ee_x, ee_y, ee_z)
+        # print("Extending to ", x_g, y_g, z_g, grasp_yaw)
+        # print("end effector pose ", ee_x, ee_y, ee_z)
             
+        rospy.loginfo("EE_pose is {}".format(ee_y))
+        rospy.loginfo("Extending to {}".format((grasp)))
         move_to_pose(trajectoryClient, {
             "arm;by": abs(y_g - ee_y),
         })
@@ -453,9 +460,10 @@ class ManipulationMethods:
         })
         rospy.sleep(2)
         
-        move_to_pose(trajectoryClient, {
-            "lift;to": 0.4,
-        })
+        # move_to_pose(trajectoryClient, {
+        #     "lift;to": 0.4,
+        # })
+        return True
         
     def visualize_boxes_rviz(self, boxes, centers):
         colors = [
@@ -501,7 +509,7 @@ class ManipulationMethods:
             marker.pose.orientation.w = quat[3]
             self.marker_pub.publish(marker)    
     
-    def execute_trajectory(self, plan, visualize = False, planner = None):
+    def execute_trajectory(self, trajectory_client, plan, visualize = False, planner = None):
         """
         takes in a series of waypoints and executes it one by one as the target is reached.
         """
@@ -520,21 +528,21 @@ class ManipulationMethods:
                 if waypoint[j] != plan[i-1][j]:
                     idx_to_move = j
                     break
-            move_to_pose(trajectory_client, {
-                "base_translate;by" : waypoint[0],
-                "lift|;to" : waypoint[3],
-                "arm|;to" : waypoint[5],
-                "wrist_yaw|;to": waypoint[4],
-            })
+            # move_to_pose(trajectory_client, {
+            #     "base_translate;by" : waypoint[0],
+            #     "lift|;to" : waypoint[3],
+            #     "arm|;to" : waypoint[5],
+            #     "wrist_yaw|;to": waypoint[4],
+            # })
             rospy.sleep(waits[idx_to_move])
             
         if len(plan) == 0:
             return
-        move_to_pose(trajectory_client, {
-            "lift|;to" : waypoint[3],
-            "arm|;to" : waypoint[5],
-            "wrist_yaw|;to": waypoint[4],
-        })
+        # move_to_pose(trajectory_client, {
+        #     "lift|;to" : waypoint[3],
+        #     "arm|;to" : waypoint[5],
+        #     "wrist_yaw|;to": waypoint[4],
+        # })
     def pick_with_feedback(self, trajectoryClient, x, y, z, theta):
         """
         DEPRECATED
