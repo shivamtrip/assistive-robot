@@ -93,7 +93,9 @@ class ObjectLocation:
             'confidence' : latest_confidence,
             'time' : latest_time,
         }
-        if time.time() - latest_time < self.time_diff_for_realtime:
+        timediff = time.time() - latest_time
+        # rospy.loginfo("Time diff = " + str(timediff))
+        if timediff < self.time_diff_for_realtime:
             isLive = True
         return dic, isLive
 
@@ -150,9 +152,10 @@ class SceneParser:
             "distortion_coefficients" : np.array(msg.D).reshape(5,1),
         }
         
-        self.dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
-        self.arucoParams = cv2.aruco.DetectorParameters_create()
-        
+        # self.dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
+        # self.arucoParams = cv2.aruco.DetectorParameters_create()
+        self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        self.arucoParams =  cv2.aruco.DetectorParameters()
         
         cam = o3d.camera.PinholeCameraIntrinsic()
         cam.intrinsic_matrix = self.intrinsics
@@ -306,13 +309,28 @@ class SceneParser:
             for rvec, tvec, id in zip(rvecs, tvecs, ids):
                 if id == self.objectId: # looking only for a single ID please.
       
-                    quat = cv2.Rodrigues(rvec)[0]
-                    quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
-                    quaternion = quaternion/np.linalg.norm(quaternion)
-                    self.tf_broadcaster.sendTransform((tvec[0][0], tvec[0][1], tvec[0][2]),quaternion,rospy.Time.now(),"aruco_pose" + str(id),"camera_color_optical_frame")
+                    # quat = cv2.Rodrigues(rvec)[0]
+                    # quaternion = np.array([quat[0][0],quat[1][0],quat[2][0],1.0])
+                    # quaternion = quaternion/np.linalg.norm(quaternion)
+                    tf_aruco_to_cam = np.zeros((4, 4))
+                    tf_aruco_to_cam[3, 3] = 1.0
+                    tf_aruco_to_cam[:3, 3] = tvec[0]
+                    tf_aruco_to_cam[:3, :3], _ = cv2.Rodrigues(rvec)
+                    quaternion = tf.transformations.quaternion_from_matrix(tf_aruco_to_cam)
+                    self.tf_broadcaster.sendTransform(
+                        tvec[0], 
+                        quaternion,
+                        rospy.Time.now(),
+                        "aruco_pose" + str(id),
+                        "camera_color_optical_frame"
+                    )
+                    tf_cam_to_base = self.get_transform("base_link", "camera_color_optical_frame")
+                    tf_cam_to_base = np.vstack((tf_cam_to_base, np.array([0, 0, 0, 1])))
+                    tf_aruco_to_base = np.matmul(tf_cam_to_base, tf_aruco_to_cam)
                     
-                    roll, pitch, yaw = tf.transformations.euler_from_quaternion(quaternion)
-                    x, y, z = tvec[0][0], tvec[0][1], tvec[0][2]
+                    x, y, z = tf_aruco_to_base[:3, 3]
+                    roll, pitch, yaw = tf.transformations.euler_from_matrix(tf_aruco_to_base)
+                    quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
                     self.object.add_observation(
                         x = x,
                         y = y,
@@ -324,9 +342,18 @@ class SceneParser:
                         t = time.time()
                     )
                     self.current_detection = [x - 0.1, y - 0.1, x + 0.1, y + 0.1]
+                     
+                    self.tf_broadcaster.sendTransform(
+                        [x, y, z], 
+                        quaternion,
+                        rospy.Time.now(),
+                        "aruco_pose_1" + str(id),
+                        "base_link"
+                    )
+                    
                     
 
-    def parse_scene(self, depth, rgb , detection):
+    def parse_scene(self, depth, rgb, detection):
         self.obtained_initial_images = True
 
         # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
@@ -348,7 +375,7 @@ class SceneParser:
             return False # no object id set
         
         if self.parse_mode == "ARUCO":
-            self.parse_aruco(rgb)
+            self.parse_aruco(self.color_image)
         elif self.parse_mode == "YOLO":
             self.parse_detections(detection)
         

@@ -17,10 +17,10 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
-from yolo.srv import DeticDetections, DeticDetectionsResponse, DeticDetectionsRequest
+# from yolo.srv import DeticDetections, DeticDetectionsResponse, DeticDetectionsRequest
 
 
-from yolo.msg import DeticDetections, DeticDetectionsResponse
+# from yolo.msg import DeticDetections, DeticDetectionsResponse
 
 class SceneParser:
     def __init__(self):

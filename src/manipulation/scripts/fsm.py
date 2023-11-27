@@ -15,7 +15,8 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
 from std_srvs.srv import Trigger, TriggerResponse
-from scene_parser import SceneParser
+# from scene_parser import SceneParser
+from scene_parser_refactor import SceneParser
 from planner.planner import Planner
 from drawer_manip import DrawerManager
 from pick import PickManager

@@ -26,7 +26,7 @@ recoveries:
   n_scan_attempts : 3
 
 # scene_parser:
-time_diff_for_realtime : 0.3 #seconds - for scene parser to determine whether the estimate is live or stale
+time_diff_for_realtime : 0.35 #seconds - for scene parser to determine whether the estimate is live or stale
 object_filter:
   height : 0.5
   radius : 5
