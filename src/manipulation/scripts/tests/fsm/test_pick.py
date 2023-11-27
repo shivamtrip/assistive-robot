@@ -13,12 +13,11 @@ from enum import Enum
 import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
-from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 import json
 from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
-
+from manipulation.msg import PickTriggerAction, PickTriggerFeedback, PickTriggerResult, PickTriggerGoal
 from fsm import ManipulationFSM
 
 
@@ -45,14 +44,18 @@ if __name__ == '__main__':
     startManipService()
     class_list = rospy.get_param('/object_detection/class_list')
     
-    node = ManipulationFSM()
-    goal = TriggerGoal()
-    goal.objectId = 12
-    goal.isPick = True
+    stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
+    stow_robot_service.wait_for_service()
     
-    node.goal = goal
-    node.pick()
-
+    stow_robot_service()
+    node = ManipulationFSM()
+    client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
+    print("Waiting to get pick_action server")
+    client.wait_for_server()
+    goal = PickTriggerGoal()
+    goal.objectId = 9
+    client.send_goal(goal)
+    client.wait_for_result()
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 
 

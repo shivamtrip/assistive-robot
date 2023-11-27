@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
 import actionlib
-from yolo.msg import DeticDetectionsAction, DeticDetectionsActionGoal, DeticDetectionsActionResult, DeticDetectionsFeedback, DeticDetectionsGoal, DeticDetectionsResult, DeticDetectionsActionFeedback
+from yolo.msg import DeticDetectionsGoal, DeticDetectionsAction, DeticDetectionsActionResult
 
 class ObjectLocation:
     
@@ -129,8 +129,8 @@ class SceneParser:
         self.objectId = None
         
         self.current_detection = None
-        self.scene_no_object_cloud = None
-        self.object_cloud = None
+        self.scene_points = None
+        self.object_points = None
         self.prevtime = time.time()
         
         self.tsdf_volume = None
@@ -533,7 +533,7 @@ class SceneParser:
                 extrinsics)
     
     def get_detic_detections(self):
-        req = DeticDetectionsActionGoal(
+        req = DeticDetectionsGoal(
             image = self.bridge.cv2_to_imgmsg(self.color_image, encoding="passthrough"),
         )
         rospy.loginfo("Requested DETIC for results")
@@ -730,6 +730,9 @@ class SceneParser:
         return placingLocation
     
     def get_point_cloud_o3d(self, ws_mask = None, downsample = None, publish = False):
+        """
+        sets everything as numpy array
+        """
         starttime = time.time()
         rospy.loginfo("Generating point cloud...")
         
@@ -804,15 +807,14 @@ class SceneParser:
                 x1, y1, x2, y2 =  result
                 self.ws_mask = seg_mask
 
-        self.object_cloud = self.get_point_cloud_o3d(mask = self.ws_mask, publish = publish)
+        self.object_points = self.get_point_cloud_o3d(ws_mask = self.ws_mask, publish = publish)
         no_object_mask = np.ones_like(self.depth_image) - self.ws_mask
         
-        self.scene_no_object_cloud = self.get_point_cloud_o3d(mask = no_object_mask, publish = publish)
+        self.scene_points = self.get_point_cloud_o3d(ws_mask = no_object_mask, publish = False)
         
         if visualize:
             scene_pcd = o3d.geometry.PointCloud()
             scene_pcd.points = o3d.utility.Vector3dVector(self.object_points)
-            scene_pcd.colors = o3d.utility.Vector3dVector(self.object_colors)
             
             o3d.visualization.draw_geometries([scene_pcd])
         
@@ -820,11 +822,11 @@ class SceneParser:
     def get_grasp(self, visualize = False, publish = False):
         rospy.loginfo("Generating grasp")
         starttime = time.time()
-        if self.object_cloud is None:
+        if self.object_points is None:
             rospy.loginfo("No object cloud found, please set it first.")
             return None
         
-        points = self.object_cloud
+        points = self.object_points
         # segment out the object and remove things that are not part of the object using depth information
         o3dpcd = o3d.geometry.PointCloud()
         o3dpcd.points = o3d.utility.Vector3dVector(points)

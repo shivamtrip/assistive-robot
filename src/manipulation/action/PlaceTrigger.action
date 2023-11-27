@@ -1,0 +1,10 @@
+#input  
+int64 objectId
+float64 heightOfObject
+---
+#output
+bool success
+---
+#feedback
+int64 curState
+string curStateInfo

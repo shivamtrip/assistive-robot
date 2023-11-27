@@ -38,9 +38,6 @@ class DrawerManager():
 
         
         self.pid_gains = rospy.get_param('/manipulation/pid_gains')
-
-
-        
         self.recoveries = rospy.get_param('/manipulation/recoveries')
         
         self.forward_vel = rospy.get_param('/manipulation/forward_velocity')
