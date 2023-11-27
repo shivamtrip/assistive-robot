@@ -40,14 +40,14 @@ class ObjectDetectionNode:
         
         rospy.loginfo(f"[{rospy.get_name()}] " + "Loaded model")
         self.visualize = rospy.get_param('/object_detection/visualize')
-        self.data_pub = rospy.Publisher(rospy.get_param('/object_detection/publish_topic'), Detections, queue_size=1)
+        self.data_pub = rospy.Publisher(rospy.get_param('/object_detection/publish_topic'), Detections, queue_size=5)
         if self.visualize:
             self.annotated_image_pub = rospy.Publisher(rospy.get_param('/object_detection/visualize_topic'), Image, queue_size=1)
 
 
         self.upscale_fac = 1/rospy.get_param('/image_shrink/downscale_ratio')
 
-        self.rgb_image_subscriber = message_filters.Subscriber(rospy.get_param('/object_detection/subscribe_topic'), Image)
+        self.rgb_image_subscriber = message_filters.Subscriber(rospy.get_param('/object_detection/subscribe_topic'), Image, queue_size = 5)
         self.rgb_image_subscriber.registerCallback(self.callback)
         self.cv_bridge = CvBridge()
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
@@ -172,6 +172,7 @@ class ObjectDetectionNode:
         msg.confidences = confs.tolist()
 
         self.data_pub.publish(msg)
+        rospy.loginfo("Time taken: " + str(time.time() - self.last_image_time) + " seconds.")
         
         if self.visualize:
             annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
