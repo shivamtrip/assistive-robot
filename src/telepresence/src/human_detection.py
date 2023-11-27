@@ -17,7 +17,6 @@ import time
 import tf
 from scipy.spatial.transform import Rotation as R
 from std_srvs.srv import Trigger
-# from manipulation.srv import ArUcoStatus, ArUcoStatusResponse
 from enum import Enum
 from tf import TransformerROS
 from yolo.msg import Detections

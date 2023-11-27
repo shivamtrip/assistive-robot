@@ -66,7 +66,7 @@ class TelepresenceManager():
 
 
 
-    def main(self, objectId):
+    def main(self,  goal: TriggerGoal):
         
         print("Telepresence Manager received goal from Mission Planner")
 
@@ -74,7 +74,7 @@ class TelepresenceManager():
         self.yolo_status_control_pub.publish(True)      
     
 
-        self.human_detector.objectId = objectId
+        self.human_detector.objectId = goal.objectId
 
         self.current_state = State.SEARCH
         self.num_retries = 0
@@ -118,7 +118,7 @@ class TelepresenceManager():
         self.human_detector.objectId = None
         self.tele_man_result.success = True
         self.tele_man_server.set_succeeded(self.tele_man_result)
-        print("Successfully completed manipulation!")
+        print("Successfully completed Telepresence!")
         return True
 
 

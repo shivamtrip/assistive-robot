@@ -105,7 +105,7 @@
                     }
                 },
                 "current_eta": "",
-                "current_task": "",
+                "current_task": "NAVIGATION_TO_PICK",
                 "resident_name": "Mary",
                 "room_number": "202"
             }
@@ -124,7 +124,7 @@
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1701070647.6763654,
+            "last_update": 1701106378.8404746,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {

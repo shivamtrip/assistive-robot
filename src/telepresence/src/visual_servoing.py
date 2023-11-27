@@ -76,26 +76,30 @@ class AlignToObject:
 
             
             objectLocs = np.array(self.human_detector.objectLocArr)
-            # print(objectLocs,"\n")
+
             if len(objectLocs) != 0:
+
                 # compute some statistical measure of where the object is to make some more intelligent servoing guesses.
                 angleToGo, x, y, z, radius,  = self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)
 
+
+                # If robot isn't rotating more than 3 degrees between iterations, break (to avoid being stuck in loop)
                 if prev_angle_to_go and abs(angle_to_go) - abs(prev_angle_to_go) <= 3:
                         print("Robot alignment is still the same since the previous iteration. Exiting loop.")
                         break
 
+
+                # If robot is aligned less than 'alignment_threshold' degrees wrt to object - break, else keep rotating
                 if (abs(angleToGo) + 0.28 < np.radians(self.alignment_threshold)):
                     print(f"Robot is aligned within {np.degrees(angleToGo)} degrees of the user")
                     break
                 else:
                     print(f"Robot not yet aligned to the user. Currently at {np.degrees(angleToGo)} degrees with respect to the user")
-                
-                self.objectLocation = [x, y, z]
-                # self.human_detector.requestClearObject = True
-                # self.maxDistanceToMove = radius
+
 
                 rospy.loginfo('Object found at angle: {}. Location = {}. Radius = {}'.format(angleToGo, (x, y, z), radius))
+
+                # Rotate base to align with object
                 if(angleToGo<0):
                     self.move_to_pose(self.trajectoryClient, {
                         'base_rotate;by' : angleToGo - 0.28,
@@ -115,10 +119,14 @@ class AlignToObject:
                 })
                 rospy.sleep(2)
 
+
+                # Reset the array of detections since the robot has now stopped rotating
                 self.human_detector.requestClearObject = True
                 objectLocs = np.array(self.human_detector.objectLocArr)
                 rospy.sleep(5)
-                    # print(objectLocs,"\n")
+
+                
+                # If robot is aligned less than 'alignment_threshold' degrees wrt to object - break, else keep rotating
                 if len(objectLocs) != 0:
                     # compute some statistical measure of where the object is to make some more intelligent servoing guesses.
                     angleToGo, x, y, z, radius,  = self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)
@@ -167,17 +175,8 @@ class AlignToObject:
  
         maxGraspableDistance = 1.2
 
-        # print("Distance to move is currently infinity!")   
         distanceToMove = self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)[4] - maxGraspableDistance
-
-        # distanceToMove = self.radius - maxGraspableDistance
-
         rospy.loginfo("Object distance for YOLO = {}".format(self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)[4]))
-        # rospy.loginfo("Object distance from Object Loc Array: {}".format(self.human_detector.objectLocArr[-1][0]))
-
-        # rospy.loginfo("Object distance Z = {}".format(self.z))
-        # rospy.loginfo("Object distance = {}".format(distanceToMove))
-        # rospy.loginfo("Distance to move = {}. Threshold = {}".format(distanceToMove, distanceThreshold))
         
         if distanceToMove < 0:
             rospy.loginfo("Object is close enough. Not moving.")
@@ -193,7 +192,7 @@ class AlignToObject:
             num_of_retries = 0
 
             objectLocs = np.array(self.human_detector.objectLocArr)
-            # print(objectLocs,"\n")
+
             if len(objectLocs) != 0:
                 # compute some statistical measure of where the object is to make some more intelligent servoing guesses.
                 angleToGo, x, y, z, radius,  = self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)
@@ -231,10 +230,7 @@ class AlignToObject:
                 self.move_to_pose(self.trajectoryClient, {
                     'base_translate;vel' : vel,
                 })
-                # rospy.loginfo("Distance to move = {}, Distance moved = {}".format(distanceToMove, distanceMoved))
-                # rospy.loginfo()
-                # rospy.loginfo("Object location = {}".format(self.objectLocArr[-1]))
-
+   
                 if self.human_detector.isDetected and self.human_detector.objectLocArr:
                     lastDetectedTime = time.time()
                     # print(f"Compared distance: {self.objectLocArr[-1][0]}\n")
