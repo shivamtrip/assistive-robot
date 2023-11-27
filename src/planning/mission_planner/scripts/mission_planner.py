@@ -160,18 +160,18 @@ class Mission_Planner():
 
         elif self.current_task_type == TaskType.VIDEOCALL.name:
 
-            # Navigate to Outside Room Location (in front of door, same as delivery location)            
-            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
-            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
-            if not navSuccess:
-                return
+            # # Navigate to Outside Room Location (in front of door, same as delivery location)            
+            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
+            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
+            # if not navSuccess:
+            #     return
 
             print("Reached User location")
 
-            # self.update_mission_status(GlobalStates.ALIGN_TO_USER)
-            # align_success = self.TaskExecutor.align_to_user(ObjectOfInterest.USER.value)
-            # if not align_success:
-            #     return
+            self.update_mission_status(GlobalStates.ALIGN_TO_USER)
+            align_success = self.TaskExecutor.align_to_user(ObjectOfInterest.USER.value)
+            if not align_success:
+                return
 
             print("Aligned to User")
     

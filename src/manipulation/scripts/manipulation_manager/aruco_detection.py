@@ -185,7 +185,7 @@ class ArUcoDetector:
             # print("xyz_cam", x, y, z)
             # print("xyz_base", x_b, y_b, z_b)
             
-            return [x_b, y_b, z_b]
+            return [x_b, y_b, z_b]                      # Aruco pose in base frame
         else:
             return None
 

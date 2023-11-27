@@ -136,9 +136,9 @@ class TaskExecutor:
         goal.objectId = user_id
         self.telepresence_client.send_goal(goal, feedback_cb = self.dummy_cb)
         print("Task Executor has sent goal to Telepresence Manager")
-        self.manipulation_client.wait_for_result()
+        self.telepresence_client.wait_for_result()
         print("Task Executor received result from Telepresence Manager")
-        result: TriggerResult = self.manipulation_client.get_result()
+        result: TriggerResult = self.telepresence_client.get_result()
 
         if(result.success):
             rospy.loginfo("Manipulation complete")

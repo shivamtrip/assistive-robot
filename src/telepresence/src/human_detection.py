@@ -22,6 +22,7 @@ from enum import Enum
 from tf import TransformerROS
 from yolo.msg import Detections
 from geometry_msgs.msg import PointStamped
+from termcolor import colored
 
 
 class HumanDetector:
@@ -47,6 +48,8 @@ class HumanDetector:
         self.isDepthMatters = False
         self.depth_image_subscriber = rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image,self.depthCallback)
         self.boundingBoxSub = rospy.Subscriber("/object_bounding_boxes", Detections, self.detector_status_control)
+
+        self.isDetected = False
         # while not self.obtainedIntrinsics and not self.obtainedInitialImages:
         #     rospy.loginfo("Waiting for images")
         #     rospy.sleep(1)    
@@ -57,6 +60,7 @@ class HumanDetector:
     def computeObjectLocation(self, objectLocs):
         objectLocs = np.array(objectLocs)
         if len(objectLocs) == 0:
+            print("Object was not computed")
             return np.inf, np.inf, np.inf, np.inf, np.inf
         print(colored("hello", 'blue'))
 
@@ -64,8 +68,8 @@ class HumanDetector:
         x = np.average(objectLocs[:, 0], weights = weights)
         y = np.average(objectLocs[:, 1], weights = weights)
         z = np.average(objectLocs[:, 2], weights = weights)
-        angleToGo = np.arctan2(y, x)
-        radius = np.sqrt(x**2 + y**2)
+        angleToGo = np.arctan2(y, x)            # Angle to rotate base by to align to object (x direction is forward, y is left -> so arctan results in hypotenuse)
+        radius = np.sqrt(x**2 + y**2)           # Distane that base must move forward in x to reach object (after aligning to it) - hypotenuse
         return angleToGo, x, y, z, radius
 
 
@@ -104,95 +108,51 @@ class HumanDetector:
             'confidences' : np.array(msg.confidences).reshape(num_detections),
         }
 
+        # Filtering out all detections which don't correspond to the desired object id
         loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
         upscale_fac = self.upscale_fac
+
+
         if len(loc) > 0:
+
             loc = loc[0]
             box = np.squeeze(msg['boxes'][loc])
             confidence = np.squeeze(msg['confidences'][loc])
-            x1, y1, x2, y2 =  box
+            x1, y1, x2, y2 =  box           # top-left and bottom-right corners of the object in the image
             # print(x1, y1, x2, y2)
-            crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]
+            crop = self.depth_image[int(y1 * upscale_fac) : int(y2 * upscale_fac), int(x1 * upscale_fac) : int(x2 * upscale_fac)]       # cropping out the object
             
+            z_f = np.median(crop[crop != 0])/1000.0
+            h, w = self.depth_image.shape[:2]
+            y_new1 = w - x2 * upscale_fac
+            x_new1= y1 * upscale_fac
+            y_new2 = w - x1 * upscale_fac
+            x_new2 = y2 * upscale_fac
+
+            # Getting center of upscaled image bounding box
+            x_f = (x_new1 + x_new2)/2
+            y_f = (y_new1 + y_new2)/2
             
+
+            # Converting the center of the bounding box from 2D pixel coordinates to base frame
+            point = self.convertPointToBaseFrame(x_f, y_f, z_f)
+
+            x, y, z = point.x, point.y, point.z
+            rospy.logdebug("Object detected at" + str((x, y, z)))
+
+            radius = np.sqrt(x**2 + y**2)
             
-
-            # draw rectangel
-
-            # im = self.depth_image.copy().astype(np.uint8)
-            # cv2.rectangle(im, (int(x1 * upscale_fac), int(y1 * upscale_fac)), (int(x2 * upscale_fac), int(y2 * upscale_fac)), (0, 0, 0), 2)
-            # im = cv2.resize(im, (w//2, h//2), interpolation=cv2.INTER_AREA)
-            # cv2.imshow("a", im)
-            # cv2.waitKey(1)
-            if self.objectId == 60 and self.isDepthMatters:
-                # h, w = crop.shape[:2]
-                # xmap = (np.arange(0, w) + x1) * upscale_fac
-                # ymap = (np.arange(0, h) + y1) * upscale_fac
-                # xmap, ymap = np.meshgrid(xmap, ymap)
-                # points_z = crop / 1000.0
-                # cx, cy, fx, fy = self.intrinsics[0][2], self.intrinsics[1][2], self.intrinsics[0][0], self.intrinsics[1][1]
-                # points_x = (xmap - cx) * points_z / fx
-                # points_y = (ymap - cy) * points_z / fy
-                # cloud = np.stack([points_x, points_y, points_z], axis=-1)
-                # pcd_points = cloud.reshape([-1, 3])
-                # pcd_points = np.hstack((pcd_points,np.ones((pcd_points.shape[0],1)))) 
-                # transform_mat = self.get_transform('/base_link', '/camera_depth_optical_frame')            
-                # pcd_points = np.matmul(transform_mat,pcd_points.T).T  
-                # print(np.median(pcd_points[:,0]))
-                upscale_fac = self.upscale_fac
-                h, w = crop.shape[:2]
-                xmap = np.arange(0, w) + x1 * upscale_fac
-                ymap = np.arange(0, h) + y1 * upscale_fac
-                xmap, ymap = np.meshgrid(xmap, ymap)
-                points_z = crop / 1000.0
-                cx, cy, fx, fy = self.intrinsics[0][2], self.intrinsics[1][2], self.intrinsics[0][0], self.intrinsics[1][1]
-                points_x = (xmap - cx) * points_z / fx
-                points_y = (ymap - cy) * points_z / fy
-                cloud = np.stack([points_x, points_y, points_z], axis=-1)
-                pcd_points = cloud.reshape([-1, 3])
-                pcd_points = np.hstack((pcd_points,np.ones((pcd_points.shape[0],1)))) 
-                transform_mat = self.getTransform('/base_link', '/camera_depth_optical_frame')            
-                pcd_points = np.matmul(transform_mat,pcd_points.T).T  
-
-                #filter ground plane
-                pcd_points = pcd_points[pcd_points[:,2]>0.2]
-
-                #visualize point clouds using o3d
-                # pcd = o3d.geometry.PointCloud()
-                # pcd.points = o3d.utility.Vector3dVector(pcd_points[:, :3])
-                # o3d.visualization.draw_geometries([pcd])
-
-                print(np.median(pcd_points[:,0]), pcd_points.shape)
+            confidence /= radius
+            # confidence *= ()
+            self.objectLocationArrInCamera.append((x_f, y_f, z_f, 1))      
+            if self.objectId == 0 or (z > 0.7  and radius < 2.5): # to remove objects that are not in field of view
+                # print(x, y, z)
                 self.isDetected = True
-                self.objectLocArr.append((np.median(pcd_points[:,0]), np.median(pcd_points[:,1]), np.median(pcd_points[:,2]), confidence))
+                self.objectLocArr.append((x, y, z, confidence))         # location of object in base frame
+                # print(f"I AM HERE!!! Human detected at {self.objectLocArr}")
             else:
-                z_f = np.median(crop[crop != 0])/1000.0
-                h, w = self.depth_image.shape[:2]
-                y_new1 = w - x2 * upscale_fac
-                x_new1= y1 * upscale_fac
-                y_new2 = w - x1 * upscale_fac
-                x_new2 = y2 * upscale_fac
-
-                x_f = (x_new1 + x_new2)/2
-                y_f = (y_new1 + y_new2)/2
-                # print("cam frame", x_f, y_f, z_f)
-                point = self.convertPointToBaseFrame(x_f, y_f, z_f)
-
-                x, y, z = point.x, point.y, point.z
-                rospy.logdebug("Object detected at" + str((x, y, z)))
-
-                radius = np.sqrt(x**2 + y**2)
-                
-                confidence /= radius
-                # confidence *= ()
-                self.objectLocationArrInCamera.append((x_f, y_f, z_f, 1))
-                if self.objectId == 60 or (z > 0.7  and radius < 2.5): # to remove objects that are not in field of view
-                    # print(x, y, z)
-                    self.isDetected = True
-                    self.objectLocArr.append((x, y, z, confidence))
-                else:
-                    self.isDetected = False
-                
+                self.isDetected = False
+            
         else:
             self.isDetected = False
 
@@ -216,5 +176,5 @@ class HumanDetector:
 
     def detector_status_control(self, msg):
 
-        if self.objectId:
+        if self.objectId == 0:
             self.parseScene(msg)

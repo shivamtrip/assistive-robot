@@ -42,9 +42,7 @@ class ObjectDetectionNode:
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
 
         self.yolo_status_control_sub = rospy.Subscriber("yolo_status_control", Bool, self.yolo_status_control)
-
         self.yolo_detection_enabled = True
-
         self.started_publishing = False
         
     def runModel(self, img):
@@ -66,11 +64,12 @@ class ObjectDetectionNode:
         return box, box_cls, confs, img
 
     def callback(self,ros_rgb_image):
+        # self.start_time = time.time()
 
 
         if self.yolo_detection_enabled:
 
-            print("Yolo Object Detector will START INFERENCING")
+            # print("Yolo Object Detector will START INFERENCING")
 
             rgb_image = self.cv_bridge.imgmsg_to_cv2(ros_rgb_image)
             rgb_image = cv2.rotate(rgb_image, cv2.ROTATE_90_CLOCKWISE)
@@ -98,7 +97,7 @@ class ObjectDetectionNode:
             
             if self.visualize:
                 annotated_img = cv2.resize(annotated_img, (0, 0), fx = 0.5, fy = 0.5)
-                annotated_img = cv2.rotate(annotated_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                # annotated_img = cv2.rotate(annotated_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 self.annotated_image_pub.publish(self.cv_bridge.cv2_to_imgmsg(annotated_img))
 
 

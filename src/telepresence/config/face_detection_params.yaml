@@ -1,0 +1,11 @@
+
+model_type: 'yolov8n.pt'
+
+# subscribe_topic: '/camera/color/small_image'
+subscribe_topic: '/camera/color/small_image'
+
+publish_topic: 'object_bounding_boxes'
+visualize: true
+visualize_topic: 'annotated_image_face'
+
+device: 'cpu'

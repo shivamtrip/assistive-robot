@@ -113,18 +113,18 @@
         "status": {
             "battery_percent": 0,
             "current_task": {
-                "object_type": "BOTTLE",
-                "relative_name": "",
-                "resident_name": "Mary",
-                "room_number": "202",
-                "task_type": "DELIVERY"
+                "object_type": "",
+                "relative_name": "Frank",
+                "resident_name": "Adam",
+                "room_number": "201",
+                "task_type": "VIDEOCALL"
             },
-            "global_state": "MANIPULATION_TO_PICK",
+            "global_state": "ALIGN_TO_USER",
             "hri_params": {
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1700955877.530996,
+            "last_update": 1701070647.6763654,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {

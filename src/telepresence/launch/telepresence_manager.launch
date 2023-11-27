@@ -1,6 +1,12 @@
 <launch>
     <node name="telepresence_manager" pkg="telepresence" type="telepresence_manager.py" output="screen" />  
 
-    <!-- <include file="$(find yolo)/launch/object_detector.launch" pass_all_args="true"/> -->
+     <!-- <node name="telepresence_manager" pkg="telepresence" type="face_detection.py" output="screen" />   -->
+
+    <!-- <group ns="telepresence">
+        <rosparam file="$(find telepresence)/config/face_detection_params.yaml" />
+    </group> -->
+
+    <include file="$(find yolo)/launch/object_detector.launch" pass_all_args="true"/>
 
 </launch>

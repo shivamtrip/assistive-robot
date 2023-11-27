@@ -107,7 +107,7 @@ class ManipulationManager:
 
         self.num_retries = 0
 
-        while self.current_state != State.COMPLETE and self.num_retries < 5:
+        while self.current_state != State.COMPLETE:
 
             self.prev_state = self.current_state
 
@@ -148,12 +148,11 @@ class ManipulationManager:
                 # self.aruco_status_message.status = False
                 # self.aruco_status_service(self.aruco_status_message)
 
-                print(f"Manipulation failed during the {self.prev_state.name} state.")
-                self.manip_man_result.success = False
-                self.manip_man_server.set_succeeded(self.manip_man_result)
-
                 if self.num_retries > 5:
                     self.aruco_detector.detect_aruco = False
+                    print(f"Manipulation failed during the {self.prev_state.name} state.")
+                    self.manip_man_result.success = False
+                    self.manip_man_server.set_succeeded(self.manip_man_result)
                     return False
 
                 self.num_retries += 1

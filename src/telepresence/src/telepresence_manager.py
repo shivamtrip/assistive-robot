@@ -41,7 +41,6 @@ class TelepresenceManager():
 
         self.prev_state = None
         self.current_state = None
-
         self.yolo_status_control_pub = rospy.Publisher("yolo_status_control", Bool, queue_size=10)
 
         startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
@@ -51,20 +50,18 @@ class TelepresenceManager():
         print("Waiting for trajectory server")
         self.trajectoryClient.wait_for_server()
 
-        self.tele_man_server = actionlib.SimpleActionServer('telepresence_manager', TriggerAction, execute_cb=self.main, auto_start=False)
-
-        self.human_detector = HumanDetector()
-        self.visual_servoing = AlignToObject(self.trajectoryClient, self.human_detector)
-
         rospy.loginfo("waiting for stow robot service")
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         self.stow_robot_service.wait_for_service()
         self.stow_robot_service()
 
+        self.human_detector = HumanDetector()
+        self.visual_servoing = AlignToObject(self.trajectoryClient, self.human_detector)
+
+        self.tele_man_server = actionlib.SimpleActionServer('telepresence_manager', TriggerAction, execute_cb=self.main, auto_start=False)
+        self.tele_man_result = TriggerResult()
         self.tele_man_server.start()
 
-        self.tele_man_result = TriggerResult()
-   
         rospy.loginfo("Telepresence Manager is ready!\n")
 
 
@@ -82,7 +79,7 @@ class TelepresenceManager():
         self.current_state = State.SEARCH
         self.num_retries = 0
 
-        while self.current_state != State.COMPLETE and self.num_retries < 5:
+        while self.current_state != State.COMPLETE and not rospy.is_shutdown():
 
             self.prev_state = self.current_state
 
@@ -91,6 +88,7 @@ class TelepresenceManager():
                 self.current_state = State.MOVE_TO_OBJECT if success else State.FAILED
 
             elif self.current_state == State.MOVE_TO_OBJECT:
+                rospy.sleep(5)
                 success = self.visual_servoing.moveTowardsObject()
                 self.current_state = State.COMPLETE if success else State.FAILED
 
@@ -101,13 +99,14 @@ class TelepresenceManager():
             if self.current_state == State.FAILED:
                 # Stop ArUco detector
                 print("Stopping Alignment to User")
-                print(f"Aligning to user failed during the {self.prev_state.name} state.")
-                self.tele_man_result.success = False
-                self.tele_man_server.set_succeeded(self.tele_man_result)
 
                 if self.num_retries > 5:
                     self.human_detector.objectId = None
                     self.yolo_status_control_pub.publish(False)
+                    
+                    print(f"Aligning to user failed during the {self.prev_state.name} state.")
+                    self.tele_man_result.success = False
+                    self.tele_man_server.set_succeeded(self.tele_man_result)
                     return False
 
                 self.num_retries += 1
@@ -124,15 +123,13 @@ class TelepresenceManager():
 
 
 if __name__ == "__main__":
-    switch_to_manipulation = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
-    switch_to_manipulation.wait_for_service()
-    switch_to_manipulation()
-    rospy.init_node("align_to_object", anonymous=True)
-    node = TelepresenceManager()
-    node.main(0)
 
-    # rospy.init_node('telepresence_manager')
-    # telepresence_manager = TelepresenceManager()
+    # rospy.init_node("telepresence_manager", anonymous=True)
+    # node = TelepresenceManager()
+    # node.main(0)
+
+    rospy.init_node('telepresence_manager')
+    telepresence_manager = TelepresenceManager()
     
     try:
         rospy.spin()
