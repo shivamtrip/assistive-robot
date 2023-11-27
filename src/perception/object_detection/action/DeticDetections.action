@@ -1,5 +1,7 @@
+#input  
 sensor_msgs/Image image
 ---
+#output
 sensor_msgs/Image seg_mask
 float32[] box_classes
 float32[] instance_id
@@ -7,4 +9,5 @@ float32[] box_bounding_boxes
 float32[] confidences
 int32 nPredictions
 ---
+# feedback
 int32 status
