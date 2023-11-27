@@ -3,23 +3,12 @@ import rospy
 import tf
 # from scene_parser import SceneParser
 from scene_parser_refactor import SceneParser
-from visual_servoing import AlignToObject
 from manip_basic_control import ManipulationMethods
 import actionlib
 from manipulation.msg import PlaceTriggerAction, PlaceTriggerFeedback, PlaceTriggerResult, PlaceTriggerGoal
 from helpers import move_to_pose
 import time
-from enum import Enum
 import actionlib
-import open3d as o3d
-class States(Enum):
-    IDLE = 0
-    ALIGNING = 1
-    MOVING_TO_OBJECT = 2
-    REALIGNMENT = 3
-    OPEN_DRAWER = 4
-    CLOSE_DRAWER = 5
-    COMPLETE = 6
 
 class PlaceManager():
     def __init__(self, scene_parser : SceneParser, trajectory_client, manipulation_methods : ManipulationMethods):
@@ -80,7 +69,7 @@ class PlaceManager():
                 ])
                 rospy.loginfo("Using fixed placing location: {}".format(placingLocation))
                 
-        success = self.manipulationMethods.place(self.trajectory_client, placingLocation)
+        success = self.manipulationMethods.place(placingLocation)
         return success
     
     def execute_cb(self, goal : PlaceTriggerGoal):
@@ -93,7 +82,7 @@ class PlaceManager():
         if goal.use_place_location:
             place_location = goal.place_location
             
-        self.scene_parser.set_parse_mode("YOLO", goal.objectId)
+        self.scene_parser.set_parse_mode("YOLO", None)
         success = self.place(
             fixed_place = use_fixed_place,
             location = place_location,

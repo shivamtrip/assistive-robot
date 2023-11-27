@@ -77,7 +77,7 @@ class DrawerManager():
         as soon as the aruco is found, reorient and align to it instantly.
         """
         
-        rospy.loginfo(f"[{self.node_name}]: Finding and orienting to Drawer")
+        rospy.loginfo(f"Finding and orienting to Drawer")
         move_to_pose(self.trajectory_client, {
             'head_tilt;to' : - self.head_tilt_angle_search * np.pi/180,
             'head_pan;to' : self.vs_range[0],
@@ -160,7 +160,7 @@ class DrawerManager():
             lastDetectedTime = object_properties['time']
 
             if isLive:
-                if object_properties[0] < maxGraspableDistance:
+                if object_properties['x'] < maxGraspableDistance:
                     rospy.loginfo("Drawer is close enough. Stopping.")
                     rospy.loginfo("Drawer location = {}".format(object_properties['x']))
                     move_to_pose(self.trajectory_client, {
@@ -202,7 +202,7 @@ class DrawerManager():
             y = object_properties['y']
             z = object_properties['z']
             
-            self.manipulationMethods.reorient_base(self.trajectory_client, angleToGo)
+            self.manipulationMethods.reorient_base(angleToGo)
             return (x, y, z, angleToGo), True
     
     def alignObjectHorizontal(self, ee_pose_x = 0.0, debug_print = {}):
@@ -276,13 +276,13 @@ class DrawerManager():
         """
         Rotates base to align manipulator for grasping
         """
-        rospy.loginfo(f"[{self.node_name}]: Aligning object for manipulation")
+        rospy.loginfo(f"Aligning object for manipulation")
         move_to_pose(self.trajectory_client, {
                 'head_pan;to' : -np.pi/2,
                 'base_rotate;by' : np.pi/2,
             }
         )
-        rospy.sleep(3)
+        rospy.sleep(4)
         return True
     
     def open_drawer(self):
@@ -296,14 +296,14 @@ class DrawerManager():
                 success = self.find_and_align_to_drawer()
                 if not success:
                     ntries += 1
-                    rospy.loginfo(f"[{self.node_name}]: Failed to find drawer. Retrying...")    
+                    rospy.loginfo(f"Failed to find drawer. Retrying...")    
                 else:
                     self.state = States.MOVING_TO_OBJECT
             elif self.state == States.MOVING_TO_OBJECT:
                 success = self.move_to_drawer()
                 if not success:
                     ntries += 1
-                    rospy.loginfo(f"[{self.node_name}]: Failed to move to drawer. Retrying...")
+                    rospy.loginfo(f"Failed to move to drawer. Retrying...")
                     self.state = States.ALIGNING
                 else:
                     self.state = States.REALIGNMENT
@@ -313,7 +313,7 @@ class DrawerManager():
                 drawer_loc, success = self.realign_base_to_aruco(offset = np.pi/2)
                 if not success:
                     ntries += 1
-                    rospy.loginfo(f"[{self.node_name}]: Failed to realign base. Retrying...")
+                    rospy.loginfo(f"Failed to realign base. Retrying...")
                 else:
                     self.drawer_location = drawer_loc
                     self.state = States.ALIGN_HORIZONTAL
@@ -322,7 +322,7 @@ class DrawerManager():
                 success = self.alignObjectHorizontal(ee_pose_x = 0.08)
                 if not success:
                     ntries += 1
-                    rospy.loginfo(f"[{self.node_name}]: Failed to align horizontally. Retrying...")
+                    rospy.loginfo(f"Failed to align horizontally. Retrying...")
                     self.state = States.ALIGNING
                 else:
                     self.state = States.OPEN_DRAWER
@@ -333,14 +333,13 @@ class DrawerManager():
                 
                 
                 success = self.manipulationMethods.open_drawer(
-                    self.trajectory_client,
                     self.drawer_location[0],
                     self.drawer_location[1],
                     self.drawer_location[2],
                 )
                 if not success:
                     ntries += 1
-                    rospy.loginfo(f"[{self.node_name}]: Failed to open drawer. Retrying...")
+                    rospy.loginfo(f"Failed to open drawer. Retrying...")
                 else:
                     self.state = States.COMPLETE
                     break
@@ -353,7 +352,7 @@ class DrawerManager():
     def close_drawer(self):
         if self.drawer_location:
             (x, y, z, angleToGo) = self.drawer_location
-            self.manipulationMethods.close_drawer(self.trajectory_client, x, y, z)
+            self.manipulationMethods.close_drawer(x)
             self.drawer_location = None
             return True
         else:

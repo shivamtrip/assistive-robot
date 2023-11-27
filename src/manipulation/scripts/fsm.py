@@ -1,343 +1,39 @@
 #! /usr/bin/env python3
 
 from manip_basic_control import ManipulationMethods
-from visual_servoing import AlignToObject
-from advanced_servoing import AlignToObjectAdvanced
 import rospy
 import actionlib
-from enum import Enum
-import numpy as np
-from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
-from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
-from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerTriggerResult, DrawerTriggerGoal
-import json
 from control_msgs.msg import FollowJointTrajectoryAction
-from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
-from helpers import move_to_pose
-from std_srvs.srv import Trigger, TriggerResponse
-# from scene_parser import SceneParser
 from scene_parser_refactor import SceneParser
 from planner.planner import Planner
+
 from drawer_manip import DrawerManager
 from pick import PickManager
 from place import PlaceManager
-class States(Enum):
-    IDLE = 0
-    VISUAL_SERVOING = 1
-    PICK = 2
-    WAITING_FOR_GRASP_AND_PLANE = 3
-    WAITING_FOR_GRASP = 4
-    WAITING_FOR_PLANE = 5
-    PLACE = 6
-    COMPLETE = 7
-    
-    OPEN_DRAWER = 8
-    CLOSE_DRAWER = 9
+from stow import StowManager
 
-class ManipulationFSM:
+class ManipulationManager:
 
     def __init__(self, loglevel = rospy.INFO):
-
-        rospy.init_node('manipulation_fsm', anonymous=True, log_level=loglevel)
-        self.state = States.IDLE
-        self.grasp = None
-        self.planeOfGrasp = None
-        self.drawer_location = None
-
-        
-        self.class_list = rospy.get_param('/object_detection/class_list')
-        self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
-
-        self.offset_dict = rospy.get_param('/manipulation/offsets')
-        self.isContactDict = rospy.get_param('/manipulation/contact')
-        
-        self.n_max_servo_attempts = rospy.get_param('/manipulation/n_max_servo_attempts')   
-        self.n_max_pick_attempts = rospy.get_param('/manipulation/n_max_pick_attempts')
+        rospy.init_node('manipulation', anonymous=True, log_level=loglevel)
 
         self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for trajectoryClient server...")
+        rospy.loginfo( "Waiting for trajectory client server...")
         self.trajectoryClient.wait_for_server()
 
-
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow_robot service...")
-        self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
-        self.stow_robot_service.wait_for_service()
-        
-        self.scene_parser = SceneParser()
         self.planner = Planner()
-
-        self.advancedServoing = AlignToObjectAdvanced(self.scene_parser, self.planner)
-        self.basicServoing = AlignToObject(self.scene_parser, self.planner)
-        self.manipulationMethods = ManipulationMethods()
+        self.scene_parser = SceneParser()
+        self.manipulationMethods = ManipulationMethods(self.trajectoryClient)
         
+        self.stow_manager   = StowManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.drawer_manager = DrawerManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
-        self.pick_manager = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
-        self.place_manager = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
+        self.pick_manager   = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
+        self.place_manager  = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
+        rospy.loginfo( "Manipulation subsystem up.")
     
-    def send_feedback(self, info):
-        # feedback = TriggerFeedback()
-        # feedback.curState = self.state.value
-        # feedback.curStateInfo = json.dumps(info)
-        # rospy.loginfo(f"[{rospy.get_name()}]:" + json.dumps(info))
-        # self.server.publish_feedback(feedback)
-        pass
-    
-    def reset(self):
-        self.state = States.IDLE
-        self.grasp = None
-        self.planeOfGrasp = None
-
-    
-    
-    def place(self, fixed_place = True, location = None, is_rotate = True):
-        
-        self.heightOfObject = self.goal.heightOfObject
-        
-        if is_rotate:
-            base_rotate = np.pi/2
-        else:
-            base_rotate = 0
-            
-        move_to_pose(
-            self.trajectoryClient,
-            {
-                'head_pan;to' : -np.pi/2,
-                'head_tilt;to' : - 30 * np.pi/180,
-                'base_rotate;by': base_rotate,
-            }
-        )
-        
-        rospy.sleep(5)
-        self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
-        plane = self.scene_parser.get_plane(publish = True)
-        if plane:
-            if location is not None:
-                placingLocation = location
-            else:
-                if not fixed_place:
-                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
-                else:
-                    placingLocation = np.array([
-                        0.0, 0.7, 0.9
-                    ])
-            success = self.manipulationMethods.place(self.trajectoryClient, placingLocation)
-            self.stow_robot_service()
-            return success
-        else:
-            return False
-        
-    def open_drawer(self):
-        isLive = False
-        self.scene_parser.clear_observations()
-        rospy.sleep(3)
-        [angleToGo, x, y, z, radius], success = self.scene_parser.estimate_object_location(from_live = True)
-        if success:
-            self.manipulationMethods.reorient_base(self.trajectoryClient, angleToGo + np.pi/2)
-            self.manipulationMethods.open_drawer(self.trajectoryClient, x, y, z)
-            self.drawer_location = (x, y, 0.72, 0)
-            return self.drawer_location, True
-        return None, False
-    
-    def close_drawer(self):
-        if self.drawer_location:
-            (x, y, z, angleToGo) = self.drawer_location
-            self.manipulationMethods.close_drawer(self.trajectoryClient, x, y, z)
-            self.drawer_location = None
-            return True
-
-    def manipulate_object(self, goal : TriggerGoal):
-        self.goal = goal
-        self.state = States.IDLE
-        objectManipulationState = States.PICK
-
-        # self.scene_parser.set_object_id(goal.objectId)
-        rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        if goal.isPick:
-            rospy.loginfo("Received pick request.")
-            objectManipulationState = States.PICK
-            success = self.pick_manager.pick()
-            self.server.set_succeeded(result = TriggerResult(success = success, heightOfObject = self.heightOfObject))
-            return success
-        else:
-            rospy.loginfo("Received place request.")
-            objectManipulationState = States.PLACE
-
-        self.nServoTriesAttempted = 0
-        self.nServoTriesAllowed = self.n_max_servo_attempts
-
-        self.nPickTriesAttempted = 0
-        self.nPickTriesAllowed = self.n_max_pick_attempts
-
-        while not rospy.is_shutdown():
-            if self.state == States.IDLE:
-                self.state = States.VISUAL_SERVOING
-                if objectManipulationState == States.PLACE:
-                    self.send_feedback({'msg' : "Trigger Request received. Placing"})
-                    self.state = States.PLACE
-                else:
-                    self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
-            
-            elif self.state == States.VISUAL_SERVOING:
-                success = self.advancedServoing.main()
-                if success:
-                    self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
-                    self.state = objectManipulationState
-                else:
-                    if self.nServoTriesAttempted >= self.nServoTriesAllowed:
-                        self.send_feedback({'msg' : "Servoing failed. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
-                    self.nServoTriesAttempted += 1
-                self.state = States.COMPLETE
-            elif self.state == States.PICK:
-                self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                self.send_feedback({'msg' : "moving to pregrasp pose"})
-                self.state = self.pick()
-                
-                if success:
-                    self.send_feedback({'msg' : "Pick succeeded! "})
-                    self.state = States.COMPLETE
-                else:
-                    self.send_feedback({'msg' : "Pick failed. Reattempting."})
-                    if self.nPickTriesAttempted >= self.nPickTriesAllowed:
-                        self.send_feedback({'msg' : "Pick failed. Cannot grasp successfully. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    
-                    self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
-                    self.nPickTriesAttempted += 1
-                    # self.stow_robot_service()
-                    
-                    self.state =  States.VISUAL_SERVOING
-
-            elif self.state == States.PLACE:
-                success = self.place()
-                if success:
-                    self.send_feedback({'msg' : "Pick succeeded! "})
-                    self.state =  States.COMPLETE
-                else:
-                    self.send_feedback({'msg' : "Pick failed. Reattempting."})
-                    if self.nPickTriesAttempted >= self.nPickTriesAllowed:
-                        self.send_feedback({'msg' : "Pick failed. Cannot grasp successfully. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    
-                    self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
-                    self.nPickTriesAttempted += 1
-                    # self.stow_robot_service()
-                    
-                    self.state = States.PLACE
-                    
-
-            elif self.state == States.COMPLETE:
-                # self.send_feedback({'msg' : "Work complete successfully."})
-                rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
-                move_to_pose(self.trajectoryClient, {
-                    "head_pan;to" : 0,
-                })
-                break
-
-        self.reset()
-        self.server.set_succeeded(result = TriggerResult(success = True, heightOfObject = self.heightOfObject))
-
-    def manipulate_drawer(self, goal : DrawerTriggerGoal):
-        self.goal = goal
-        self.state = States.IDLE
-        
-        
-        rospy.loginfo(f"{rospy.get_name()} : Stowing robot.")
-        if goal.to_open:
-            rospy.loginfo("Received open drawer request.")
-            objectManipulationState = States.OPEN_DRAWER
-            self.stow_robot_service()
-        else:
-            rospy.loginfo("Received close drawer request.")
-            objectManipulationState = States.CLOSE_DRAWER
-
-        self.nServoTriesAttempted = 0
-        self.nServoTriesAllowed = self.n_max_servo_attempts
-
-        self.nPickTriesAttempted = 0
-        self.nPickTriesAllowed = self.n_max_pick_attempts
-        
-        self.scene_parser.set_parse_mode("ARUCO", goal.aruco_id)
-
-        while not rospy.is_shutdown():
-            if self.state == States.IDLE:
-                self.state = States.VISUAL_SERVOING
-                # if objectManipulationState == States.PLACE:
-                #     self.send_feedback({'msg' : "Trigger Request received. Placing"})
-                #     self.state = States.PLACE
-                # else:
-                #     self.send_feedback({'msg' : "Trigger Request received. Starting to find the object"})
-            
-            elif self.state == States.VISUAL_SERVOING:
-                success = self.basicServoing.main_drawer()
-                if success:
-                    self.send_feedback({'msg' : "Servoing succeeded! Starting manipulation."})
-                    self.state = objectManipulationState
-                else:
-                    if self.nServoTriesAttempted >= self.nServoTriesAllowed:
-                        self.send_feedback({'msg' : "Servoing failed. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    
-                    self.send_feedback({'msg' : "Servoing failed. Attempting to recover from failure."  + str(self.nServoTriesAttempted) + " of " + str(self.nServoTriesAllowed) + " allowed."})
-                    self.nServoTriesAttempted += 1
-                self.state = States.OPEN_DRAWER
-            elif self.state == States.OPEN_DRAWER:
-                self.state = States.WAITING_FOR_GRASP_AND_PLANE
-                self.send_feedback({'msg' : "moving to pregrasp pose"})
-                self.state = self.open_drawer()
-                
-                if success:
-                    self.send_feedback({'msg' : "Open succeeded! "})
-                    self.state = States.COMPLETE
-                else:
-                    self.send_feedback({'msg' : "Open failed. Reattempting."})
-                    if self.nPickTriesAttempted >= self.nPickTriesAllowed:
-                        self.send_feedback({'msg' : "Open failed. Cannot grasp successfully. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    
-                    self.send_feedback({'msg' : "Open failed. Reattempting Open, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
-                    self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
-                    self.state =  States.VISUAL_SERVOING
-
-            elif self.state == States.CLOSE_DRAWER:
-                success = self.close_drawer()
-                if success:
-                    self.send_feedback({'msg' : "Close succeeded! "})
-                    self.state =  States.COMPLETE
-                else:
-                    self.send_feedback({'msg' : "Close failed. Reattempting."})
-                    if self.nPickTriesAttempted >= self.nPickTriesAllowed:
-                        self.send_feedback({'msg' : "Close failed. Cannot grasp successfully. Aborting."})
-                        self.reset()
-                        return TriggerResult(success = False)
-                    
-                    self.send_feedback({'msg' : "Picking failed. Reattempting pick, try number " + str(self.nPickTriesAttempted) + " of " + str(self.nPickTriesAllowed) + " allowed."})
-                    self.nPickTriesAttempted += 1
-                    self.stow_robot_service()
-                    
-                    self.state = States.PLACE
-                    
-
-            elif self.state == States.COMPLETE:
-                # self.send_feedback({'msg' : "Work complete successfully."})
-                rospy.loginfo(f"{rospy.get_name()} : Work complete successfully.")
-                break
-
-        self.reset()
-        self.server.set_succeeded(result = DrawerTriggerResult(success = True))
-
-
 if __name__ == '__main__':
-    node = ManipulationFSM()
+    node = ManipulationManager()
     try:
         rospy.spin()
     except KeyboardInterrupt:

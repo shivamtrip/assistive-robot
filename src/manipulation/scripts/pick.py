@@ -9,17 +9,8 @@ import actionlib
 from manipulation.msg import PickTriggerAction, PickTriggerFeedback, PickTriggerResult, PickTriggerGoal
 from helpers import move_to_pose
 import time
-from enum import Enum
 import actionlib
 import open3d as o3d
-class States(Enum):
-    IDLE = 0
-    ALIGNING = 1
-    MOVING_TO_OBJECT = 2
-    REALIGNMENT = 3
-    OPEN_DRAWER = 4
-    CLOSE_DRAWER = 5
-    COMPLETE = 6
 
 class PickManager():
     def __init__(self, scene_parser : SceneParser, trajectory_client, manipulation_methods : ManipulationMethods):
@@ -50,19 +41,14 @@ class PickManager():
         
         rospy.loginfo("Picking object" + str(objectId))
         starttime = time.time()
-        self.manipulationMethods.move_to_pregrasp(self.trajectory_client)
+        self.manipulationMethods.move_to_pregrasp()
         self.scene_parser.set_point_cloud(publish = False, use_detic = True) 
         grasp = self.scene_parser.get_grasp(publish_grasp = isPublish, publish_cloud = True)
-        # plane = self.scene_parser.get_plane(publish = isPublish)
         plane = None
         
         rospy.loginfo("From pick request to grasp detection took " + str(time.time() - starttime) + " seconds.")
-        # ee_pose = self.manipulationMethods.getEndEffectorPose()
-        # self.align_to_object_horizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
-
         if grasp:
             grasp_center, grasp_yaw = grasp
-
             if plane:
                 plane_height = plane[1]
                 self.heightOfObject = abs(grasp_center[2] - plane_height)
@@ -75,14 +61,12 @@ class PickManager():
             object_cloud.points = o3d.utility.Vector3dVector(self.scene_parser.object_points)
             if use_planner:
                 manip_method = self.manipulationMethods.plan_and_pick(
-                    self.trajectory_client, 
                     grasp,
                     object_cloud,
                     moveUntilContact = self.isContactDict[self.label2name[objectId]]
                 ) 
             else:                
                 manip_method = self.manipulationMethods.pick(
-                    self.trajectory_client, 
                     grasp,
                     moveUntilContact = self.isContactDict[self.label2name[objectId]]
                 ) 

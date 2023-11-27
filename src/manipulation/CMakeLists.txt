@@ -70,6 +70,7 @@ add_action_files(
    DrawerTrigger.action
    PickTrigger.action
    PlaceTrigger.action
+   StowTrigger.action
  )
 
 ## Generate added messages and services with any dependencies listed here

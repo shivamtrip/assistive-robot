@@ -20,7 +20,7 @@ from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
 
-from fsm import ManipulationFSM
+from fsm import ManipulationManager
 
 
 # class_list:
@@ -54,7 +54,7 @@ from fsm import ManipulationFSM
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
     
-    node = ManipulationFSM()
+    node = ManipulationManager()
     
     
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
@@ -65,6 +65,7 @@ if __name__ == '__main__':
     stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
     stow_robot_service.wait_for_service()
     
+    stow_robot_service()
     
     pick_client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
     pick_client.wait_for_server()
@@ -111,36 +112,36 @@ if __name__ == '__main__':
     place_client.send_goal(goal)
     place_client.wait_for_result()
     
-    goal = PickTriggerGoal()
-    goal.objectId = 6
+    # goal = PickTriggerGoal()
+    # goal.objectId = 6
 
-    pick_client.send_goal(goal)
-    pick_client.wait_for_result()
-    goal = PlaceTriggerGoal(
-        heightOfObject = 0.7,
-        place_location = place_location,
-        fixed_place = False,
-        use_place_location = True,
-        is_rotate = False,
-    )
-    place_client.send_goal(goal)
-    place_client.wait_for_result()
+    # pick_client.send_goal(goal)
+    # pick_client.wait_for_result()
+    # goal = PlaceTriggerGoal(
+    #     heightOfObject = 0.7,
+    #     place_location = place_location,
+    #     fixed_place = False,
+    #     use_place_location = True,
+    #     is_rotate = False,
+    # )
+    # place_client.send_goal(goal)
+    # place_client.wait_for_result()
     
     
-    goal = PickTriggerGoal()
-    goal.objectId = 12
+    # goal = PickTriggerGoal()
+    # goal.objectId = 12
 
-    pick_client.send_goal(goal)
-    pick_client.wait_for_result()
-    goal = PlaceTriggerGoal(
-        heightOfObject = 0.7,
-        place_location = place_location,
-        fixed_place = False,
-        use_place_location = True,
-        is_rotate = False,
-    )
-    place_client.send_goal(goal)
-    place_client.wait_for_result()
+    # pick_client.send_goal(goal)
+    # pick_client.wait_for_result()
+    # goal = PlaceTriggerGoal(
+    #     heightOfObject = 0.7,
+    #     place_location = place_location,
+    #     fixed_place = False,
+    #     use_place_location = True,
+    #     is_rotate = False,
+    # )
+    # place_client.send_goal(goal)
+    # place_client.wait_for_result()
     
     
     

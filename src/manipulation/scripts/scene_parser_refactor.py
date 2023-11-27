@@ -191,7 +191,8 @@ class SceneParser:
         id is the object to track or the id of the aruco marker
         """
         self.parse_mode = mode
-        self.objectId = id
+        if id is not None:
+            self.objectId = id
         self.clear_observations(wait = True)
 
     
