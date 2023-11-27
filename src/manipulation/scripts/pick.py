@@ -37,13 +37,13 @@ class PickManager():
     
     
 
-    def pick(self, objectId, use_planner = False, isPublish = True):
+    def pick(self, objectId, use_planner = True, isPublish = True):
         
         rospy.loginfo("Picking object" + str(objectId))
         starttime = time.time()
         self.manipulationMethods.move_to_pregrasp()
-        self.scene_parser.set_point_cloud(publish = False, use_detic = True) 
-        grasp = self.scene_parser.get_grasp(publish_grasp = isPublish, publish_cloud = True)
+        self.scene_parser.set_point_cloud(publish_scene = True, use_detic = True) 
+        grasp = self.scene_parser.get_grasp(publish_grasp = isPublish, publish_cloud = isPublish)
         plane = None
         
         rospy.loginfo("From pick request to grasp detection took " + str(time.time() - starttime) + " seconds.")

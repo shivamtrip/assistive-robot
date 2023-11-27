@@ -60,6 +60,7 @@ class JointTrajectoryAction:
                     self.robot.base.set_translate_velocity(pos)
                 elif motionType == 'by':
                     self.robot.base.translate_by(pos)
+                    
             elif 'base_rotate' in joint:
                 if motionType == 'vel':
                     self.robot.base.set_rotational_velocity(pos)

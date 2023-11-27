@@ -54,11 +54,11 @@ class NaivePlanner(BasePlanner):
         delay = 0.1
         plan = np.array(path)
         
-        interp_waypoints = [plan[0]]
+        # interp_waypoints = [plan[0]]
         
-        for i in range(1, len(plan)):
-            for j in range(int(1/delay)):
-                delta = (plan[i] - plan[i-1]) * j * delay
-                interp_waypoints.append(plan[i-1] + delta)
+        # for i in range(1, len(plan)):
+        #     for j in range(int(1/delay)):
+        #         delta = (plan[i] - plan[i-1]) * j * delay
+        #         interp_waypoints.append(plan[i-1] + delta)
 
-        return interp_waypoints, True
+        return plan, True

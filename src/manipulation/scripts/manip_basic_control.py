@@ -276,7 +276,7 @@ class ManipulationMethods:
             'lift;to': curz + move_up,
         })
 
-    def plan_and_pick(self, grasp, cloud, moveUntilContact = False):
+    def plan_and_pick(self, grasp, cloud, moveUntilContact = False, demo = False):
         # self.pick(self.trajectory_client, grasp)
         
         # (x, y, z), theta = grasp
@@ -284,42 +284,62 @@ class ManipulationMethods:
         # x, y, theta, z, phi, ext
         curstate = self.cur_robot_state
         
+        x, y, theta, z, phi, ext= curstate
+        ee_x, ee_y, ee_z = self.getEndEffectorPose()
         (x_g, y_g, z_g), grasp_yaw = grasp
-        offset_z = 0.0 # difference between lift and the end effector height.
-        offset_y = 0.2 # difference between arm and the end effector height.
+        
+        offset_z = z - ee_z # difference between lift and the end effector height.
+        offset_y = abs(abs(ext) - abs(ee_y))
+        rospy.loginfo("Offset z = {}".format(offset_z))
+        rospy.loginfo("Offset y = {}".format(offset_y))
+        rospy.loginfo("pregrasp location = {}".format((x_g, y_g, z_g)))
         if not moveUntilContact:
             grasp_yaw = 0
+            
         goal_state = np.array([
-            curstate[0] + x_g,
-            curstate[1],
-            curstate[2],
+            x + x_g,
+            y,
+            theta,
             z_g + offset_z,
             grasp_yaw,
-            # int((grasp_yaw / np.pi) * 10)/10.0,
-            abs(y_g) - offset_y - 0.3,
+            abs(y_g) - 0.3 - 0.2
         ])
         rospy.loginfo("Current state is {}".format(curstate))
         rospy.loginfo("Goal state is {}".format(goal_state))
-        planner = NaivePlanner(curstate, goal_state, cloud)
+
+        # planner = NaivePlanner(curstate, goal_state, cloud)
+        # plan, success = planner.plan()
+        # rospy.loginfo("Naive planner success = {}".format(success))
+        # if success:
+        #     self.pick(
+        #         grasp,
+        #         moveUntilContact
+        #     )
+        #     return True
+
+
+        rospy.loginfo("Naive planner failed, using A*")
+        planner = AStarPlanner(curstate, goal_state, cloud)
         plan, success = planner.plan()
-        rospy.loginfo("Naive planner success = {}".format(success))
-        
-        if not success:
-            rospy.loginfo("Naive planner failed, using A*")
-            planner = AStarPlanner(curstate, goal_state, cloud)
-            plan, success = planner.plan()
-        
+    
         if success:
             rospy.loginfo("Plan successful. Executing trajectory")
-            self.execute_trajectory(self.trajectory_client, plan, visualize = True, planner = planner)        
+            self.execute_trajectory(
+                plan, 
+                visualize = True, 
+                planner = planner, 
+                dummy = demo
+            )        
             
-            # self.pick(
-            #     self.trajectory_client,
-            #     ((0, y_g, z_g), grasp_yaw),
-            #     moveUntilContact
-            # )
-            
+            if not demo:
+                self.pick(
+                    ((0, y_g, z_g), grasp_yaw),
+                    moveUntilContact
+                )
+                
             return True
+            
+            # return True
         return False
         
     def plan_and_stow(self, grasp, cloud, moveUntilContact = False):
@@ -538,40 +558,54 @@ class ManipulationMethods:
             marker.pose.orientation.w = quat[3]
             self.marker_pub.publish(marker)    
     
-    def execute_trajectory(self, plan, visualize = False, planner = None):
+    
+    def execute_trajectory(self, plan, visualize = False, planner = None, dummy = False):
         """
         takes in a series of waypoints and executes it one by one as the target is reached.
         """
-        
+        if len(plan) == 0:
+            return
         # x, y, theta, z, phi, ext
         waits = [0.5, 0.1, 0.5, 0.5, 0.1, 0.5]
         for i, waypoint in enumerate(plan):
+            
             if visualize:
                 if planner is None:
                     return 
                 boxes, centers = planner.get_collision_boxes(waypoint)
                 self.visualize_boxes_rviz(boxes, centers)     
-            rospy.loginfo("Sending waypoint")
             idx_to_move = 0
             for j in range(len(waypoint)):
                 if waypoint[j] != plan[i-1][j]:
                     idx_to_move = j
                     break
-            # move_to_pose(trajectory_client, {
-            #     "base_translate;by" : waypoint[0],
-            #     "lift|;to" : waypoint[3],
-            #     "arm|;to" : waypoint[5],
-            #     "wrist_yaw|;to": waypoint[4],
-            # })
+            rospy.loginfo("Moving to waypoint {}".format(waypoint))
+            final_waypoint = waypoint.copy()
+            if idx_to_move == 0 and i != 0:
+                rospy.loginfo("waypoint[0] = {}".format(waypoint[0]))
+                rospy.loginfo("plan[i] = {}".format(plan[i][0]))
+                rospy.loginfo("plan[i-1] = {}".format(plan[i-1][0]))
+                final_waypoint[0] = final_waypoint[0] - plan[i-1][0]
+                
+            if not dummy:
+                if idx_to_move == 0:
+                    move_to_pose(self.trajectory_client, {
+                        "base_translate;by" : final_waypoint[0],
+                    })
+                else:
+                    move_to_pose(self.trajectory_client, {
+                        "lift|;to" : final_waypoint[3],
+                        "arm|;to" : final_waypoint[5],
+                        "wrist_yaw|;to": final_waypoint[4],
+                    })
             rospy.sleep(waits[idx_to_move])
-            
-        if len(plan) == 0:
-            return
-        # move_to_pose(trajectory_client, {
-        #     "lift|;to" : waypoint[3],
-        #     "arm|;to" : waypoint[5],
-        #     "wrist_yaw|;to": waypoint[4],
-        # })
+
+        if not dummy:
+            move_to_pose(self.trajectory_client, {
+                "lift|;to" : waypoint[3],
+                "arm|;to" : waypoint[5],
+                "wrist_yaw|;to": waypoint[4],
+            })
     def pick_with_feedback(self, x, y, z, theta):
         """
         DEPRECATED

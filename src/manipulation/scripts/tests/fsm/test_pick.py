@@ -13,12 +13,14 @@ from enum import Enum
 import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
+from manipulation.msg import PickTriggerGoal, PlaceTriggerGoal, PickTriggerAction, PlaceTriggerAction
+from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerTriggerResult, DrawerTriggerGoal
 import json
 from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
-from manipulation.msg import PickTriggerAction, PickTriggerFeedback, PickTriggerResult, PickTriggerGoal
-from fsm import ManipulationFSM
+
+from fsm import ManipulationManager
 
 
 # class_list:
@@ -35,10 +37,26 @@ from fsm import ManipulationFSM
 #   - 'cup' #9
 #   - 'teddy bear' #10
 #   - 'remote' #11
-
+#   - 'marker' #12
+# #input  
+# bool to_open 
+# int64 aruco_id
+# float32[] saved_position
+# ---
+# #output
+# bool success
+# float32[] saved_position
+# ---
+# #feedback
+# int64 curState
+# string curStateInfo
 
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
+    
+    node = ManipulationManager()
+    
+    
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
@@ -47,16 +65,24 @@ if __name__ == '__main__':
     stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
     stow_robot_service.wait_for_service()
     
-    node = ManipulationFSM()
-    
     stow_robot_service()
-    client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
-    print("Waiting to get pick_action server")
-    client.wait_for_server()
+    
+    pick_client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
+    pick_client.wait_for_server()
+    
+    place_client = actionlib.SimpleActionClient('place_action', PlaceTriggerAction)
+    place_client.wait_for_server()
+    
+    drawer_client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
+    drawer_client.wait_for_server()
+    
     goal = PickTriggerGoal()
-    goal.objectId = 6
-    client.send_goal(goal)
-    client.wait_for_result()
+    goal.objectId = 9
+    # goal.use_planner = False
+
+    pick_client.send_goal(goal)
+    pick_client.wait_for_result()
+
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')
 
 

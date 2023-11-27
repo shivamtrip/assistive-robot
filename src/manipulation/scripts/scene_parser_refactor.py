@@ -110,6 +110,7 @@ class SceneParser:
         
         self.obj_cloud_pub = rospy.Publisher('/object_cloud', PointCloud2, queue_size=10)
         self.plane_cloud_pub = rospy.Publisher('/plane_cloud', PointCloud2, queue_size=10)
+        self.scene_cloud_pub = rospy.Publisher('/scene_cloud', PointCloud2, queue_size=10)
         self.marker_pub = rospy.Publisher("/visualization_marker", Marker, queue_size = 2)
         
         
@@ -730,7 +731,7 @@ class SceneParser:
             
         return placingLocation
     
-    def get_point_cloud_o3d(self, ws_mask = None, downsample = None, publish = False):
+    def get_point_cloud_o3d(self, ws_mask = None, downsample = None,publisher = None):
         """
         sets everything as numpy array
         """
@@ -773,20 +774,20 @@ class SceneParser:
         points = np.array(cloud.points)
         rospy.loginfo("Point cloud generated in {} seconds.".format(time.time() - starttime))
         
-        if publish:
+        if publisher is not None:
             rospy.loginfo("Publishing point cloud")
             starttime = time.time()
             header = Header()
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
             msg = pcl2.create_cloud_xyz32(header, points)
-            self.obj_cloud_pub.publish(msg)
+            publisher.publish(msg)
             rospy.loginfo("Published point cloud. Took" + str(time.time() - starttime) + "seconds.")
             
         return points
         
     
-    def set_point_cloud(self, visualize = False, use_detic = False, publish = False, get_object = True):
+    def set_point_cloud(self, visualize = False, use_detic = False, publish_object = False, publish_scene =False, get_object = True):
         rospy.loginfo(f"[{rospy.get_name()}]: Setting point cloud")
         
         if get_object:
@@ -806,12 +807,19 @@ class SceneParser:
                 self.ws_mask[y1 : y2, x1 : x2] = 1
             else:
                 x1, y1, x2, y2 =  result
-                self.ws_mask = seg_mask
-
-        self.object_points = self.get_point_cloud_o3d(ws_mask = self.ws_mask, publish = publish)
-        no_object_mask = np.ones_like(self.depth_image) - self.ws_mask
+                self.ws_mask = seg_mask 
         
-        self.scene_points = self.get_point_cloud_o3d(ws_mask = no_object_mask, publish = False)
+        object_publisher = None
+        scene_publisher = None
+        if publish_object:
+            object_publisher = self.obj_cloud_pub
+        if publish_scene:
+            scene_publisher = self.scene_cloud_pub
+            
+        self.object_points = self.get_point_cloud_o3d(ws_mask = self.ws_mask, publisher = object_publisher)
+        
+        no_object_mask = np.ones_like(self.depth_image) - self.ws_mask
+        self.scene_points = self.get_point_cloud_o3d(ws_mask = no_object_mask, publisher = scene_publisher)
         
         if visualize:
             scene_pcd = o3d.geometry.PointCloud()

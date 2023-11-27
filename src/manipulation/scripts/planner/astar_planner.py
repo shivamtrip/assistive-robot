@@ -96,20 +96,20 @@ class AStarPlanner(BasePlanner):
 
     def astar(self):
         # x, y, theta, z, phi, ext
-        # modify this state vector to -> (x, z, phi_ext (0 or 1), ext)
+        # modify this state vector to -> (x, z, phi_ext (-1 to 1), ext)
         start = self.start
         goal = self.goal
         orig_start = start.copy()
         start = np.array([
             start[0],
             start[3],
-            start[4],
+            int((start[4] / np.pi) * 10)/10.0, # this is in rad. we need to convert to -1 -> 1
             start[5]
         ])
         goal = np.array([
             goal[0],
             goal[3],
-            goal[4],
+            int((goal[4] / np.pi) * 10)/10.0,
             goal[5]
         ])
         
