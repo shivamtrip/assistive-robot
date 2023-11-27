@@ -11,7 +11,7 @@ from helpers import move_to_pose
 import time
 from enum import Enum
 import actionlib
-
+import open3d as o3d
 class States(Enum):
     IDLE = 0
     ALIGNING = 1
@@ -71,17 +71,23 @@ class PickManager():
             
             offsets = self.offset_dict[self.label2name[objectId]]
             grasp = (grasp_center + np.array(offsets)), grasp_yaw
-            
+            object_cloud = o3d.geometry.PointCloud()
+            object_cloud.points = o3d.utility.Vector3dVector(self.scene_parser.object_points)
             if use_planner:
-                manip_method = self.manipulationMethods.plan_and_pick
+                manip_method = self.manipulationMethods.plan_and_pick(
+                    self.trajectory_client, 
+                    grasp,
+                    object_cloud,
+                    moveUntilContact = self.isContactDict[self.label2name[objectId]]
+                ) 
             else:                
-                manip_method = self.manipulationMethods.pick
+                manip_method = self.manipulationMethods.pick(
+                    self.trajectory_client, 
+                    grasp,
+                    moveUntilContact = self.isContactDict[self.label2name[objectId]]
+                ) 
             
-            manip_method(
-                self.trajectory_client, 
-                grasp,
-                moveUntilContact = self.isContactDict[self.label2name[objectId]]
-            ) 
+            manip_method
             success = self.scene_parser.is_grasp_success()
             return success
         return False

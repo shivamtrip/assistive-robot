@@ -13,7 +13,7 @@ from enum import Enum
 import stretch_body.robot as rb
 import numpy as np
 from grasp_detector.msg import GraspPoseAction, GraspPoseResult, GraspPoseGoal
-from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
+from manipulation.msg import PickTriggerGoal, PlaceTriggerGoal, PickTriggerAction, PlaceTriggerAction
 from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerTriggerResult, DrawerTriggerGoal
 import json
 from control_msgs.msg import FollowJointTrajectoryAction
@@ -37,6 +37,7 @@ from fsm import ManipulationFSM
 #   - 'cup' #9
 #   - 'teddy bear' #10
 #   - 'remote' #11
+#   - 'marker' #12
 # #input  
 # bool to_open 
 # int64 aruco_id
@@ -52,35 +53,106 @@ from fsm import ManipulationFSM
 
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
+    
+    node = ManipulationFSM()
+    
+    
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
     startManipService()
     class_list = rospy.get_param('/object_detection/class_list')
     
-    node = ManipulationFSM()
+    stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
+    stow_robot_service.wait_for_service()
+    
+    
+    pick_client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
+    pick_client.wait_for_server()
+    
+    place_client = actionlib.SimpleActionClient('place_action', PlaceTriggerAction)
+    place_client.wait_for_server()
+    
+    drawer_client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
+    drawer_client.wait_for_server()
+    
+    
+    
+    
+    
     goal = DrawerTriggerGoal()
     goal.to_open = True
     goal.aruco_id = 0
-    node.manipulate_drawer(goal)
     
+    drawer_client.send_goal(goal)
+    drawer_client.wait_for_result()
+    result = drawer_client.get_result()
     
-    goal = TriggerGoal()
+    drawer_location = result.saved_position
+    place_location = [
+        0.0,
+        -abs(drawer_location[2]) + 0.3,
+        0.76 + 0.25
+    ]
+    rospy.loginfo("drawer_location: {}".format(drawer_location))
+    rospy.loginfo("Place location: {}".format(place_location))
+    
+    goal = PickTriggerGoal()
     goal.objectId = 9
-    goal.isPick = True
-    node.goal = goal
-    node.scene_parser.set_parse_mode('YOLO', goal.objectId)
-    node.pick()
+
+    pick_client.send_goal(goal)
+    pick_client.wait_for_result()
+    goal = PlaceTriggerGoal(
+        heightOfObject = 0.7,
+        place_location = place_location,
+        fixed_place = False,
+        use_place_location = True,
+        is_rotate = False,
+    )
+    place_client.send_goal(goal)
+    place_client.wait_for_result()
     
-    goal = TriggerGoal()
-    goal.objectId = 9
-    goal.isPick = False
-    node.goal = goal
-    loc = node.drawer_location
-    print("PLACING LOCATION", loc)
-    node.place(is_rotate = False, location = [-0.02, loc[1] + 0.1, loc[2] + 0.25])
+    goal = PickTriggerGoal()
+    goal.objectId = 6
+
+    pick_client.send_goal(goal)
+    pick_client.wait_for_result()
+    goal = PlaceTriggerGoal(
+        heightOfObject = 0.7,
+        place_location = place_location,
+        fixed_place = False,
+        use_place_location = True,
+        is_rotate = False,
+    )
+    place_client.send_goal(goal)
+    place_client.wait_for_result()
     
     
-    node.close_drawer()
+    goal = PickTriggerGoal()
+    goal.objectId = 12
+
+    pick_client.send_goal(goal)
+    pick_client.wait_for_result()
+    goal = PlaceTriggerGoal(
+        heightOfObject = 0.7,
+        place_location = place_location,
+        fixed_place = False,
+        use_place_location = True,
+        is_rotate = False,
+    )
+    place_client.send_goal(goal)
+    place_client.wait_for_result()
+    
+    
+    
+    goal = DrawerTriggerGoal()
+    goal.to_open = False
+    goal.aruco_id = 0
+    
+    drawer_client.send_goal(goal)
+    drawer_client.wait_for_result()
+        
+    
+    
     
 
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')

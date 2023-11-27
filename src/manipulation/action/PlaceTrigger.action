@@ -1,6 +1,9 @@
 #input  
-int64 objectId
 float64 heightOfObject
+float32[] place_location
+bool fixed_place
+bool use_place_location
+bool is_rotate
 ---
 #output
 bool success

@@ -20,6 +20,7 @@ from scene_parser_refactor import SceneParser
 from planner.planner import Planner
 from drawer_manip import DrawerManager
 from pick import PickManager
+from place import PlaceManager
 class States(Enum):
     IDLE = 0
     VISUAL_SERVOING = 1
@@ -72,7 +73,7 @@ class ManipulationFSM:
         
         self.drawer_manager = DrawerManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.pick_manager = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
-        
+        self.place_manager = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready to accept pick/drawer commands.")
     
     def send_feedback(self, info):

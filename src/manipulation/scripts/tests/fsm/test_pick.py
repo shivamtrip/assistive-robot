@@ -47,8 +47,9 @@ if __name__ == '__main__':
     stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
     stow_robot_service.wait_for_service()
     
-    stow_robot_service()
     node = ManipulationFSM()
+    
+    stow_robot_service()
     client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
     print("Waiting to get pick_action server")
     client.wait_for_server()
