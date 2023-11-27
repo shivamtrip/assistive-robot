@@ -819,7 +819,7 @@ class SceneParser:
             o3d.visualization.draw_geometries([scene_pcd])
         
     
-    def get_grasp(self, visualize = False, publish = False):
+    def get_grasp(self, visualize = False, publish_grasp = False, publish_cloud = False):
         rospy.loginfo("Generating grasp")
         starttime = time.time()
         if self.object_points is None:
@@ -868,7 +868,7 @@ class SceneParser:
             grasp_yaw -= np.pi/2    
         rospy.loginfo("Generated grasp. Took {} seconds.".format(time.time() - starttime))
         
-        if publish:
+        if publish_grasp:
             rospy.loginfo("Publishing grasp pose")
             self.tf_broadcaster.sendTransform((grasp_center),
                 tf.transformations.quaternion_from_euler(0, 0, grasp_yaw),
@@ -887,6 +887,16 @@ class SceneParser:
             )
 
             self.marker_pub.publish(box_marker)
+        
+        if publish_cloud:
+            rospy.loginfo("Publishing point cloud")
+            starttime = time.time()
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"  # Set your desired frame_id
+            msg = pcl2.create_cloud_xyz32(header, points)
+            self.obj_cloud_pub.publish(msg)
+            rospy.loginfo("Published point cloud. Took" + str(time.time() - starttime) + "seconds.")
         
         if visualize:
             line_set = o3d.geometry.LineSet()

@@ -53,7 +53,7 @@ if __name__ == '__main__':
     print("Waiting to get pick_action server")
     client.wait_for_server()
     goal = PickTriggerGoal()
-    goal.objectId = 9
+    goal.objectId = 6
     client.send_goal(goal)
     client.wait_for_result()
     rospy.loginfo(f'{rospy.get_name()} : "Manipulation Finished"')

@@ -49,13 +49,14 @@ class PickManager():
     def pick(self, objectId, use_planner = False, isPublish = True):
         
         rospy.loginfo("Picking object" + str(objectId))
-        
+        starttime = time.time()
         self.manipulationMethods.move_to_pregrasp(self.trajectory_client)
-        self.scene_parser.set_point_cloud(publish = isPublish, use_detic = True) 
-        grasp = self.scene_parser.get_grasp(publish = isPublish)
+        self.scene_parser.set_point_cloud(publish = False, use_detic = True) 
+        grasp = self.scene_parser.get_grasp(publish_grasp = isPublish, publish_cloud = True)
         # plane = self.scene_parser.get_plane(publish = isPublish)
         plane = None
         
+        rospy.loginfo("From pick request to grasp detection took " + str(time.time() - starttime) + " seconds.")
         # ee_pose = self.manipulationMethods.getEndEffectorPose()
         # self.align_to_object_horizontal(ee_pose_x = ee_pose[0], debug_print = {"ee_pose" : ee_pose})
 
@@ -86,10 +87,11 @@ class PickManager():
         return False
 
     def execute_cb(self, goal : PickTriggerGoal):
-        
+        starttime = time.time()
         self.goal = goal
         self.scene_parser.set_parse_mode("YOLO", goal.objectId)
         success = self.pick(goal.objectId)
+        rospy.loginfo("Pick action took " + str(time.time() - starttime) + " seconds.")
         result = PickTriggerResult()
         result.success = success
         if success:
