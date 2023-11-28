@@ -22,6 +22,8 @@ import sensor_msgs.point_cloud2 as pcl2
 import actionlib
 from yolo.msg import DeticDetectionsGoal, DeticDetectionsAction, DeticDetectionsActionResult
 
+
+
 class ObjectLocation:
     
     def __init__(self, time_diff_for_realtime):
@@ -140,7 +142,6 @@ class SceneParser:
             self.depth_image_subscriber, self.rgb_image_subscriber,
             self.boundingBoxSub
         ], 100, 0.5, allow_headerless=False)
-        synced_messages.registerCallback(self.parse_scene)
         
         rospy.loginfo(f"[{rospy.get_name()}]: Waiting for camera intrinsics...")
         msg = rospy.wait_for_message('/camera/color/camera_info', CameraInfo, timeout=30)
@@ -165,10 +166,18 @@ class SceneParser:
         
         self.o3d_cam = cam
         
-        rospy.loginfo(f"[{rospy.get_name()}]: Obtained camera intrinsics.")
+        rospy.loginfo(f"Obtained camera intrinsics.")
 
         self.parse_mode = ("YOLO", None)
         
+
+        
+        self.listener = tf.TransformListener()
+        self.tf_ros = tf.TransformerROS()
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        rospy.sleep(2)
+        
+        synced_messages.registerCallback(self.parse_scene)
         
         starttime = time.time()
         while not self.obtained_initial_images:
@@ -178,12 +187,6 @@ class SceneParser:
                 rospy.loginfo("Failed to obtain images. Please check the camera node.")
                 exit()
         
-
-        
-        self.listener = tf.TransformListener()
-        self.tf_ros = tf.TransformerROS()
-        self.tf_broadcaster = tf.TransformBroadcaster()
-
         rospy.loginfo("Scene parser initialized")
 
     def set_parse_mode(self, mode, id = None):
@@ -352,14 +355,115 @@ class SceneParser:
                         "aruco_pose_1" + str(id),
                         "base_link"
                     )
-                    
-                    
+    
+    def check_if_in_frustum(self, point):
+        frustum_lines = self.get_view_frustum()[1]
+        for line in frustum_lines:
+            v0, v1 = line
+            normal = np.cross(v1 - v0, point - v0)
+            d = -np.dot(normal, v0)
+            if np.dot(normal, point) + d < 0:
+                return False
+                
+        return True
+    
+    
+    def get_view_frustum(self, max_depth = 2500, publish = True):
+        """
+        returns the points of the frustum of the camera w.r.t base_link
+        """
+        
+        points_cam_frame = np.array([
+            [0, 0, 50],
+            [self.cameraParams['width'], 0, 50],
+            
+            [0, self.cameraParams['height'], 50],
+            [self.cameraParams['width'], self.cameraParams['height'], 50],
+            
+            [0, 0, max_depth],
+            [self.cameraParams['width'], 0, max_depth],
+            
+            [0, self.cameraParams['height'], max_depth],
+            [self.cameraParams['width'], self.cameraParams['height'], max_depth],
+            
+        ], dtype=np.float32)
+        points_cam_frame[:, 2] /= 1000.0
+        
+        
+        frustum_lines = [
+            [points_cam_frame[0], points_cam_frame[1]],
+            [points_cam_frame[1], points_cam_frame[3]],
+            [points_cam_frame[3], points_cam_frame[2]],
+            [points_cam_frame[2], points_cam_frame[0]],
+            
+            [points_cam_frame[4], points_cam_frame[5]],
+            [points_cam_frame[5], points_cam_frame[7]],
+            [points_cam_frame[7], points_cam_frame[6]],
+            [points_cam_frame[6], points_cam_frame[4]],
+            
+            [points_cam_frame[0], points_cam_frame[4]],
+            [points_cam_frame[1], points_cam_frame[5]],
+            [points_cam_frame[2], points_cam_frame[6]],
+            [points_cam_frame[3], points_cam_frame[7]],
+        ]
+        
+        new_points = []
+        # for point in points_cam_frame:
+            # new_points.append(self.convertPointToFrame(point[0], point[1], point[2]))
+        final_frustum_lines = []
+        for pair in frustum_lines:
+            temp = []
+            for point in pair:
+                conv = self.convertPointToFrame(point[0], point[1], point[2])
+                new_points.append(conv)
+                temp.append([conv.x, conv.y, conv.z])
+            final_frustum_lines.append(temp.copy())
+                
+                
+            
+        # add lines to visualize frustum
+        if publish:
+            rospy.loginfo("Publishing frustum")
+            header = Header()
+            header.stamp = rospy.Time.now()
+            header.frame_id = "base_link"
+            marker = Marker()
+            marker.header = header
+            marker.type = Marker.LINE_LIST
+            marker.pose.orientation.w = 1.0
+            marker.scale.x = 0.005  # Line width
+            marker.color.r = 0
+            marker.color.g = 1
+            marker.color.b = 0
+            marker.color.a = 1
+            marker.action = Marker.ADD
+            
+            marker.frame_locked = True
+            marker.id = 500
+
+            strip_points =[]
+            for point in new_points:
+                # print(point)
+                strip_points.append(Point(x = point.x, y = point.y, z = point.z))
+                
+            marker.points = strip_points
+            
+            self.marker_pub.publish(marker)
+        
+        # return np.array(new_points)            
+        return new_points, final_frustum_lines
+        
+        
+        
 
     def parse_scene(self, depth, rgb, detection):
         self.obtained_initial_images = True
 
         # rospy.loginfo("Got synced images, delta = " + str(time.time() - self.prevtime))
         # self.prevtime = time.time()
+        
+        # self.get_view_frustum(publish = True)
+        
         
         # convert images to numpy arrays
         depth_img = self.bridge.imgmsg_to_cv2(depth, desired_encoding="passthrough")
@@ -369,8 +473,8 @@ class SceneParser:
         self.color_image = np.array(color_img, dtype=np.uint8)
         
         if self.request_clear_object:
-            self.request_clear_object = False
             self.object.clear()
+            self.request_clear_object = False
         
         
         if self.objectId is None:
@@ -456,7 +560,7 @@ class SceneParser:
         id,
         frame = 'base_link', 
         center = [0, 0, 0],
-        mtype = "CUBE",
+        mtype = Marker.CUBE,
         extents = [0.05, 0.05, 0.05],
         color = None,
         alpha = 1,
@@ -466,9 +570,6 @@ class SceneParser:
         marker.header.frame_id = frame
         marker.header.stamp = rospy.Time.now()
         marker.header.stamp = rospy.Time.now()
-
-        types = ["ARROW", "CUBE", "SPHERE", "CYLINDER"]
-        mtype = types.index(mtype.upper())
         
         # set shape, Arrow: 0; Cube: 1 ; Sphere: 2 ; Cylinder: 3
         marker.type = mtype
@@ -517,7 +618,7 @@ class SceneParser:
             marker = self.get_marker(
                 id = 10, 
                 center = detection,
-                mtype = "sphere"
+                mtype = Marker.SPHERE
             )
             self.marker_pub.publish(marker)
 
@@ -888,7 +989,7 @@ class SceneParser:
             box_marker = self.get_marker(
                 id = 30,
                 center = grasp_center,
-                mtype = "CUBE",
+                mtype = Marker.CUBE,
                 extents = extents,
                 euler_angles = R.from_matrix(box_angles).as_euler('xyz'),
                 frame = "base_link",

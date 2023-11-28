@@ -564,6 +564,7 @@ class ManipulationMethods:
         takes in a series of waypoints and executes it one by one as the target is reached.
         """
         if len(plan) == 0:
+    
             return
         # x, y, theta, z, phi, ext
         waits = [0.5, 0.1, 0.5, 0.5, 0.1, 0.5]

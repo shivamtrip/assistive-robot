@@ -1,0 +1,9 @@
+#input  
+int64 objectId
+---
+#output
+bool success
+---
+#feedback
+int64 curState
+string curStateInfo

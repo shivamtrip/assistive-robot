@@ -71,6 +71,7 @@ add_action_files(
    PickTrigger.action
    PlaceTrigger.action
    StowTrigger.action
+   FindAlign.action
  )
 
 ## Generate added messages and services with any dependencies listed here
