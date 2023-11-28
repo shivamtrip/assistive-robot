@@ -115,16 +115,16 @@
             "current_task": {
                 "object_type": "",
                 "relative_name": "",
-                "resident_name": "",
-                "room_number": "",
-                "task_type": ""
+                "resident_name": "Mary",
+                "room_number": "202",
+                "task_type": "VIDEOCALL"
             },
-            "global_state": "IDLE",
+            "global_state": "ALIGN_TO_USER",
             "hri_params": {
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1701148821.615345,
+            "last_update": 1701152820.3677995,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {

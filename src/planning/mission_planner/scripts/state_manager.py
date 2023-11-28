@@ -41,6 +41,7 @@ class GlobalStates(Enum):
     MANIPULATION_TO_PLACE = 9
     ALIGN_TO_USER = 8
     VIDEOCALL = 5
+    RETURN_TO_HOME = 11
     
 
 class ObjectOfInterest(Enum): 

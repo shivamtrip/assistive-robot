@@ -48,6 +48,7 @@ class Mission_Planner():
         rospy.sleep(0.5)
         self.update_mission_status(GlobalStates.IDLE)
         
+
         print("Mission Planner initialized..")
     
 
@@ -157,6 +158,17 @@ class Mission_Planner():
                 return
 
             print("Placed object")
+            
+            
+            # Return to robot home location 
+            self.update_mission_status(GlobalStates.RETURN_TO_HOME)
+            navSuccess = self.TaskExecutor.navigate_to_location("HOME")
+            if not navSuccess:
+                return
+
+            print("Returned Home")
+
+            
 
         elif self.current_task_type == TaskType.VIDEOCALL.name:
 
