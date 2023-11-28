@@ -72,6 +72,7 @@ add_action_files(
    PlaceTrigger.action
    StowTrigger.action
    FindAlign.action
+   DeticRequest.action
  )
 
 ## Generate added messages and services with any dependencies listed here

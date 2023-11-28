@@ -21,8 +21,7 @@ from sensor_msgs.msg import PointCloud, PointField
 import sensor_msgs.point_cloud2 as pcl2
 import actionlib
 from yolo.msg import DeticDetectionsGoal, DeticDetectionsAction, DeticDetectionsActionResult
-
-
+from manipulation.msg import DeticRequestAction, DeticRequestGoal, DeticRequestResult
 
 class ObjectLocation:
     
@@ -156,6 +155,10 @@ class SceneParser:
         
         # self.dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
         # self.arucoParams = cv2.aruco.DetectorParameters_create()
+        
+
+        
+        
         self.dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         self.arucoParams =  cv2.aruco.DetectorParameters()
         
@@ -187,7 +190,31 @@ class SceneParser:
                 rospy.loginfo("Failed to obtain images. Please check the camera node.")
                 exit()
         
+        self.detic_request_server = actionlib.SimpleActionServer(
+            'detic_request_scene_parser', 
+            DeticRequestAction, 
+            execute_cb=self.detic_request_callback, 
+            auto_start = True
+        )
+
         rospy.loginfo("Scene parser initialized")
+
+    def detic_request_callback(self, goal : DeticRequestGoal):
+        rospy.loginfo("DETIC callback requested")
+        result = DeticRequestResult()
+        result.list_of_objects = []
+        if self.color_image is None:
+            rospy.loginfo("DETIC callback - don't have any image")
+            self.detic_request_server.set_aborted(result)
+            return
+        
+        _, _, msg, _ = self.get_detic_detections()
+        
+        box_classes = np.array(msg['box_classes']).astype(np.uint8)
+        for clas in box_classes:
+            result.list_of_objects.append(self.class_list[clas])
+        
+        self.detic_request_server.set_succeeded(result)
 
     def set_parse_mode(self, mode, id = None):
         """
@@ -700,9 +727,9 @@ class SceneParser:
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
-                return [x1, y1, x2, y2], mask, True
+                return [x1, y1, x2, y2], mask, msg, True
                 
-        return None, None, False
+        return None, None, msg, False
     
     def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask):
         """
@@ -903,7 +930,7 @@ class SceneParser:
         if get_object:
             success = False
             if use_detic:           
-                result, seg_mask, success = self.get_detic_detections()
+                result, seg_mask, _, success = self.get_detic_detections()
             
             if not success:
                 if self.current_detection:

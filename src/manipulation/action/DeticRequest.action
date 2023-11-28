@@ -1,0 +1,9 @@
+#input  
+bool request 
+---
+#output
+string[] list_of_objects
+---
+#feedback
+int64 curState
+string curStateInfo

@@ -16,6 +16,7 @@ from task_planner.msg import PlanTriggerAction, PlanTriggerGoal, PlanTriggerResu
 from manipulation.msg import PickTriggerGoal, PlaceTriggerGoal, PickTriggerAction, PlaceTriggerAction, PickTriggerResult, PlaceTriggerResult
 from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerTriggerResult, DrawerTriggerGoal
 from manipulation.msg import FindAlignAction, FindAlignResult, FindAlignGoal
+from manipulation.msg import DeticRequestAction, DeticRequestGoal, DeticRequestResult
 
 import numpy as np
 
@@ -79,9 +80,9 @@ class TaskPlanner:
         self.align_client = actionlib.SimpleActionClient('find_align_action', FindAlignAction)
         self.align_client.wait_for_server()
         
-        
-        
-        
+        rospy.loginfo("Waiting for DETIC services from scene_parser")
+        self.detic_request_client = actionlib.SimpleActionClient('detic_request_scene_parser', DeticRequestAction)
+        self.detic_request_client.wait_for_server()
         
         self.class_list = rospy.get_param('/object_detection/class_list')
         self.server = actionlib.SimpleActionServer('task_planner', PlanTriggerAction, self.execute, False)
@@ -215,7 +216,27 @@ class TaskPlanner:
         return result.success
     
     def get_detections(self):
-        pass
+        self.detic_request_client.send_goal(DeticRequestGoal(request = True))
+        self.detic_request_client.wait_for_result()
+        result : DeticRequestResult = self.detic_request_client.get_result()
+        list_of_objects = result.list_of_objects
+        
+        if len(list_of_objects) == 0:
+            strtospk = "I don't see anything."
+        else:
+            strtospk  = "I see "
+            for i, obj in enumerate(list_of_objects):
+                nat_name = obj.replace("_", " ")
+                if i == len(list_of_objects) - 1:
+                    strtospk += "and " + nat_name + "."
+                else:
+                    strtospk += nat_name + ", "
+
+        self.speak(strtospk)
+        
+        
+        
+        return list_of_objects
     
     def speak(self, string_to_speak):
         req = VerbalResponseRequest(
