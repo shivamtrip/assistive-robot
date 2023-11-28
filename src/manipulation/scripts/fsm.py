@@ -11,6 +11,7 @@ from drawer_manip import DrawerManager
 from pick import PickManager
 from place import PlaceManager
 from stow import StowManager
+from find_and_align import FindAndAlignManager
 
 class ManipulationManager:
 
@@ -30,6 +31,7 @@ class ManipulationManager:
         self.drawer_manager = DrawerManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.pick_manager   = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.place_manager  = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
+        self.find_manager = FindAndAlignManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods, self.planner)
         rospy.loginfo( "Manipulation subsystem up.")
     
 if __name__ == '__main__':

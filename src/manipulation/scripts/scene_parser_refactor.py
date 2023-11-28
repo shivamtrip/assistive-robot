@@ -358,6 +358,7 @@ class SceneParser:
     
     def check_if_in_frustum(self, point):
         frustum_lines = self.get_view_frustum()[1]
+        frustum_lines = np.array(frustum_lines)
         for line in frustum_lines:
             v0, v1 = line
             normal = np.cross(v1 - v0, point - v0)
@@ -550,7 +551,7 @@ class SceneParser:
             header.stamp = rospy.Time.now()
             header.frame_id = "base_link"  # Set your desired frame_id
             msg = pcl2.create_cloud_xyz32(header, points)
-            self.obj_cloud_pub.publish(msg)
+            self.scene_cloud_pub.publish(msg)
             
         return pcd
     
@@ -886,7 +887,14 @@ class SceneParser:
             rospy.loginfo("Published point cloud. Took" + str(time.time() - starttime) + "seconds.")
             
         return points
-        
+    
+    def publish_point(self, point, name = "point", frame = "base_link"):
+        self.tf_broadcaster.sendTransform((point[0], point[1], point[2]),
+            tf.transformations.quaternion_from_euler(0, 0, 0),
+            rospy.Time.now(),
+            name,
+            frame
+        )
     
     def set_point_cloud(self, visualize = False, use_detic = False, publish_object = False, publish_scene =False, get_object = True):
         rospy.loginfo(f"[{rospy.get_name()}]: Setting point cloud")

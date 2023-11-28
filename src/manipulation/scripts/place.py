@@ -31,7 +31,7 @@ class PlaceManager():
         self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
         self.server.start()
         
-        rospy.loginfo("Loaded pick manager.")
+        rospy.loginfo("Loaded place manager.")
     
     def place(self, fixed_place = False, location = None, is_rotate = True):
         

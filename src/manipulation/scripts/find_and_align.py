@@ -8,6 +8,7 @@ from manip_basic_control import ManipulationMethods
 import actionlib
 from manipulation.msg import FindAlignAction, FindAlignResult, FindAlignGoal
 from std_srvs.srv import Trigger, TriggerResponse
+from alfred_navigation.msg import NavManAction, NavManGoal
 
 from helpers import move_to_pose
 import time
@@ -45,6 +46,11 @@ class FindAndAlignManager():
         self.head_tilt_angle_search = rospy.get_param('/manipulation/head_tilt_angle_search')
         self.head_tilt_angle_grasp = rospy.get_param('/manipulation/head_tilt_angle_grasp')
         
+        # self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        # self.navigation_client.wait_for_server()
+        
+        
         self.class_list = rospy.get_param('/object_detection/class_list')
         self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
         self.server.start()
@@ -64,10 +70,11 @@ class FindAndAlignManager():
         settling_time = self.vs_range[3]
         
         nRotates = 0
-        
         while not rospy.is_shutdown():
+            self.scene_parser.reset_tsdf()  
             self.scene_parser.clear_observations(wait = True)
             for i, angle in enumerate(np.linspace(self.vs_range[0], self.vs_range[1], self.vs_range[2])):
+                rospy.loginfo("Rotating head to angle: " + str(angle))
                 move_to_pose(self.trajectory_client, {
                     'head_pan;to' : angle,
                 })
@@ -76,12 +83,12 @@ class FindAndAlignManager():
             
             objectProperties, success = self.scene_parser.estimate_object_location()
             if success:
-                angle = objectProperties['angle']
+                angle = objectProperties['angleToGo']
                 object_location = [
                     objectProperties['x'],
                     objectProperties['y'],
                     objectProperties['z'],
-                    objectProperties['angle']
+                    objectProperties['angleToGo']
                 ]
                 cloud = self.scene_parser.get_pcd_from_tsdf(publish = True)
                 return object_location, cloud, success
@@ -100,21 +107,31 @@ class FindAndAlignManager():
             
     def align_to_object_for_manipulation(self, object_location):
         x, y, z, theta = object_location
+        # x, y, z is prior to rotation
+        inFrustum = self.scene_parser.check_if_in_frustum(np.array([x, y, z]))
+        
         move_to_pose(self.trajectory_client, {
             'head_tilt;to' : - self.head_tilt_angle_grasp * np.pi/180,
             'head_pan;to' : -np.pi/2,
             'base_rotate;by' : theta + np.pi/2,
         })
+        rospy.sleep(5)
+        # if its not in the frustum, move a little bit to get it back in the frame such 
+        # that the visual servoing can work.
+        # if not inFrustum:
+        #     rospy.loginfo("Object not in frustum, moving base a little bit.")
+        #     move_to_pose(self.trajectory_client, {
+        #         'base_translate;by' : 0.1,
+        #     })
+        #     rospy.sleep(3)
         
-        self.scene_parser.get_view_frustum()
-        
-    
     def is_object_reachable(self, object_location, cloud):
         nav_target, is_required = self.planner.plan_base(cloud, object_location)
         return nav_target, is_required
     
     def main(self):
         is_object_found = False
+        
         while not is_object_found:
             self.switch_to_manipulation_mode()
             rospy.sleep(1)
@@ -122,13 +139,12 @@ class FindAndAlignManager():
             rospy.loginfo("Object found: " + str(is_object_found))
             if is_object_found:
                 target, is_nav_required = self.is_object_reachable(object_location, cloud)
-                
+                rospy.loginfo("Object reachable: " + str(not is_nav_required))
                 if not is_nav_required:
-                    rospy.loginfo("Object is reachable!")
                     self.switch_to_manipulation_mode()
-                    self.alignObjectForManipulation(object_location)
+                    self.align_to_object_for_manipulation(object_location)
                     return True
-                    
+                
                 target = object_location
                 theta = np.arctan2(target[1], target[0])
 
@@ -137,9 +153,9 @@ class FindAndAlignManager():
                     'head_pan;to' : 0,
                 })
                 # convert target to world frame
-                self.scene_parser.publish_point(target, "point_a", frame = 'base_link')
+                # self.scene_parser.publish_point(target, "point_a", frame = 'base_link')
                 target = self.scene_parser.convert_point_from_to_frame(target[0], target[1], target[2], from_frame = 'base_link', to_frame = 'map')
-                self.scene_parser.publish_point(target, "point_b", frame = 'map')
+                # self.scene_parser.publish_point(target, "point_b", frame = 'map')
                 self.switch_to_navigation_mode()
                 rospy.loginfo("new_to?: " + str(target))
                 
@@ -153,14 +169,14 @@ class FindAndAlignManager():
                 # add behavior to recover from not finding the object.
                 # for now return false
                 # request new search location from task_planner.
-                return False
+               return False
         return True
     def execute_cb(self, goal):
         rospy.loginfo("\n\n--------RECEIVED FIND AND ALIGN GOAL--------")
         starttime = time.time()
         self.goal = goal
         self.scene_parser.set_parse_mode("YOLO", goal.objectId)
-        success = self.find_renav_location()
+        success = self.main()
         rospy.loginfo("Find and renavigate action took " + str(time.time() - starttime) + " seconds.")
         result = FindAlignResult()
         result.success = success

@@ -39,14 +39,14 @@ class Planner:
         h, w = img.shape[:2]
         sorted_points = points[np.argsort(points[:,2])]
 
-        def convert_point_to_img(x, y, offset = 0):
-            x_ind = int((x - x_min)/self.resolution) + offset
-            y_ind = int((y - y_min)/self.resolution) + offset
+        def convert_point_to_img(x, y, offset = 1.0):
+            x_ind = int((x + offset - x_min)/self.resolution) 
+            y_ind = int((y + offset - y_min)/self.resolution)
             return x_ind, y_ind
             
-        def convert_point_to_world(x, y, offset = 0):
-            x = (x - offset) * self.resolution + x_min
-            y = (y - offset) * self.resolution + y_min
+        def convert_point_to_world(x_ind, y_ind, offset = 1.0):
+            x = (x_ind) * self.resolution + x_min - offset
+            y = (y_ind) * self.resolution + y_min - offset 
             return x, y
 
         for point in sorted_points:
@@ -77,14 +77,21 @@ class Planner:
         reachability_map = target_reachable_dist * source_reachabile_dist * safety_dist
         
         is_plan_reqd = True
+        
+        pt = convert_point_to_img(0, 0)
+        check_pixels = 15
         if reachability_map[convert_point_to_img(0, 0)] != 0:
             is_plan_reqd = False
+            
+        
         
         reachability_map -= np.min(reachability_map)
         reachability_map /= np.max(reachability_map)
         reachability_map[reachability_map < 0.8] = 0
         
-        
+        print(pt)
+        window = reachability_map[pt[0] - check_pixels: pt[0] + check_pixels, pt[1] - check_pixels: pt[1] + check_pixels]
+        cv2.imwrite("/home/hello-robot/alfred-autonomy/src/manipulation/scripts/tests/collision_boxes/window.png", window)
         
         # pick the point with the highest distance
         base_loc = np.unravel_index(np.argmax(reachability_map), reachability_map.shape)
