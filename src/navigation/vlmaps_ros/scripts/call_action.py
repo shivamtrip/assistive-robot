@@ -40,6 +40,7 @@ class vlmaps_fsm():
         """ Send the goal to the action server"""
         goal = VLMapsGoal()
         mask_list = []
+        heatmaps_list = []
         labels = self.labels
         
         for label in labels:
@@ -49,19 +50,25 @@ class vlmaps_fsm():
         result = self.vlmaps_client.get_result()
 
         for i in range(len(result.masks)):
-            height = result.masks[i].height
-            width = result.masks[i].width
+            height_mask = result.masks[i].height
+            width_mask = result.masks[i].width
+            height_heatmap = result.heatmaps[i].height
+            width_heatmap = result.heatmaps[i].width
             mask = np.frombuffer(result.masks[i].data, 
-                                 dtype=np.uint8).reshape(height, width)
+                                 dtype=np.uint8).reshape(height_mask, width_mask)
+            heatmap = np.frombuffer(result.heatmaps[i].data, 
+                                    dtype=np.float32).reshape(height_heatmap, width_heatmap)
             mask_list.append(mask)
+            heatmaps_list.append(heatmap)
 
         if(self.vlmaps_client.get_state() == actionlib.GoalStatus.SUCCEEDED):
             rospy.loginfo("Goal succeeded")
             rospy.loginfo("Result: {}".format(len(mask_list)))
 
         mask_list = np.array(mask_list)
+        heatmaps_list = np.array(heatmaps_list)
 
-        self.results = mask_list
+        self.results = {"masks": mask_list, "heatmaps": heatmaps_list}
 
 if __name__ == "__main__":
     rospy.init_node('vlmaps_caller', anonymous=True)

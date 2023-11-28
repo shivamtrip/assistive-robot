@@ -238,6 +238,21 @@ def visualize_masked_map_2d(rgb: np.ndarray, mask: np.ndarray,title='masked map'
     """
     visualize_heatmap_2d(rgb, mask.astype(np.float32),title=title)
 
+def get_masked_map_2d(rgb: np.ndarray, mask: np.ndarray,title='masked map',transparency: float = 0.4):
+    """visualize masked map
+
+    Args:
+        rgb (np.ndarray): (gs, gs, 3) element range [0, 255] np.uint8
+        mask (np.ndarray): (gs, gs) element range [0, 1] np.uint8
+    """
+    heatmap = mask.astype(np.float32).copy()
+    sim_new = (heatmap * 255).astype(np.uint8)
+    heat = cv2.applyColorMap(sim_new, cv2.COLORMAP_JET)
+    heat = heat[:, :, ::-1].astype(np.float32)  # convert to RGB
+    heat_rgb = heat * transparency + rgb * (1 - transparency)
+    heat_rgb = heat_rgb.astype(np.uint8)
+    return heat_rgb
+
 def show_heatmap(cell_size,color_top_down:np.ndarray, \
                  obstacles:np.ndarray,mask_list,labels
                  ,outputs:dict):
@@ -271,6 +286,43 @@ def show_heatmap(cell_size,color_top_down:np.ndarray, \
         heatmap = get_heatmap_from_mask_2d(mask, cell_size=cell_size)
         rgb = color_top_down.copy()
         visualize_masked_map_2d(rgb, heatmap,title=labels[i]+" heatmap")
+
+def get_heatmaps(cell_size,color_top_down:np.ndarray, \
+                 obstacles:np.ndarray,mask_list,labels
+                 ,outputs:dict):
+    """visualize heatmap given the labels and masks"""
+    NON_OBJECT_CLASSES = ['floor','wall','ceiling']
+    # obstacles
+    x_indices, y_indices = np.where(obstacles == 0)
+    xmin = np.min(x_indices)
+    xmax = np.max(x_indices)
+    ymin = np.min(y_indices)
+    ymax = np.max(y_indices)
+    color_top_down = color_top_down[xmin:xmax+1, ymin:ymax+1]
+    heatmaps = []
+    
+
+    for i in range(len(labels)):
+        # print ranges of mask_list[i]
+        mask = mask_list[i]
+        bbox = find_best_bbox(outputs[labels[i]]['bboxes'])
+
+        if bbox is None:
+            print("No bbox found for ", labels[i])
+            continue
+
+        if labels[i] not in NON_OBJECT_CLASSES:
+            # create a binary mask within the above bbox
+            filter = np.zeros_like(mask)
+            filter[bbox[1]:bbox[3]+1, bbox[0]:bbox[2]+1] = 1
+            mask = mask * filter
+
+        mask = mask[xmin:xmax+1, ymin:ymax+1]
+        heatmap = get_heatmap_from_mask_2d(mask, cell_size=cell_size)
+        rgb = color_top_down.copy()
+        heatmaps.append(get_masked_map_2d(rgb, heatmap,title=labels[i]+" heatmap"))
+
+    return heatmaps
 
 def find_best_bbox(bboxes: np.ndarray):
     """Finds the centroid of the mask"""

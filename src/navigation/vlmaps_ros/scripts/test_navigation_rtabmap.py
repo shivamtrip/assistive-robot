@@ -39,7 +39,7 @@ from landmark_index import *
 from utils.clip_mapping_utils import *
 from vis_tools import *
 from cv_bridge import CvBridge
-from geometry_msgs.msg import Quaternion
+from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped
 
 class TestTaskPlanner:
     def __init__(self):
@@ -61,6 +61,12 @@ class TestTaskPlanner:
         self.show_vis = rospy.get_param('/vlmaps_robot/show_vis')
         self.data_config_dir = os.path.join(self.root_dir, "config/data_configs")
 
+        # Load location priors to get orientation
+        file_path = os.path.join(self.data_config_dir, "locations.json")
+        assert os.path.exists(file_path), "locations.json file not found at {}".format(file_path)
+        f = open(file_path)
+        self.location_priors = json.load(f)
+
         # Stores update time
         self.last_update_time = time.time()
         
@@ -79,6 +85,14 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing costmap processor node...")
         self.costmap_processor = ProcessCostmap()
 
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing amcl pose subscriber...")
+        self.curr_pos = None
+        self.RECEIVED_AMCL_POSE = False
+        self.amcl_pose_sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.amcl_pose_callback)
+        while not self.RECEIVED_AMCL_POSE:
+            rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for amcl pose...")
+            rospy.sleep(0.5)
+
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
 
         # self.labels= "table, chair, refrigerator, potted plant, floor, sofa, bed, sink, other"
@@ -89,6 +103,12 @@ class TestTaskPlanner:
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Node Ready.")
+
+    def amcl_pose_callback(self, msg):
+        """Callback for amcl pose subscriber"""
+        self.curr_pos = [msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z]
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.curr_pos))
+        self.RECEIVED_AMCL_POSE = True
         
     def executeTask(self):
 
@@ -114,6 +134,7 @@ class TestTaskPlanner:
         assert obj1 in self.labels, "Object not in vlmaps labels"
 
         # Call vlmaps
+        goals_vis = []
         self.vlmaps_caller.send_goal(self.labels)
         rospy.sleep(0.5)
         mask_list = self.vlmaps_caller.results
@@ -123,18 +144,20 @@ class TestTaskPlanner:
 
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
-        safe_goal2D = self.get_2D_goal_rtabmap(outputs,label=obj1)
+        safe_goal2D = self.get_2D_goal_rtabmap(outputs,label=obj1,safe=True)
         safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
+        goals_vis.append(safe_goal2D)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
         
         # Send goal to movebase
-        self.navigate_to_location(safe_movebase_goal)
+        # self.navigate_to_location(safe_movebase_goal)
         
         if (self.show_vis):
-            self.show_vlmaps_results(mask_list,outputs,self.labels)
+            publish_markers(goals_vis)
+            # self.show_vlmaps_results(mask_list,outputs,self.labels)
 
-    def move_between_objects(self, obj1, obj2):
+    def move_between_objects(self, obj1, obj2,safe=False):
         """ Inferences over vlmaps and navigates between the two objects in the scene."""
 
         assert obj1 in self.labels, "Object not in vlmaps labels"
@@ -161,9 +184,12 @@ class TestTaskPlanner:
         theta = goals2D[2]
 
         # Verify that the goal is safe
-        if (not self.costmap_processor.isSafe(goals2D[0],goals2D[1],0)):
+        ## For now, we are not checking if the goal is safe
+        ## Costmap based functions are not stable. Need to fix them
+
+        if (safe and (not self.costmap_processor.isSafe(goals2D[0],goals2D[1],0,ref_cost_min=10,ref_cost_max=50))):
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed goal point is not safe, finding nearest safe point")
-            x,y,z = self.costmap_processor.findNearestSafePoint(goals2D[0],goals2D[1],0)
+            x,y,z = self.costmap_processor.findNearestSafePoint(goals2D[0],goals2D[1],0,ref_cost_min=10,ref_cost_max=50)
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Computed safe goal point: {}, {}, {}".format(x,y,z))
             safe_goal2D = (x,y,theta)
         else:
@@ -178,7 +204,6 @@ class TestTaskPlanner:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Published markers to rviz. Now exiting...")
             # self.show_vlmaps_results(mask_list,outputs,self.labels)
             return
-        
         else:
 
             safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
@@ -206,18 +231,17 @@ class TestTaskPlanner:
 
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
-        safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2)
+        safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2,safe=False)
         safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
-
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
-        
+
         # Send goal to movebase
         # self.navigate_to_location(safe_movebase_goal)
         
         if (self.show_vis):
             self.show_vlmaps_results(mask_list,outputs,self.labels)
 
-    def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str)-> tuple:
+    def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str,safe:False)-> tuple:
         """ Finds the object of category 'obj1' 
         that is closest to the object of category 'obj2'"""
 
@@ -244,9 +268,11 @@ class TestTaskPlanner:
                 X, Y, Z = X1,Y1,Z1
         
         # set 2d goal
-        X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
-        rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
-        theta_goal =0
+        if(safe):
+            X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z,ref_cost_min=10, ref_cost_max=50)
+            rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
+
+        theta_goal = self.find_theta(obj1)
         goal2D = (X,Y,theta_goal)
 
         # Publish markers
@@ -344,6 +370,7 @@ class TestTaskPlanner:
         #TODO: @ag6 - Get the initial pose of the robot and associated transforms from the vlmaps action server
 
         assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Running test goal")
 
         ### Get the largest bbox and find the centroid of the bbox
         mask = results[label]['mask'].astype(np.uint8)
@@ -351,17 +378,44 @@ class TestTaskPlanner:
         X, Y ,Z = self.convert_vlmap_id_to_world_frame(x,y)
 
         if(safe):
-            X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z)
+            goal_des = (X,Y,Z)
+            curr_pos = self.curr_pos
+            # X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z,ref_cost_min=10, ref_cost_max=15)
+            # X, Y, Z = self.costmap_processor.findStraightLineSafePoint(goal_des,curr_pos,num_points=100,ref_cost_min=10, ref_cost_max=20)
+            X, Y, Z = self.findStraightLinePoint(goal_des,curr_pos,num_points=100)
             rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
 
-        # set 2d goal
-        theta=0 # 2d navigation
+        theta = self.find_theta(label)
         goal2D = (X,Y,theta)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed goal point: {}, {}, {} for label{}".format(X,Y,Z,label))
 
         return goal2D
     
+    def findStraightLinePoint(self, goal_des, curr_pos, num_points=100,radius = 1):
+        """Finds a point on the straight line connecting the goal and current position"""
+
+        assert len(goal_des) == 3, "goal_des should be of length 3 but found {}".format(len(goal_des))
+        assert len(curr_pos) == 3, "curr_pos should be of length 3 but found {}".format(len(curr_pos))
+
+        # Find straight line
+        x1, y1, z1 = goal_des
+        x2, y2, z2 = curr_pos
+        x = np.linspace(x1,x2,num_points)
+        y = np.linspace(y1,y2,num_points)
+
+        # Iterate
+        for i in range(num_points):
+            x_curr, y_curr = x[i], y[i]
+            dist_to_goal = np.sqrt((x_curr-x1)**2 + (y_curr-y1)**2)
+
+            if(dist_to_goal > radius):
+                rospy.loginfo(f"[{rospy.get_name()}]:" +"Found safe point on straight line")
+                return x_curr, y_curr, 0
+            
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Could not find safe point on straight line, returning current position")
+        return curr_pos
+            
     def get_locations_dict_rtabmap(self,results:dict,label:str)-> tuple:
         """Returns the 2D locations of all labels bboxes from the vlmap in 2D map frame"""
         res={}
@@ -379,7 +433,7 @@ class TestTaskPlanner:
         # Vlmap to rtabmap world coordinate
         for i in range(len(centroids_dict['x_locs'])):
             X,Y,Z = self.convert_vlmap_id_to_world_frame(centroids_dict['x_locs'][i],centroids_dict['y_locs'][i])
-            theta=0
+            theta=self.find_theta(label)
             res['x_locs'].append(X)
             res['y_locs'].append(Y)
             res['z_locs'].append(Z)
@@ -439,6 +493,17 @@ class TestTaskPlanner:
         show_color_top_down(color_top_down,obstacles=obstacles)
         show_seg_mask(seg, patches)
         show_obstacle_map(obstacles)
+
+    def find_theta(self, label):
+        """ Takes hardcoded orientations"""
+
+        if (label in self.location_priors.keys()): # hardcoding the orientation for now
+            theta = self.location_priors[label]['yaw']
+            theta = np.deg2rad(theta)
+        else:
+            theta = 0
+
+        return theta
 
     def start(self):
         """Starts the action server"""
@@ -542,7 +607,7 @@ def publish_markers(goals2D: list):
         marker_array_msg.markers.append(marker)
 
     # Publish 10 times for visualization
-    for i in range(20):
+    for i in range(5):
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing marker for all goals {}".format(goals2D))
         marker_array_pub.publish(marker_array_msg)
         rospy.sleep(0.5)
@@ -550,9 +615,16 @@ def publish_markers(goals2D: list):
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
+    obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table"]
+
     # go to object
-    # task_planner.go_to_object("sofa")
-    task_planner.move_between_objects("sofa", "refrigerator")
+    for obj in obj_list:
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
+        task_planner.go_to_object(obj)
+        rospy.sleep(1)
+    
+    # task_planner.go_to_object("table")
+    # task_planner.move_between_objects("sofa", "refrigerator")
     # task_planner.move_between_objects("sofa", "potted plant")
     # task_planner.move_between_objects("potted plant", "table")
     # task_planner.move_between_objects("table", "sink")

@@ -2,6 +2,7 @@ string[] labels
 ---
 Header header
 sensor_msgs/Image[] masks
+sensor_msgs/Image[] heatmaps
 bool success
 ---
 int32 status

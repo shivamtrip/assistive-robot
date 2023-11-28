@@ -129,8 +129,11 @@ class VLMapsGenerator():
             label_mask[no_map_mask] = 0
             mask_list.append(label_mask)
 
+        heatmaps_list = self.get_heatmap_results(mask_list,labels)
+
         # Publish masks
-        self.publish_masks(mask_list,labels)
+        # self.publish_masks(mask_list,labels)
+        self.publish_masks_and_heatmaps(mask_list,heatmaps_list,labels)
 
     def cv2_to_imgmsg(self,cv_image):
 
@@ -161,6 +164,38 @@ class VLMapsGenerator():
         vlmaps_msg.success = True
         self.action_server.set_succeeded(vlmaps_msg)
         rospy.logdebug(f"[{rospy.get_name()}] " + "Published all masks successfully")
+
+    def publish_masks_and_heatmaps(self,masks:list,heatmaps_list:list,labels:list):
+
+        """ Publishes the masks for each label """
+
+        vlmaps_msg = VLMapsResult()
+        vlmaps_msg.header = rospy.Header()
+
+        for i in range(len(labels)):
+            mask = masks[i]
+            heatmap = heatmaps_list[i]
+            # use numpy.buffer to convert to ros msg
+            mask_msg = self.cv2_to_imgmsg(mask)
+            heatmap_msg = self.cv2_to_imgmsg(heatmap)
+            vlmaps_msg.masks.append(mask_msg)
+            vlmaps_msg.heatmaps.append(heatmap_msg)
+            rospy.logdebug(f"[{rospy.get_name()}] " + "Published mask for label {}".format(labels[i]))
+
+        vlmaps_msg.success = True
+        self.action_server.set_succeeded(vlmaps_msg)
+        rospy.logdebug(f"[{rospy.get_name()}] " + "Published all masks successfully")
+
+    def get_heatmap_results(self, mask_list, labels):
+
+        outputs = postprocess_masks(mask_list,labels)
+        obstacles = load_map(self.obstacles_save_path)
+
+        # More visualizations
+        color_top_down = load_map(self.color_top_down_save_path)
+        heatmaps_list = get_heatmaps(cell_size=self.cs,color_top_down=color_top_down,obstacles=obstacles, \
+                            mask_list=mask_list, labels=labels,outputs=outputs)
+        return heatmaps_list
 
     def start(self):
       
