@@ -437,7 +437,7 @@ if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
     # go to object
-    task_planner.go_to_object(" sofa")
+    task_planner.go_to_object("sofa")
 
     # rospy.sleep(2)
     try:

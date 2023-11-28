@@ -10,6 +10,7 @@ from base64 import b64encode
 import matplotlib.pyplot as plt
 from PIL import Image
 import cv2
+from scipy.ndimage import distance_transform_edt
 
 def load_depth(depth_filepath):
     with open(depth_filepath, 'rb') as f:
@@ -169,4 +170,123 @@ def show_label_masks(mask_list:list,labels:list):
         plt.imshow(mask_list[i],cmap='gray')
         plt.title('Mask for '+labels[i])
         plt.show()
+
+def pool_3d_label_to_2d(mask_3d: np.ndarray, grid_pos: np.ndarray, gs: int) -> np.ndarray:
+    mask_2d = np.zeros((gs, gs), dtype=bool)
+    for i, pos in enumerate(grid_pos):
+        row, col, h = pos
+        mask_2d[row, col] = mask_3d[i] or mask_2d[row, col]
+
+    return mask_2d
+
+
+def pool_3d_rgb_to_2d(rgb: np.ndarray, grid_pos: np.ndarray, gs: int) -> np.ndarray:
+    rgb_2d = np.zeros((gs, gs, 3), dtype=np.uint8)
+    height = -100 * np.ones((gs, gs), dtype=np.int32)
+    for i, pos in enumerate(grid_pos):
+        row, col, h = pos
+        if h > height[row, col]:
+            rgb_2d[row, col] = rgb[i]
+
+    return rgb_2d
+
+
+def get_heatmap_from_mask_2d(mask: np.ndarray, cell_size: float = 0.05, decay_rate: float = 0.0005) -> np.ndarray:
+
+    dists = distance_transform_edt(mask == 0) / cell_size
+    tmp = np.ones_like(dists) - (dists * decay_rate)
+    heatmap = np.where(tmp < 0, np.zeros_like(tmp), tmp)
+
+    return heatmap
+
+
+def visualize_rgb_map_2d(rgb: np.ndarray,title='rgb'):
+    """visualize rgb image
+
+    Args:
+        rgb (np.ndarray): (gs, gs, 3) element range [0, 255] np.uint8
+    """
+    rgb = rgb.astype(np.uint8)
+    rgb= Image.fromarray(rgb)
+    plt.figure(figsize=(8, 6), dpi=120)
+    plt.title(title)
+    plt.imshow(rgb)
+    plt.show()
+
+
+def visualize_heatmap_2d(rgb: np.ndarray, heatmap: np.ndarray, 
+                         transparency: float = 0.4,title='heatmap'):
+    """visualize heatmap
+
+    Args:
+        rgb (np.ndarray): (gs, gs, 3) element range [0, 255] np.uint8
+        heatmap (np.ndarray): (gs, gs) element range [0, 1] np.float32
+    """
+    sim_new = (heatmap * 255).astype(np.uint8)
+    heat = cv2.applyColorMap(sim_new, cv2.COLORMAP_JET)
+    heat = heat[:, :, ::-1].astype(np.float32)  # convert to RGB
+    heat_rgb = heat * transparency + rgb * (1 - transparency)
+    visualize_rgb_map_2d(heat_rgb,title=title)
+
+
+def visualize_masked_map_2d(rgb: np.ndarray, mask: np.ndarray,title='masked map'):
+    """visualize masked map
+
+    Args:
+        rgb (np.ndarray): (gs, gs, 3) element range [0, 255] np.uint8
+        mask (np.ndarray): (gs, gs) element range [0, 1] np.uint8
+    """
+    visualize_heatmap_2d(rgb, mask.astype(np.float32),title=title)
+
+def show_heatmap(cell_size,color_top_down:np.ndarray, \
+                 obstacles:np.ndarray,mask_list,labels
+                 ,outputs:dict):
+    """visualize heatmap given the labels and masks"""
+    NON_OBJECT_CLASSES = ['floor','wall','ceiling']
+    # obstacles
+    x_indices, y_indices = np.where(obstacles == 0)
+    xmin = np.min(x_indices)
+    xmax = np.max(x_indices)
+    ymin = np.min(y_indices)
+    ymax = np.max(y_indices)
+    color_top_down = color_top_down[xmin:xmax+1, ymin:ymax+1]
+    
+
+    for i in range(len(labels)):
+        # print ranges of mask_list[i]
+        mask = mask_list[i]
+        bbox = find_best_bbox(outputs[labels[i]]['bboxes'])
+
+        if bbox is None:
+            print("No bbox found for ", labels[i])
+            continue
+
+        if labels[i] not in NON_OBJECT_CLASSES:
+            # create a binary mask within the above bbox
+            filter = np.zeros_like(mask)
+            filter[bbox[1]:bbox[3]+1, bbox[0]:bbox[2]+1] = 1
+            mask = mask * filter
+
+        mask = mask[xmin:xmax+1, ymin:ymax+1]
+        heatmap = get_heatmap_from_mask_2d(mask, cell_size=cell_size)
+        rgb = color_top_down.copy()
+        visualize_masked_map_2d(rgb, heatmap,title=labels[i]+" heatmap")
+
+def find_best_bbox(bboxes: np.ndarray):
+    """Finds the centroid of the mask"""
+
+    if len(bboxes) == 0:
+        return None
+
+    bboxes = np.array(bboxes)
+    bboxes = np.reshape(bboxes,(-1,4))
+    assert bboxes.shape[1] == 4, "bboxes should be of shape (N,4) but found {}".format(bboxes.shape)
+
+    # Find areas
+    areas = (bboxes[:,2] - bboxes[:,0]) * (bboxes[:,3] - bboxes[:,1])
+    max_id = np.argmax(areas)
+    max_bbox = bboxes[max_id]
+
+    return max_bbox
+
 

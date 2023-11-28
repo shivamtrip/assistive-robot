@@ -15,6 +15,7 @@ Broadly, there are just three steps to use VLMaps for navigation:
     # Run the save_data.py script in terminal 2 inside the 
     # `vlmaps` conda environment 
     cd ~/FVD/alfred-autonomy/src/navigation/vlmaps_ros/scripts/
+    
     python save_data.py --fps <desired_fps> --img_save_dir <path_to_directory> --color_topic <color_topic_name> --depth_topic <depth_topic_name> --pose_topic <pose_topic_name> --intrinsic_topic <intrinsic_topic_name> --is_rtabmap <bool value depending on mapping method>
 
     ## Example command
