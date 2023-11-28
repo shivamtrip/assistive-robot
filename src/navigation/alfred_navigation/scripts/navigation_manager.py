@@ -38,7 +38,7 @@ class NavigationManager():
         self.navman_server.register_goal_callback(self.goal_cb)
         
 
-        self.costmap_processor = ProcessCostmap(self.pre_emption)
+        # self.costmap_processor = ProcessCostmap(self.pre_emption)
         
         # self.moveback_client = actionlib.SimpleActionClient('moveback_recovery', MovebackRecoveryAction)
 
@@ -75,13 +75,12 @@ class NavigationManager():
 
     def navigate_to_goal(self, goal):
         rospy.loginfo(f"[{self.node_name}]:" + "Navigation Manager received goal")
-        x, y, z = self.costmap_processor.findNearestSafePoint(goal.x, goal.y, 0.0)
-
-        goal.x = x
-        goal.y = y
+        # x, y, z = self.costmap_processor.findNearestSafePoint(goal.x, goal.y, 0.0)
+        # goal.x = x
+        # goal.y = y
+        # self.costmap_processor.set_goal(goal)
 
         self.goal = goal
-        self.costmap_processor.set_goal(goal)
 
         # navigate to goal location
         movebase_goal = MoveBaseGoal()
@@ -119,7 +118,7 @@ class NavigationManager():
         
         
     def send_navman_result(self, success):
-        self.costmap_processor.set_goal(None)
+        # self.costmap_processor.set_goal(None)
         navman_result = NavManResult()
         self.goal = None
         self.n_attempts = 0
