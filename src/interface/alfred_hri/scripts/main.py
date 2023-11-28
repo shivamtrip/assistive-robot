@@ -15,9 +15,13 @@ from generate_response import ResponseGenerator
 from recognize_speech import SpeechRecognition
 from wakeword_detector import WakewordDetector
 
+from firebase_node import FirebaseNode
+
 class HRI():
     def __init__(self):
         rospy.init_node("alfred_hri")
+        
+        self.firebase_node = FirebaseNode()
         
         self.speech_recognition = SpeechRecognition()
         self.wakeword_detector = WakewordDetector(self.wakeword_triggered)
@@ -27,10 +31,11 @@ class HRI():
             VerbalResponse, 
             self.verbal_response_callback
         )
-
+        self.update_param = self.firebase_node.update_param
+        
         self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
-        self.updateParamService = rospy.ServiceProxy('/update_param', UpdateParam)
+        self.updateParamService = rospy.Service('/update_param', UpdateParam, self.firebase_node.update_param)
         
         rospy.loginfo("Waiting for /startedListening service")
         self.startedListeningService.wait_for_service()
@@ -38,13 +43,7 @@ class HRI():
         rospy.loginfo("Waiting for /robot_task_command service")
         self.commandService.wait_for_service()
 
-        rospy.loginfo("Waiting for /update_param service")
-        self.updateParamService.wait_for_service()
-
         self.attention_sounds = ["Uh yes?", "Yes?", "What's up?", "How's life?", "Hey!", "Hmm?"]
-
-        self.root = ""
-        
         rospy.loginfo("HRI Node ready")
 
     def verbal_response_callback(self, req : VerbalResponseRequest):
@@ -58,7 +57,7 @@ class HRI():
                 "Let me get that for you"
             ]
             phrase = random.choice(phrases)
-            self.update_param(self.root + "hri_params/response", phrase)
+            self.update_param("hri_params/response", phrase)
             self.responseGenerator.run_tts(phrase)
         elif (req.response == "ok"):
             phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
@@ -75,31 +74,24 @@ class HRI():
         self.responseGenerator.run_tts(attn_sound)
         return attn_sound
 
-    def update_param(self, path, value):
-        req = UpdateParamRequest()
-        req.path = path
-        req.value = value
-        self.updateParamService(req)
-
     def clear_params(self):
-        self.update_param(self.root + "hri_params/wakeword", "")
-        self.update_param(self.root + "hri_params/command", "")
-        self.update_param(self.root + "hri_params/response", "")
-        self.update_param(self.root + "hri_params/ack", "")
+        self.update_param("hri_params/wakeword", "")
+        self.update_param("hri_params/command", "")
+        self.update_param("hri_params/response", "")
+        self.update_param("hri_params/ack", "")
 
     def wakeword_triggered(self):
         self.clear_params()
-        print("Wakeword triggered!")
-        self.update_param(self.root + "hri_params/wakeword", "1")
+        self.update_param("hri_params/wakeword", "1")
 
         self.startedListeningService()
         self.speech_recognition.suppress_noise()
         ack = self.triggerWakewordThread()
         
-        self.update_param(self.root + "hri_params/ack", ack)
+        self.update_param("hri_params/ack", ack)
 
         text = self.speech_recognition.speech_to_text()
-        self.update_param(self.root + "hri_params/command", text)
+        self.update_param("hri_params/command", text)
 
         # send a trigger request to planning node saying that the wakeword has been triggered
         response, primitive = self.responseGenerator.processQuery(text)
@@ -110,11 +102,11 @@ class HRI():
             return
         elif primitive == "video_call_start":
             self.responseGenerator.run_tts("Starting a video call")
-            self.update_param(self.root + "hri_params/response", "Starting a video call")
-            self.update_param(self.root + "hri_params/operation_mode", "TELEOPERATION")
+            self.update_param("hri_params/response", "Starting a video call")
+            self.update_param("hri_params/operation_mode", "TELEOPERATION")
             return
         elif primitive == "video_call_stop":
-            self.update_param(self.root + "hri_params/operation_mode", "AUTONOMOUS")
+            self.update_param("hri_params/operation_mode", "AUTONOMOUS")
             return
         
         print(text, primitive, response)

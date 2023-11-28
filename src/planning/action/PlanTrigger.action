@@ -1,0 +1,10 @@
+#input  
+string plan
+---
+#output
+bool success
+int index_at_failure
+---
+#feedback
+int64 curState
+string curStateInfo

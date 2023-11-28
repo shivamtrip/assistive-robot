@@ -61,6 +61,12 @@
   <exec_depend>tf</exec_depend>
   <exec_depend>move_base</exec_depend>
   <exec_depend>move_base_msgs</exec_depend>
+  <build_export_depend>actionlib_msgs</build_export_depend> 
+  <build_depend>actionlib_msgs</build_depend> 
+  <exec_depend>actionlib_msgs</exec_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+
   <!-- <exec_depend>response_generator</exec_depend> -->
 
   <!-- The export tag contains other, unspecified, tags -->

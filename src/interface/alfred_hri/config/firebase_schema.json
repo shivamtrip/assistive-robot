@@ -1,0 +1,23 @@
+{
+    "global_state" : "IDLE",
+    "local_state"  : "IDLE",
+    "visualization": {
+        "line_executing" : 0
+    },
+    "hri_params": {
+        "listening" : false,
+        "emotion" : {
+            "name" : "DROWSY",
+            "intensity" : 0.0,
+            "sound" : "NONE"
+        },
+        "speech_in" : {
+            "text" : "",
+            "recognized_emotion" : "NONE"
+        },
+        "wakeword": "",
+        "ack": "",
+        "command": "",
+        "response": ""
+    }
+}
