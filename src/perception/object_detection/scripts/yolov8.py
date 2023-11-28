@@ -42,7 +42,7 @@ class ObjectDetectionNode:
         rospy.loginfo(f"[{rospy.get_name()}] " + "Node Ready...")
 
         self.yolo_status_control_sub = rospy.Subscriber("yolo_status_control", Bool, self.yolo_status_control)
-        self.yolo_detection_enabled = True
+        self.yolo_detection_enabled = False
         self.started_publishing = False
         
     def runModel(self, img):
@@ -104,7 +104,7 @@ class ObjectDetectionNode:
 
     def yolo_status_control(self, msg):
 
-        if msg:
+        if msg == True:
             print("ACTIVATING Yolo Object Detector")
             self.yolo_detection_enabled = True
         else:

@@ -28,7 +28,7 @@ conservative_reset_dist : 3.0
 recovery_behavior_enabled: true
 clearing_rotation_allowed : true
 shutdown_costmaps : false
-oscillation_timeout : 20.0
-oscillation_distance : 2.0 #0.5
+oscillation_timeout : 40.0
+oscillation_distance : 4.0 #0.5
 planner_frequency: 5.0    #0.0 means the global planner will only run when a new goal is received
-max_planning_retries : 5
+max_planning_retries : 30   #5

@@ -105,7 +105,7 @@
                     }
                 },
                 "current_eta": "",
-                "current_task": "NAVIGATION_TO_PICK",
+                "current_task": "MANIPULATION_TO_PLACE",
                 "resident_name": "Mary",
                 "room_number": "202"
             }
@@ -114,17 +114,17 @@
             "battery_percent": 0,
             "current_task": {
                 "object_type": "",
-                "relative_name": "Frank",
-                "resident_name": "Adam",
-                "room_number": "201",
-                "task_type": "VIDEOCALL"
+                "relative_name": "",
+                "resident_name": "",
+                "room_number": "",
+                "task_type": ""
             },
-            "global_state": "ALIGN_TO_USER",
+            "global_state": "IDLE",
             "hri_params": {
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1701106378.8404746,
+            "last_update": 1701148821.615345,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {

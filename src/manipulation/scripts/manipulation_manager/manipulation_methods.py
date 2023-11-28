@@ -97,13 +97,13 @@ class ManipulationMethods:
         # Begin PLACE procedure
         
         self.move_to_pose(trajectoryClient, {
-            "lift;to": z-0.019, # + 0.03 for cm offset from aruco with bottle
+            "lift;to": z - 0.009,   # -0.019, # + 0.03 for cm offset from aruco with bottle
         })
         
         rospy.sleep(2)
         
         self.move_to_pose(trajectoryClient, {
-            "arm;to": y - 0.09, # + 0.08 for cm offset from aruco with center of bottle
+            "arm;to": y - 0.13 #- 0.09, # + 0.08 for cm offset from aruco with center of bottle
         })
 
         rospy.sleep(5)
@@ -158,7 +158,7 @@ class ManipulationMethods:
         # Begin PICK procedure
 
         self.move_to_pose(trajectoryClient, {
-            "lift;to": z+0.03, # have added + 0.03 for cm offset from aruco with bottle
+            "lift;to": z+0.02, # have added + 0.03 for cm offset from aruco with bottle
         })
 
         rospy.sleep(2)

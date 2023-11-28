@@ -1,7 +1,6 @@
-image: /home/hello-robot/stretch_user/maps/vincentian_floor_2_v1.pgm
+image: /home/hello-robot/ws/src/navigation/alfred_navigation/maps/vincentian_floor_2_v1.pgm
 resolution: 0.050000
 origin: [-100.000000, -100.000000, 0.000000]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196
-

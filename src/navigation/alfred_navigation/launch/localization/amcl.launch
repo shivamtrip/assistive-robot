@@ -15,11 +15,18 @@
   <param name="initial_cov_xx" value="0.03"/>
   <param name="initial_cov_yy" value="0.03"/>
 
-  <!-- <param name="initial_pose_x" value="-0.3"/>		 -->
-  <param name="initial_pose_x" value="-2.38"/>
-  <param name="initial_pose_y" value="-7.66"/>
-  <param name="initial_pose_a" value="2.85"/>
 
+  <!-- VINCENTIAN 2nd FLOOR -->
+  <param name="initial_pose_x" value="0.0"/>
+  <param name="initial_pose_y" value="0.0"/>
+  <param name="initial_pose_a" value="0.0"/>
+
+  <!-- AIMS FRIDGE -->
+  <!-- <param name="initial_pose_x" value="-2.38"/>
+  <param name="initial_pose_y" value="-7.66"/>
+  <param name="initial_pose_a" value="2.85"/> -->
+
+  <!-- AIMS HALLWAY -->
   <!-- <param name="initial_pose_x" value="-19.1"/>
   <param name="initial_pose_y" value="13.6"/>
   <param name="initial_pose_a" value="2.1"/> -->
