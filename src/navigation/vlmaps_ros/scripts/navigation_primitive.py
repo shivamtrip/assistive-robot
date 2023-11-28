@@ -43,6 +43,7 @@ from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped
 from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveResult, VLMaps_primitiveFeedback
 from sensor_msgs.msg import Image
 import sensor_msgs.msg
+
 class TestTaskPlanner:
     def __init__(self):
         rospy.init_node('Nav_primitive_tester')
@@ -64,10 +65,25 @@ class TestTaskPlanner:
         # Stores update time
         self.last_update_time = time.time()
 
+        # Stores home location
+        self.home_pos = read_home_pos(self.data_config_dir)
+
         # Defines navigation primitives
         self.primitives_mapping = {"go_to_object": self.go_to_object,
                                     "move_between_objects": self.move_between_objects,
                                     "move_object_closest_to": self.move_object_closest_to}
+        
+        # Initialize navigation services and clients
+        self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', MoveBaseAction)
+ 
+        self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
+        self.stow_robot_service.wait_for_service()
+
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        self.navigation_client.wait_for_server()
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing costmap processor node...")
         self.costmap_processor = ProcessCostmap()
@@ -91,7 +107,6 @@ class TestTaskPlanner:
         self.start()
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Server Started.")
         rospy.loginfo(f"[{rospy.get_name()}]:" + "VLMaps Primitive Node Ready.")
-
 
     def execute_cb(self, goal):
         """ Parses the goal and calls the appropriate function to get 2d nav goals!"""
@@ -119,15 +134,17 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.curr_pos))
         self.RECEIVED_AMCL_POSE = True
 
-
-    def publish_goal(self, goal):
+    def publish_goal(self, status):
 
         msg = VLMaps_primitiveResult()
         msg.header = rospy.Header()
-        msg.goal = goal
-        msg.success = True
-        self.action_server.set_succeeded(msg)
-        rospy.logdebug(f"[{rospy.get_name()}] " + "Published goals for primitive successfully")
+        msg.success = status
+        if(status):
+            self.action_server.set_succeeded(msg)
+            rospy.logdebug(f"[{rospy.get_name()}] " + "Published goals for primitive successfully")
+        else:
+            self.action_server.set_aborted(msg)
+            rospy.logdebug(f"[{rospy.get_name()}] " + "Failed to go to goals as desired")
 
     def parse_results(self, results:dict):
         """ Parses results by VLMap into masks and heatmap"""
@@ -137,8 +154,6 @@ class TestTaskPlanner:
         heatmaps = np.array(heatmap_list)
 
         return masks, heatmaps
-
-    
 
     def go_to_object(self, obj1, obj2):
         """ Inferences over vlmaps and navigates to object location """
@@ -398,9 +413,10 @@ class TestTaskPlanner:
         if(safe):
             goal_des = (X,Y,Z)
             curr_pos = self.curr_pos
+            home_pos = self.home_pos
             # X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z,ref_cost_min=10, ref_cost_max=15)
             # X, Y, Z = self.costmap_processor.findStraightLineSafePoint(goal_des,curr_pos,num_points=100,ref_cost_min=10, ref_cost_max=20)
-            X, Y, Z = self.findStraightLinePoint(goal_des,curr_pos,num_points=100)
+            X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100)
             rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
 
         theta = self.find_theta(label)
@@ -470,10 +486,11 @@ class TestTaskPlanner:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
             # cancel navigation
             self.navigation_client.cancel_goal()
+            self.publish_goal(False)
             return False
         
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
-       
+        self.publish_goal(True)
         return True
     
     def show_vlmaps_results(self, mask_list, outputs, labels):
@@ -658,6 +675,20 @@ def publish_heatmap(heatmaps, labels, useful_labels):
     heatmap_pub.publish(heatmap_img_msg)
 
     return
+
+def read_home_pos(data_config_dir:str):
+    """ Reads home amcl location from json file"""
+
+    # ensure that file exists
+    initial_pose_path = os.path.join(data_config_dir, 'amcl_pose.json')
+    assert os.path.exists(initial_pose_path), "Initial pose json file not found at {}".format(initial_pose_path)
+    
+    f = open(initial_pose_path)
+    initial_pose_dict = json.load(f)
+    pos = initial_pose_dict['position']
+    home_pos = (pos['x'],pos['y'],pos['z'])
+
+    return home_pos
 
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
