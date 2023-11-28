@@ -108,7 +108,6 @@ class FindAndAlignManager():
     def align_to_object_for_manipulation(self, object_location):
         x, y, z, theta = object_location
         # x, y, z is prior to rotation
-        inFrustum = self.scene_parser.check_if_in_frustum(np.array([x, y, z]))
         
         move_to_pose(self.trajectory_client, {
             'head_tilt;to' : - self.head_tilt_angle_grasp * np.pi/180,
@@ -116,6 +115,7 @@ class FindAndAlignManager():
             'base_rotate;by' : theta + np.pi/2,
         })
         rospy.sleep(5)
+        inFrustum = self.scene_parser.check_if_in_frustum(np.array([x, y, z]))
         # if its not in the frustum, move a little bit to get it back in the frame such 
         # that the visual servoing can work.
         # if not inFrustum:

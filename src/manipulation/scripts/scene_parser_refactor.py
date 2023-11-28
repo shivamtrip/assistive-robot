@@ -438,8 +438,9 @@ class SceneParser:
             marker.color.b = 0
             marker.color.a = 1
             marker.action = Marker.ADD
+            marker.lifetime = rospy.Duration(5)
             
-            marker.frame_locked = True
+            # marker.frame_locked = True
             marker.id = 500
 
             strip_points =[]
