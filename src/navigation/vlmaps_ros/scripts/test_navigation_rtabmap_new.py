@@ -117,8 +117,8 @@ class TestTaskPlanner:
         rospy.sleep(0.5)
 
         # Implement navigation primitive - go_to_object(obj A)
-        # self.go_to_object(" sofa")
-        self.move_between_objects(" sofa", " sink")
+        # self.go_to_object("sofa")
+        self.move_between_objects("sofa", "sink")
 
         navSuccess = self.navigate_to_location(self.navigationGoal)
         if not navSuccess:
