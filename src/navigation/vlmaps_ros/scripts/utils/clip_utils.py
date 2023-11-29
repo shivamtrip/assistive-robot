@@ -47,8 +47,8 @@ def get_imgs_feats(raw_imgs, preprocess, clip_model, clip_feat_dim):
     return imgs_feats
 
 
-def get_text_feats(in_text, clip_model, clip_feat_dim, batch_size=64):
-    text_tokens = clip.tokenize(in_text).cuda()
+def get_text_feats(in_text, clip_model, clip_feat_dim, batch_size=64, device="cuda:3"):
+    text_tokens = clip.tokenize(in_text).to(device)
     text_id = 0
     text_feats = np.zeros((len(in_text), clip_feat_dim), dtype=np.float32)
     while text_id < len(text_tokens):  # Batched inference.

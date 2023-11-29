@@ -28,6 +28,7 @@ class VLMaps():
         self.show_vis = params["show_vis"]
         self.map_save_dir = os.path.join(self.data_dir, self.map_save_dir)
         self.data_config_dir = os.path.join(self.root_dir, "config/data_configs")
+        self.device = params["device"] if torch.cuda.is_available() else "cpu"
 
         # check if checkpoints exists
         checkpoints_dir = os.path.join(self.root_dir, "scripts/lseg", "checkpoints")
@@ -46,7 +47,7 @@ class VLMaps():
 
         if(params["inference"]):
             print("Loading CLIP")
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = self.device if torch.cuda.is_available() else "cpu"
             clip_version = "ViT-B/32"
             self.clip_feat_dim = {'RN50': 1024, 'RN101': 512, 'RN50x4': 640, 'RN50x16': 768,
                             'RN50x64': 1024, 'ViT-B/32': 512, 'ViT-B/16': 512, 'ViT-L/14': 768}[clip_version]
@@ -194,7 +195,7 @@ class VLMaps():
         no_map_mask = obstacles[xmin:xmax+1, ymin:ymax+1] > 0
         predictions = get_seg_mask(labels,self.clip_model,self.clip_feat_dim,
                                     self.grid_save_path, obstacles,
-                                    xmin, xmax, ymin, ymax)
+                                    xmin, xmax, ymin, ymax,device=self.device)
 
         for i in range(len(labels)):
             label_mask = np.array(predictions == i)
@@ -224,8 +225,8 @@ class VLMaps():
             # More visualizations
             color_top_down = load_map(self.color_top_down_save_path)
             print("color_top_down shape: ", color_top_down.shape)
-            # show_color_top_down(color_top_down,obstacles=obstacles)
-            # show_seg_mask(seg, patches)
+            show_color_top_down(color_top_down,obstacles=obstacles)
+            show_seg_mask(seg, patches)
             # show_obstacle_map(obstacles)
             show_heatmap(cell_size=self.cs,color_top_down=color_top_down,obstacles=obstacles, \
                           mask_list=mask_list, labels=labels,outputs=outputs)
@@ -248,6 +249,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_video", type=bool, default=False)
     parser.add_argument("--inference", type=bool, default=False)
     parser.add_argument("--show_vis", type=bool, default=False)
+    parser.add_argument("--device", type=str, default="cuda:3")
 
     args = parser.parse_args()
     params = vars(args)
@@ -274,7 +276,8 @@ if __name__ == "__main__":
     else:
         # LABELS = "big flat counter, sofa, floor, chair, wash basin, other" # @param {type: "string"}
         # LABELS = "table, chair, floor, sofa, bed, other"
-        LABELS = "table,kitchen,floor,sofa,sink,refrigerator,potted plant,other"
+        # LABELS = "table,kitchen,floor,sofa,sink,refrigerator,potted plant,other"
+        LABELS = "table,kitchen,floor,sofa,sink,refrigerator,potted plant,laptop,other"
         # LABELS = "television, chair, floor, sofa, refrigerator, other"
         LABELS = LABELS.split(",")
         vlmaps.inference_labels(labels=LABELS)

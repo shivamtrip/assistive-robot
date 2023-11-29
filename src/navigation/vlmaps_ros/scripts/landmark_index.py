@@ -39,7 +39,7 @@ def get_colored_seg_mask(lang:list,clip_model,
 
 def get_seg_mask(lang:list,clip_model,
                  clip_feat_dim, grid_save_path, 
-                 obstacles, xmin, xmax, ymin, ymax):
+                 obstacles, xmin, xmax, ymin, ymax, device="cuda:3"):
 
     grid = load_map(grid_save_path)
     grid = grid[xmin:xmax+1, ymin:ymax+1]
@@ -47,15 +47,13 @@ def get_seg_mask(lang:list,clip_model,
     no_map_mask = obstacles[xmin:xmax+1, ymin:ymax+1] > 0
     obstacles_rgb = np.repeat(obstacles[xmin:xmax+1, ymin:ymax+1,
                                          None],3, axis=2)
-    print(no_map_mask.shape)
-    text_feats = get_text_feats(lang, clip_model, clip_feat_dim)
+    text_feats = get_text_feats(lang, clip_model, clip_feat_dim, device=device)
 
     map_feats = grid.reshape((-1, grid.shape[-1]))
     scores_list = map_feats @ text_feats.T
 
     predicts = np.argmax(scores_list, axis=1)
     predicts = predicts.reshape((xmax - xmin + 1, ymax - ymin + 1))
-    print("Predicts shape: ", predicts.shape)
 
     return predicts
 

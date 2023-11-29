@@ -188,14 +188,14 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to Nav Man{}".format(safe_navman_goal))
         
         # Send goal to navman
-        status = self.navigate_to_location(safe_navman_goal)
+        # status = self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1]
             self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
-
+        status = True
         return status
 
     def move_between_objects(self, obj1, obj2,safe=False):

@@ -122,7 +122,7 @@ class VLMapsGenerator():
         no_map_mask = obstacles[xmin:xmax+1, ymin:ymax+1] > 0
         predictions = get_seg_mask(labels,self.clip_model,self.clip_feat_dim,
                                     self.grid_save_path, obstacles,
-                                    xmin, xmax, ymin, ymax)
+                                    xmin, xmax, ymin, ymax,device=self.cuda_device)
 
         for i in range(len(labels)):
             label_mask = np.array(predictions == i)

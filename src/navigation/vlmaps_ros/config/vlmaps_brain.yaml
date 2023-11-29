@@ -28,4 +28,4 @@ area_threshold_to_match: 2000
 inference: True
 save_video: False
 show_vis: True
-cuda_device: 'cuda:0'
+cuda_device: 'cuda:3'
