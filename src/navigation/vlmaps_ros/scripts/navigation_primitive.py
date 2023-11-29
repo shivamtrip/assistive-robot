@@ -167,7 +167,7 @@ class TestTaskPlanner:
 
     def go_to_object(self, obj1, obj2):
         """ Inferences over vlmaps and navigates to object location """
-        
+
         if(obj1=='user'):
             homeGoal2d = (self.home_pos[0],self.home_pos[1],0)
             home_navman_goal = convertToNavManGoals(homeGoal2d)
@@ -282,6 +282,10 @@ class TestTaskPlanner:
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
         safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2,safe=False)
+
+        if(obj1=='table'):
+            safe_goal2D = get_default_location(self.data_config_dir,label=obj1)
+
         safe_navman_goal = convertToNavManGoals(safe_goal2D)
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(safe_navman_goal))
 
@@ -432,6 +436,10 @@ class TestTaskPlanner:
         #TODO: @ag6 - Get the initial pose of the robot and associated transforms from the vlmaps action server
 
         assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
+
+        ### Return default position for 'table'.
+        if(label=='table'):
+            return get_default_location(self.data_config_dir,label=label)
 
         ### Get the largest bbox and find the centroid of the bbox
         mask = results[label]['mask'].astype(np.uint8)
@@ -714,7 +722,25 @@ def publish_markers(goals2D: list):
         marker_array_pub.publish(marker_array_msg)
         rospy.sleep(0.5)
 
+def get_default_location(data_config_dir:str, label:str):
+    """ Returns default location for the given label"""
 
+    # ensure that file exists
+    locations_path = os.path.join(data_config_dir, 'locations.json')
+    assert os.path.exists(locations_path), "Initial pose json file not found at {}".format(initial_pose_path)
+    
+    f = open(locations_path)
+    locations_dict = json.load(f)
+    
+    if(label in locations_dict.keys()):
+        pos = locations_dict[label]
+        roll, pitch, yaw = pos['roll'], pos['pitch'], pos['yaw']
+        x, y, z = pos['x'], pos['y'], pos['z']
+        goal2D = (x,y,yaw)
+        return goal2D
+    else:
+        rospy.logerr(f"[{rospy.get_name()}]:" +"Label {} not found in locations dict".format(label))
+        return None
 
 def read_home_pos(data_config_dir:str):
     """ Reads home amcl location from json file"""
