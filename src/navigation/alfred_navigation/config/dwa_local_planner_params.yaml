@@ -43,7 +43,7 @@ DWAPlannerROS:
   max_scaling_factor: 0.2
 
 # Oscillation Prevention Parameters
-  oscillation_reset_dist: 0.005
+  oscillation_reset_dist: 0.00001
 
 # Debugging
   publish_traj_pc : true

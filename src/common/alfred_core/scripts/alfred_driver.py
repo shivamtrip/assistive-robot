@@ -256,6 +256,7 @@ class AlfredBodyNode:
         def code_to_run():
             self.linear_velocity_mps = 0.0
             self.angular_velocity_radps = 0.0
+            # self.stow(None)
             self.robot.head.move_to('head_tilt', -30 * np.pi/180)
             self.robot.head.move_to('head_pan', 0.0)
         self.change_mode('navigation', code_to_run)
@@ -380,20 +381,18 @@ class AlfredBodyNode:
         self.turn_on_manipulation_mode()
         self.robot.head.move_to('head_pan', self.robot.get_stow_pos('head_pan'))
         self.robot.head.move_to('head_tilt', self.robot.get_stow_pos('head_tilt'))
-
         pos_arm = self.robot.get_stow_pos('arm')
-        self.robot.arm.move_to(pos_arm)
-        # self.robot.end_of_arm.move_to('stretch_gripper', self.robot.get_stow_pos('stretch_gripper'))
+        self.robot.arm.move_to(0.01)
+        rospy.loginfo("Retracting gripper and arm")
         self.robot.end_of_arm.move_to('wrist_yaw', np.pi * 175/180)
         self.robot.push_command()
-        
-        # first pull everything in, then move the lift however you want.
-
         rospy.sleep(2)
+        
+        rospy.loginfo("Lift down")
         self.robot.lift.move_to(0.4)
         self.robot.push_command()
-        
         self.robot.lift.wait_until_at_setpoint()
+        
         if temp == 'navigation':
             self.turn_on_navigation_mode()
         else:

@@ -118,9 +118,12 @@ class TaskPlanner:
         self.switch_to_manip_mode()
         objectId = self.class_list.index(object_name)
         natural_name = object_name.replace("_", " ")
+        
         self.speak("Picking " + natural_name)
+        
         goal = PickTriggerGoal(
             objectId = objectId,
+            use_planner = False
         )
         self.pick_client.send_goal(goal)
         self.pick_client.wait_for_result()
@@ -131,7 +134,7 @@ class TaskPlanner:
         self.switch_to_manip_mode()
         fixed_place = False
         use_place_location = False
-        is_rotate = False
+        is_rotate = True
         place_location = []
         if surface == "drawer":
             self.speak("Placing inside drawer.")
@@ -160,6 +163,8 @@ class TaskPlanner:
         # self.primitives_mapping = {"go_to_object": self.go_to_object,
         #                     "move_between_objects": self.move_between_objects,
         #                     "move_object_closest_to": self.move_object_closest_to}
+
+        self.update_param("visualization/active_primitive", f"go_to({location})")
         
         self.switch_to_nav_mode()
         natural_name = location.replace("_", " ")
@@ -177,10 +182,13 @@ class TaskPlanner:
         
         self.vlmaps_client.send_goal(goal)
         self.vlmaps_client.wait_for_result()
-        return True
+        result = self.vlmaps_client.get_result()
+        return result.success
         
     
     def move_between_objects(self, loc1, loc2):
+        self.update_param("visualization/active_primitive", f"go_between({loc1}, {loc2})")
+
         self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
@@ -197,9 +205,12 @@ class TaskPlanner:
         
         self.vlmaps_client.send_goal(goal)
         self.vlmaps_client.wait_for_result()
-        return True
+        result = self.vlmaps_client.get_result()
+        return result.success
     
     def move_object_closest_to(self, loc1, loc2):
+        self.update_param("visualization/active_primitive", f"move_object_closest_to({loc1}, {loc2})")
+
         #move to obj1 that is closest to obj2
         self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
@@ -218,10 +229,13 @@ class TaskPlanner:
         
         self.vlmaps_client.send_goal(goal)
         self.vlmaps_client.wait_for_result()
-        return True
+        result = self.vlmaps_client.get_result()
+        return result.success
     
     
     def find_and_align_to_object(self, object_name):
+        self.update_param("visualization/active_primitive", f"find_and_align_to_object({object_name})")
+
         self.switch_to_manip_mode()
         objectId = self.class_list.index(object_name)
         natural_name = object_name.replace("_", " ")
@@ -236,6 +250,7 @@ class TaskPlanner:
         return result.success
     
     def open_drawer(self):
+        self.update_param("visualization/active_primitive", f"open_drawer()")
         self.switch_to_manip_mode()
         self.speak("Opening the drawer")
         goal = DrawerTriggerGoal(
@@ -250,6 +265,8 @@ class TaskPlanner:
         
             
     def close_drawer(self):
+        self.update_param("visualization/active_primitive", f"close_drawer()")
+
         self.switch_to_manip_mode()
         self.speak("Closing the drawer")
         goal = DrawerTriggerGoal(
@@ -262,7 +279,9 @@ class TaskPlanner:
         return result.success
     
     def get_detections(self):
-        self.detic_request_client.send_goal(DeticRequestGoal(request = True))
+        self.update_param("visualization/active_primitive", f"get_detections()")
+
+        self.detic_request_client.send_goal(DeticRequestGoal(request = True, get_surface = False))
         self.detic_request_client.wait_for_result()
         result : DeticRequestResult = self.detic_request_client.get_result()
         list_of_objects = result.list_of_objects
@@ -283,6 +302,8 @@ class TaskPlanner:
         return list_of_objects
     
     def speak(self, string_to_speak):
+        self.update_param("visualization/active_primitive", f"speak()")
+
         req = VerbalResponseRequest(
             response = string_to_speak
         )

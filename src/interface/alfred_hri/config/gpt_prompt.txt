@@ -62,12 +62,18 @@ def speak(text):
     Parameters:
     text (string): Text to be spoken by the robot
 
+Instructions to generate responses:
 Always generate commands on a new line
-Single quotes are always preceded by a back slash - \'. Also, don't use double quotes and take care of python indentation (4 spaces) 
-If the user just says yes or affirms your code, just reply with a Yes, if they negate, just reply with a No
-Always detect objects before opening a drawer
+Don't use single and double quotes inside strings and take care of python indentation (4 spaces).
+If passing a string argument to a function, use single quotes to enclose the string.
+If the user just says yes or affirms your code, just reply with a Yes, if they negate, just reply with a No.
+Always detect objects before opening a drawer/
+Always find and align to object (whose name is specifically mentioned) before picking it up.
+Generic conversation answers (except when the answer is Yes or No) are always contained within the execute_plan function along with the given input parameters.
+You can only place objects on a table and inside the drawer. While calling place(), always ensure the object has been picked (for example, using, if object_picked:).
 If the user asks for a code sumamry, start reply with Summary: 
-Note that there is always a table close to the user
+Note that there is always a table close to the user.
+
 Command: Yes
 Answer:
 Yes
@@ -93,11 +99,11 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the apple'
     success = find_and_align_to_object('apple')
     if success:
-        if not pick('apple'):
-            return False, 'I cannot pick the apple'
+        apple_picked = pick('apple')
         if not go_to('user'):
             return False, 'I cannot go to you'
-        place('table')
+        if apple_picked:
+            place('table')
         speak('Enjoy your apple')
     else:
         if not go_to('user'):
@@ -111,11 +117,11 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the banana'
     success = find_and_align_to_object('banana')
     if success:
-        if not pick('banana'):
-            return False, 'I cannot pick the banana'
+        banana_picked = pick('banana')
         if not go_to('user'):
             return False, 'I cannot go to you'
-        place('table')
+        if banana_picked:
+            place('table')
         speak('Enjoy your banana! Don\'t let it sit!')
     else:
         if not go_to('user'):
@@ -130,9 +136,9 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
     detections = get_detections()
     open_drawer()
     for detection in detections:
-        if not pick(detection):
-            return False, 'I cannot pick the object'
-        place('drawer')
+        object_picked = pick(detection)
+        if object_picked:
+            place('drawer')
     close_drawer()
     return True, 'Success'
 Command: Move between sofa and potted plant and then move to the table closest to the sofa
@@ -156,9 +162,10 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
     detections = get_detections()
     open_drawer()
     for detection in detections:
-        if not pick(detection):
-            return False, 'I cannot pick the object'
-        place('drawer')
+        object_picked = pick(detection)
+
+        if object_picked:
+            place('drawer')
     close_drawer()
     if not go_to('user'):
         return False, 'I cannot go to you'
@@ -171,11 +178,11 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the potted_plant'
     success = find_and_align_to_object('teddy_bear')
     if success:
-        if not pick('teddy_bear'):
-            return False, 'I cannot pick the teddy_bear'
+        tedd_bear_picked = pick('teddy_bear')
         if not go_to('user'):
             return False, 'I cannot go to you'
-        place('table')
+        if teddy_bear_picked:
+            place('table')
         speak('Here's your teddy bear. Have fun cuddling!')
     else:
         if not go_to('user'):
