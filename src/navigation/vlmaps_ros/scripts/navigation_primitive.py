@@ -134,7 +134,9 @@ class TestTaskPlanner:
             return
         
         else:
-            safe_movebase_goal = self.primitives_mapping[self.goal_primitive](self.goal_obj1, self.goal_obj2)
+            status = self.primitives_mapping[self.goal_primitive](self.goal_obj1, self.goal_obj2)
+
+        self.publish_result(status)
 
     def amcl_pose_callback(self, msg):
         """Callback for amcl pose subscriber"""
@@ -186,13 +188,15 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to Nav Man{}".format(safe_navman_goal))
         
         # Send goal to navman
-        self.navigate_to_location(safe_navman_goal)
+        status = self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1]
             self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
+
+        return status
 
     def move_between_objects(self, obj1, obj2,safe=False):
         """ Inferences over vlmaps and navigates between the two objects in the scene."""
@@ -238,7 +242,7 @@ class TestTaskPlanner:
         safe_navman_goal = convertToNavManGoals(safe_goal2D)
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(safe_navman_goal))
 
-        self.navigate_to_location(safe_navman_goal)
+        status = self.navigate_to_location(safe_navman_goal)
 
         ##### Publish to Rviz for debugging #####
         if(self.show_vis):
@@ -246,7 +250,7 @@ class TestTaskPlanner:
             # labels of interest
             USEFUL_LABELS = [obj1,obj2]
             self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
-            return
+        return status
         
     def move_object_closest_to(self, obj1, obj2):
         """ Navigates to the object of category 'obj1' 
@@ -274,7 +278,7 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(safe_navman_goal))
 
         # Send goal to navman
-        self.navigate_to_location(safe_navman_goal)
+        status =self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
             # Publish markers
@@ -285,6 +289,8 @@ class TestTaskPlanner:
             ## TODO: ag6 - Fix this
             USEFUL_LABELS = [obj1,obj2]
             self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
+
+        return status
 
     def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str,safe:False)-> tuple:
         """ Finds the object of category 'obj1' 
@@ -500,18 +506,13 @@ class TestTaskPlanner:
         """Navigates to the given location"""
         self.navigation_client.send_goal(goal, feedback_cb = self.navigation_feedback)
         wait = self.navigation_client.wait_for_result()
-
         if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
             rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal at X = {}, Y = {}".format(goal.x, goal.y))
             # cancel navigation
             self.navigation_client.cancel_goal()
-            self.publish_result(False)
-    
             return False
         
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached goal at X = {}, Y = {}".format(goal.x, goal.y))
-        self.publish_result(True)
-     
         return True
     
     def publish_heatmap(self,heatmaps, labels, useful_labels):
@@ -527,12 +528,11 @@ class TestTaskPlanner:
         heatmap_img = np.reshape(heatmap_img, (height,width,3))
         heatmap_img = np.uint8(heatmap_img)
 
-        heatmap_img_msg = self.bridge.cv2_to_imgmsg(heatmap_img, encoding="passthrough")
+        heatmap_img_msg = self.bridge.cv2_to_imgmsg(heatmap_img[:,:,::-1], encoding="passthrough")
 
         for i in range(5):
             self.heatmap_pub.publish(heatmap_img_msg)
             rospy.sleep(0.5)
-
         return
     
     def show_vlmaps_results(self, mask_list, outputs, labels):
@@ -736,17 +736,17 @@ if __name__ == "__main__":
     obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table", "floor"]
 
     # go to object
-    # for obj in obj_list:
-    #     rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
-    #     task_planner.go_to_object(obj, None)
-    #     rospy.sleep(1)
+    for obj in obj_list:
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
+        task_planner.go_to_object(obj, None)
+        rospy.sleep(1)
     
     # task_planner.go_to_object("table")
     # task_planner.move_between_objects("sofa", "refrigerator")
     # task_planner.move_between_objects("sofa", "potted plant")
     # task_planner.move_between_objects("potted plant", "table")
     # task_planner.move_between_objects("table", "sink")
-    task_planner.move_object_closest_to("table", "sofa")
+    # task_planner.move_object_closest_to("table", "sofa")
 
     # rospy.sleep(2)
     try:
