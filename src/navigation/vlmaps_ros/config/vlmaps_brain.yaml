@@ -22,9 +22,10 @@ camera_height: 1.3
 max_depth_value: 5
 depth_sample_rate: 30
 use_self_built_map: True
+area_threshold_to_match: 2000
 
 # Other parameters
 inference: True
 save_video: False
-show_vis: False
+show_vis: True
 cuda_device: 'cuda:0'

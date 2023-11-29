@@ -300,7 +300,6 @@ def get_heatmaps(cell_size,color_top_down:np.ndarray, \
     ymax = np.max(y_indices)
     color_top_down = color_top_down[xmin:xmax+1, ymin:ymax+1]
     heatmaps = []
-    
 
     for i in range(len(labels)):
         # print ranges of mask_list[i]
@@ -309,6 +308,8 @@ def get_heatmaps(cell_size,color_top_down:np.ndarray, \
 
         if bbox is None:
             print("No bbox found for ", labels[i])
+            dummy_img = np.zeros_like(color_top_down)
+            heatmaps.append(dummy_img)
             continue
 
         if labels[i] not in NON_OBJECT_CLASSES:

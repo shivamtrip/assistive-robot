@@ -8,7 +8,7 @@ project(alfred_navigation)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  stretch_navigation genmsg actionlib_msgs actionlib
+ genmsg actionlib_msgs actionlib
 )
 
 ## System dependencies are found with CMake's conventions
