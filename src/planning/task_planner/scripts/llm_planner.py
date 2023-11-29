@@ -91,6 +91,20 @@ class TaskPlanner:
         self.server.start()
         
         self.drawer_location = None
+        # - 'soda_can'
+        # - 'tissue_paper'
+        # - 'toothbrush'
+        # - 'tie'
+        # - 'cell phone'
+        # - 'banana'
+        # - 'apple'
+        # - 'orange'
+        # - 'bottle'
+        # - 'cup'
+        # - 'teddy_bear'
+        # - 'remote'
+        # - 'marker'
+        # - 'table surface'
 
         rospy.loginfo( "Task planner ready to accept inputs...")
 
@@ -116,10 +130,14 @@ class TaskPlanner:
     
     def pick(self, object_name):
         self.switch_to_manip_mode()
-        objectId = self.class_list.index(object_name)
-        natural_name = object_name.replace("_", " ")
         
-        self.speak("Picking " + natural_name)
+        natural_name = object_name.replace("_", " ")
+        if object_name not in ['soda_can', 'tissue_paper']:
+            object_name = natural_name
+            
+        objectId = self.class_list.index(object_name)
+
+        self.speak("Picking " + natural_name, external=False)
         
         goal = PickTriggerGoal(
             objectId = objectId,
@@ -137,7 +155,7 @@ class TaskPlanner:
         is_rotate = True
         place_location = []
         if surface == "drawer":
-            self.speak("Placing inside drawer.")
+            self.speak("Placing inside drawer.", external=False)
             place_location = [
                 0.0,
                 -abs(self.drawer_location[2]) + 0.3,
@@ -165,11 +183,11 @@ class TaskPlanner:
         #                     "move_object_closest_to": self.move_object_closest_to}
 
         self.update_param("visualization/active_primitive", f"go_to({location})")
-        
+        self.stow_robot_service()
         self.switch_to_nav_mode()
         natural_name = location.replace("_", " ")
         
-        self.speak("Going to " + natural_name)
+        self.speak("Going to " + natural_name, external=False)
 
         if natural_name == "drawer":
             natural_name = 'potted plant'
@@ -188,11 +206,11 @@ class TaskPlanner:
     
     def move_between_objects(self, loc1, loc2):
         self.update_param("visualization/active_primitive", f"go_between({loc1}, {loc2})")
-
+        self.stow_robot_service()
         self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
-        self.speak("Moving between" + natural_name_1 + " and " + natural_name_2)
+        self.speak("Moving between" + natural_name_1 + " and " + natural_name_2, external=False)
         if natural_name_1 == "drawer":
             natural_name_1 = "potted plant"
         if natural_name_2 == "drawer":
@@ -210,12 +228,12 @@ class TaskPlanner:
     
     def move_object_closest_to(self, loc1, loc2):
         self.update_param("visualization/active_primitive", f"move_object_closest_to({loc1}, {loc2})")
-
+        self.stow_robot_service()
         #move to obj1 that is closest to obj2
         self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
-        self.speak("Going to " + natural_name_1 + " closest to " + natural_name_2)
+        self.speak("Going to " + natural_name_1 + " closest to " + natural_name_2, external=False)
         
         if natural_name_1 == "drawer":
             natural_name_1 = "potted plant"
@@ -237,9 +255,13 @@ class TaskPlanner:
         self.update_param("visualization/active_primitive", f"find_and_align_to_object({object_name})")
 
         self.switch_to_manip_mode()
-        objectId = self.class_list.index(object_name)
+        # 3.39, 3.73
         natural_name = object_name.replace("_", " ")
-        self.speak("Searching for " + natural_name)
+        if object_name not in ['soda_can', 'tissue_paper']:
+            object_name = natural_name
+            
+        objectId = self.class_list.index(object_name)
+        self.speak("Searching for " + natural_name, external=False)
         
         goal = FindAlignGoal(
             objectId = objectId,
@@ -252,7 +274,7 @@ class TaskPlanner:
     def open_drawer(self):
         self.update_param("visualization/active_primitive", f"open_drawer()")
         self.switch_to_manip_mode()
-        self.speak("Opening the drawer")
+        self.speak("Opening the drawer", external=False)
         goal = DrawerTriggerGoal(
             to_open = True,
             aruco_id = 0,
@@ -268,7 +290,7 @@ class TaskPlanner:
         self.update_param("visualization/active_primitive", f"close_drawer()")
 
         self.switch_to_manip_mode()
-        self.speak("Closing the drawer")
+        self.speak("Closing the drawer", external=False)
         goal = DrawerTriggerGoal(
             to_open = False,
             aruco_id = 0,
@@ -297,12 +319,13 @@ class TaskPlanner:
                 else:
                     strtospk += nat_name + ", "
 
-        self.speak(strtospk)
+        self.speak(strtospk, external=False)
 
         return list_of_objects
     
-    def speak(self, string_to_speak):
-        self.update_param("visualization/active_primitive", f"speak()")
+    def speak(self, string_to_speak, external=True):
+        if external:
+            self.update_param("visualization/active_primitive", f"speak()")
 
         req = VerbalResponseRequest(
             response = string_to_speak
@@ -325,7 +348,7 @@ class TaskPlanner:
         )
         """
         exec(plan)
-        self.speak("task completed.")
+        self.speak("task completed.", external=False)
         
         
 

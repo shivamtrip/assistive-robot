@@ -152,7 +152,7 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
 Command: Crack a joke
 Answer:
 def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak):
-    speak('Why didn't the skeleton go to the party? Because he had nobody to go with!')
+    speak('Why didn\'t the skeleton go to the party? Because he had nobody to go with!')
     return True, 'Success'
 Command: Go to the drawer and place all items that you may find above it and place them all inside the drawer. Come back to me (user) and then crack a joke
 Answer:
@@ -169,7 +169,7 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
     close_drawer()
     if not go_to('user'):
         return False, 'I cannot go to you'
-    speak('Why don't scientists trust atoms? Because they make up everything!')
+    speak('Why don\'t scientists trust atoms? Because they make up everything!')
     return True, 'Success'
 Command: Go to the potted plant. You may find a teddy bear near it. If you find it, bring it back to me.
 Answer:
@@ -178,12 +178,12 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the potted_plant'
     success = find_and_align_to_object('teddy_bear')
     if success:
-        tedd_bear_picked = pick('teddy_bear')
+        teddy_bear_picked = pick('teddy_bear')
         if not go_to('user'):
             return False, 'I cannot go to you'
         if teddy_bear_picked:
             place('table')
-        speak('Here's your teddy bear. Have fun cuddling!')
+        speak('Here\'s your teddy bear. Have fun cuddling!')
     else:
         if not go_to('user'):
             return False, 'I cannot go to you'

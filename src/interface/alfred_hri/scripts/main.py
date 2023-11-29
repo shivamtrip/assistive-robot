@@ -40,7 +40,7 @@ class HRI():
         # self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         # self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
         self.command_action_client = actionlib.SimpleActionClient('task_planner', PlanTriggerAction)
-        self.updateParamService = rospy.Service('/update_param', UpdateParam, self.firebase_node.update_param)
+        self.updateParamService = rospy.Service('/update_param', UpdateParam, self.update_param_callback)
         
         # rospy.loginfo("Waiting for /startedListening service")
         # self.startedListeningService.wait_for_service()
@@ -52,6 +52,10 @@ class HRI():
         rospy.loginfo("HRI Node ready")
 
         self.code = ""
+
+    def update_param_callback(self, req : UpdateParamRequest):
+        self.firebase_node.update_param(req.path, req.value)
+        return UpdateParamResponse(success = True)
 
     def verbal_response_callback(self, req : VerbalResponseRequest):
         # call the response generator to generate a response
@@ -82,12 +86,8 @@ class HRI():
         return attn_sound
 
     def clear_params(self):
-        self.update_param("hri_params/wakeword", "")
-        self.update_param("hri_params/command", "")
-        self.update_param("hri_params/response", "")
-        self.update_param("hri_params/ack", "")
         self.update_param("visualization/code", "")
-        self.update_param("visualization/active_primitive")
+        self.update_param("visualization/active_primitive", "")
 
     def encode_code(self):
         code_bytes = self.code.encode("ascii") 
@@ -99,33 +99,16 @@ class HRI():
 
     def wakeword_triggered(self):
         self.clear_params()
-        self.update_param("hri_params/wakeword", "1")
 
-        # self.startedListeningService()
         self.speech_recognition.suppress_noise()
         ack = self.triggerWakewordThread()
-        
-        self.update_param("hri_params/ack", ack)
 
         text = self.speech_recognition.speech_to_text()
-        self.update_param("hri_params/command", text)
 
         # send a trigger request to planning node saying that the wakeword has been triggered
         self.responseGenerator.run_tts("hmm... let me think...")
         response, primitive = self.responseGenerator.processQuery(text)
 
-        # if primitive == "engagement" or primitive == "<none>":
-        #     self.responseGenerator.run_tts(response)
-        #     self.wakeword_detector.startRecorder()
-        #     return
-        # elif primitive == "video_call_start":
-        #     self.responseGenerator.run_tts("Starting a video call")
-        #     self.update_param("hri_params/response", "Starting a video call")
-        #     self.update_param("hri_params/operation_mode", "TELEOPERATION")
-        #     return
-        # elif primitive == "video_call_stop":
-        #     self.update_param("hri_params/operation_mode", "AUTONOMOUS")
-        #     return
         if primitive == "code":
             self.code = response
             self.update_param("visualization/code", self.encode_code())
