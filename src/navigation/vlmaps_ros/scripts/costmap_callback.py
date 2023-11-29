@@ -18,7 +18,6 @@ class ProcessCostmap():
 
     def __init__(self,):
 
-        rospy.init_node('Costmap_processor', anonymous=True)
         self.costmap_topic = '/move_base/global_costmap/costmap'
         self.costmap_sub = rospy.Subscriber(self.costmap_topic, OccupancyGrid, self.costmap_callback)
         self.costmap = None
@@ -29,17 +28,36 @@ class ProcessCostmap():
         self.des_obs_thresh = 10
         self.big_obs_thresh = 50
 
-    def costmap_callback(self, data):
+        rospy.loginfo("Costmap processor initialized!!")
 
-        rospy.loginfo("Costmap callback!!")
+    def costmap_callback(self, data):
 
         if(not self.LOADED_COSTMAP):
             rospy.loginfo("Costmap received!!")
             self.costmap = np.array(data.data).reshape((data.info.height, data.info.width))
             self.costmap_info = data.info
             self.LOADED_COSTMAP = True
+            rospy.loginfo("Costmap loaded!!")
+
+        # Make unkown regions as obstacles
+        self.costmap[self.costmap == -1] = 100
+        self.costmap[self.costmap <0] = 100
+
+         # save costmap as a binary mask
+        # visualize costmap as a heatmap
+        # costmap_img = self.costmap.copy()
+        # costmap_img.astype(np.float32)
+        # costmap_img = (costmap_img/100)*255
+        # costmap_img = costmap_img.astype(np.uint8)
+        # costmap_img = cv2.applyColorMap(costmap_img, cv2.COLORMAP_JET)
+        # costmap_img = cv2.cvtColor(costmap_img, cv2.COLOR_BGR2RGB)
+        # cv2.imwrite('/home/hello-robot/FVD/alfred-autonomy/src/navigation/vlmaps_ros/scripts/costmap_mask.png',costmap_img)
+        # rospy.loginfo("Saving costmap Image!!")
+        
+        # rospy.sleep(1)
 
         if(self.LOADED_COSTMAP):
+            rospy.loginfo("unregistering costmap subscriber!!")
             self.costmap_sub.unregister()
             pass 
             ### Run visualization
@@ -101,27 +119,28 @@ class ProcessCostmap():
 
         return None
 
-    def isSafe(self,x,y,z):
+    def isSafe(self,x,y,z, ref_cost_min=10, ref_cost_max=50):
 
         """ Given world coordinates, return whether the cell is safe or not. It helps dowstream in determining whether path exists or not"""
 
         assert self.LOADED_COSTMAP ," Empty costmap!! Please load costmap first!!"
 
-        ref_cost = 10
-
         if self.LOADED_COSTMAP:
             row, col = self.get_cell_indices(x, y)
             assert self.isValidRowCol(row,col), "Computed cell indices out of bounds!! Given x,y,z: {},{},{} are bad points!".format(x,y,z)
+            cost = self.costmap[row,col]
+
+            rospy.loginfo("Cost of the cell is {}".format(cost))
 
             if row is not None and col is not None:
-                if np.isclose(self.costmap[row,col],0) or self.costmap[row,col] <=10:
+                if np.isclose(cost,0) or cost <=ref_cost_min:
                     rospy.logdebug("Computed Cell is safe!! Row: {}, Col: {}".format(row,col))
                     return True
-                elif self.costmap[row,col]> 10 and self.costmap[row,col] < ref_cost:
-                    rospy.logdebug("Computed Cell Row: {}, Col: {} has significant cost {}".format(row,col,self.costmap[row,col]))
+                elif cost> ref_cost_min and cost < ref_cost_max:
+                    rospy.logdebug("Computed Cell Row: {}, Col: {} has significant cost {}".format(row,col,cost))
                     return True
                 else:
-                    rospy.logdebug("Computed Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,self.costmap[row,col]))
+                    rospy.logdebug("Computed Cell is not safe!! Row: {}, Col: {}. Cost {}".format(row,col,cost))
                     return False
             else:
                 rospy.logwarn("No cell indices computed!!")
@@ -151,7 +170,7 @@ class ProcessCostmap():
 
         return None
     
-    def findNearestSafePoint(self,x,y,z):
+    def findNearestSafePoint(self,x,y,z, ref_cost_min=10, ref_cost_max=50):
         """ Given world coordinates, return the nearest safe cell coordinates in costmap"""
 
         assert self.LOADED_COSTMAP ," Empty costmap!! Please load costmap first!!"
@@ -162,12 +181,12 @@ class ProcessCostmap():
             assert self.isValidRowCol(row,col), "Computed cell indices out of bounds!! Given x,y,z: {},{},{} are bad points!".format(x,y,z)
 
             if row is not None and col is not None:
-                if self.isSafe(x,y,z):
+                if self.isSafe(x,y,z,ref_cost_min=ref_cost_min,ref_cost_max=ref_cost_max):
                     rospy.loginfo("Computed Cell is safe!! Row: {}, Col: {}".format(row,col))
                     return x, y, z
                 else:
                     rospy.loginfo("Computed Cell is not safe!! Row: {}, Col: {}".format(row,col))
-                    row,col = self.RunBFSForSearch(row,col)
+                    row,col = self.RunBFSForSearch(row,col,ref_cost_min,ref_cost_max)
                     return self.get_cell_coordinates(row,col)
             else:
                 rospy.logwarn("No cell indices computed!!")
@@ -175,7 +194,32 @@ class ProcessCostmap():
 
         return None
     
-    def RunBFSForSearch(self,row,col):
+
+    def findStraightLineSafePoint(self,goal,curr_pos, num_points=20,ref_cost_min=10,ref_cost_max=50):
+        """ Fits a straight line between curr_pose and goal, 
+        and Dicretizes it. Selects the closest safe point to goals """
+
+        assert self.LOADED_COSTMAP ," Empty costmap!! Please load costmap first!!"
+
+        if self.LOADED_COSTMAP:
+            rospy.loginfo("Finding straight line safe point!!")
+            x1,y1,z1 = goal
+            x2,y2,z2 = curr_pos
+
+            # Fit a straight line
+            x = np.linspace(x1,x2,num_points)
+            y = np.linspace(y1,y2,num_points)
+            
+        
+            # Find the nearest safe point to goal
+            for i in range(num_points):
+                if self.isSafe(x[i],y[i],0,ref_cost_min=ref_cost_min,ref_cost_max=ref_cost_max):
+                    rospy.loginfo("Found nearest safe point!!")
+                    return x[i],y[i],0
+            rospy.logwarn("No safe point found in first iteration!!!")
+            return goal[0],goal[1],0
+    
+    def RunBFSForSearch(self,row,col,ref_cost_min=10,ref_cost_max=50):
         """ Given cell coordinates, return the nearest safe cell coordinates in costmap"""
 
         assert self.LOADED_COSTMAP ," Empty costmap!! Please load costmap first!!"
@@ -190,7 +234,7 @@ class ProcessCostmap():
             visited.add((row,col))
             while queue:
                 row,col = queue.pop(0)
-                if self.isSafe(*self.get_cell_coordinates(row,col)):
+                if self.isSafe(*self.get_cell_coordinates(row,col),ref_cost_min=ref_cost_min,ref_cost_max=ref_cost_max):
                     rospy.loginfo("Found nearest safe cell!! Row: {}, Col: {}".format(row,col))
                     return row,col
                 else:
@@ -300,6 +344,7 @@ class ProcessCostmap():
 
 
 if __name__ == '__main__':
+    rospy.init_node('Costmap_processor', anonymous=True)
 
     costmap_processor = ProcessCostmap()
     try:

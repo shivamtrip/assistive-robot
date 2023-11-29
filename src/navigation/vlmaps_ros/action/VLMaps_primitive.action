@@ -1,0 +1,8 @@
+string primitive
+string obj1
+string obj2
+---
+Header header
+bool success
+---
+int32 status

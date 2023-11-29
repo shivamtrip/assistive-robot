@@ -83,10 +83,6 @@ class RecData(object):
     def clean_dir(self,dir:str):
         """ Cleans the directory structure required by VLMaps """
 
-        # assert that directory path ends with 'rosbag_data'
-        if not dir.endswith('rosbag_data'):
-            raise Exception("Directory path should end with 'rosbag_data'")
-
         if os.path.isdir(dir):
             os.system(f"rm -rf {dir}/*")
 
@@ -259,7 +255,7 @@ if(__name__=='__main__'):
     # Take fps argumnent
     parser = argparse.ArgumentParser()
     parser.add_argument("--fps", type=float, default=1)
-    parser.add_argument("--img_save_dir", type=str, default='/home/abhinav/alfred-autonomy/src/navigation/vlmaps_ros/data/rosbag_data')
+    parser.add_argument("--img_save_dir", type=str, default='/home/abhinav/FVD/alfred-autonomy/src/navigation/vlmaps_ros/data/rosbag_data_nov11')
     parser.add_argument("--color_topic", type=str, default='/camera/color/image_raw')
     parser.add_argument("--depth_topic", type=str, default='/camera/aligned_depth_to_color/image_raw')
     parser.add_argument("--pose_topic", type=str, default='/rtabmap/odom')

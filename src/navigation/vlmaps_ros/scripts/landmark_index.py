@@ -55,7 +55,7 @@ def get_seg_mask(lang:list,clip_model,
 
     predicts = np.argmax(scores_list, axis=1)
     predicts = predicts.reshape((xmax - xmin + 1, ymax - ymin + 1))
-    print("predicts shape: ", predicts.shape)
+    print("Predicts shape: ", predicts.shape)
 
     return predicts
 

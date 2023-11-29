@@ -207,20 +207,28 @@ class VLMaps():
 
         if(self.show_vis):
             # Visualize label masks
-            show_label_masks(mask_list,labels)
+            # show_label_masks(mask_list,labels)
 
             # Visualize all bounding boxes over masks
-            show_bounding_boxes(outputs,labels)
+            # show_bounding_boxes(outputs,labels)
             
             seg, patches = get_colored_seg_mask(labels,self.clip_model,self.clip_feat_dim,
                                     self.grid_save_path, obstacles,
                                     xmin, xmax, ymin, ymax) 
+            
+            print("patches: ", patches)
+            print("seg shape: ", seg.shape)
+            print("Length mask list", len(mask_list))
+            print("mask list shape: ", mask_list[0].shape)
 
             # More visualizations
             color_top_down = load_map(self.color_top_down_save_path)
-            show_color_top_down(color_top_down,obstacles=obstacles)
-            show_seg_mask(seg, patches)
-            show_obstacle_map(obstacles)
+            print("color_top_down shape: ", color_top_down.shape)
+            # show_color_top_down(color_top_down,obstacles=obstacles)
+            # show_seg_mask(seg, patches)
+            # show_obstacle_map(obstacles)
+            show_heatmap(cell_size=self.cs,color_top_down=color_top_down,obstacles=obstacles, \
+                          mask_list=mask_list, labels=labels,outputs=outputs)
 
 if __name__ == "__main__":
 
@@ -235,7 +243,7 @@ if __name__ == "__main__":
                         help="Filter out depth values greater than this value")
     parser.add_argument("--depth_sample_rate", type=int, default=100,
                         help="Determine the step size while sampling points. Lower-> More dense sampling")
-    parser.add_argument("--use_self_built_map", type=bool, default=False)
+    parser.add_argument("--use_self_built_map", type=bool, default=True)
     parser.add_argument("--map_save_dir", type=str, default="map_correct")
     parser.add_argument("--save_video", type=bool, default=False)
     parser.add_argument("--inference", type=bool, default=False)
@@ -252,6 +260,10 @@ if __name__ == "__main__":
     if(params["data_dir"] is None):
         data_dir = os.path.join(params["root_dir"], "data", "rosbag_data/")
         params["data_dir"] = data_dir
+    
+    else:
+        # Ensure path exists
+        assert os.path.exists(params["data_dir"]), "Data directory not found at {}".format(params["data_dir"])
 
     vlmaps = VLMaps(params=params)
 
@@ -262,7 +274,7 @@ if __name__ == "__main__":
     else:
         # LABELS = "big flat counter, sofa, floor, chair, wash basin, other" # @param {type: "string"}
         # LABELS = "table, chair, floor, sofa, bed, other"
-        LABELS = "kitchen, sink, refrigerator, other"
+        LABELS = "table,kitchen,floor,sofa,sink,refrigerator,potted plant,other"
         # LABELS = "television, chair, floor, sofa, refrigerator, other"
         LABELS = LABELS.split(",")
         vlmaps.inference_labels(labels=LABELS)
