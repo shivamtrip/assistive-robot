@@ -1,6 +1,5 @@
+#!/home/abhinav/miniconda3/envs/vlmaps/bin/python3
 #Author: Abhinav Gupta
-#!/usr/local/lib/robot_env/bin/python3
-
 #
 # Copyright (C) 2023 Auxilio Robotics
 # 
@@ -41,6 +40,7 @@ from vis_tools import *
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped
 from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveResult, VLMaps_primitiveFeedback
+from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
 from sensor_msgs.msg import Image
 import sensor_msgs.msg
 
@@ -76,7 +76,7 @@ class TestTaskPlanner:
         # Initialize navigation services and clients
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('nav_man', MoveBaseAction)
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
  
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
@@ -696,10 +696,10 @@ if __name__ == "__main__":
     obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table"]
 
     # go to object
-    for obj in obj_list:
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
-        task_planner.go_to_object(obj, None)
-        rospy.sleep(1)
+    # for obj in obj_list:
+    #     rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
+    #     task_planner.go_to_object(obj, None)
+    #     rospy.sleep(1)
     
     # task_planner.go_to_object("table")
     # task_planner.move_between_objects("sofa", "refrigerator")

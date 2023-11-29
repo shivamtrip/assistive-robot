@@ -15,6 +15,7 @@ import json
 from utils.clip_mapping_utils import *
 from scipy.spatial.transform import Rotation as R
 from vlmaps_ros.msg import VLMapsAction,VLMapsGoal, VLMapsResult, VLMapsFeedback
+from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveGoal, VLMaps_primitiveResult, VLMaps_primitiveFeedback
 import numpy as np
 
 class vlmaps_primitive_caller():
@@ -38,11 +39,14 @@ class vlmaps_primitive_caller():
 
     def send_goal(self,labels):
         """ Send the goal to the action server"""
-        goal = VLMapsGoal()
-        labels = self.labels
+        goal = VLMaps_primitiveGoal()
+        # Test primitive
+        goal.primitive = "go_to_object"
+        # "move_between_objects"
+        # "move_object_closest_to"
+        goal.obj1 = "sofa"
+        goal.obj2 = "potted plant"
         
-        for label in labels:
-            goal.labels.append(label)
         self.vlmaps_client.send_goal(goal, feedback_cb=self.feedback_cb)
         self.vlmaps_client.wait_for_result()
         result = self.vlmaps_client.get_result()

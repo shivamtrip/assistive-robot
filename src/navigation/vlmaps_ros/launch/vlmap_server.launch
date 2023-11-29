@@ -1,5 +1,5 @@
 <launch>
-    <node name="VLMaps_inference_node" pkg="vlmaps_ros" type="inference_node.py" output="screen"></node>
+    <node name="VLMaps_primitive_server" pkg="vlmaps_ros" type="navigation_primitive.py" output="screen"></node>
     <group ns="vlmaps_brain">
         <rosparam file="$(find vlmaps_ros)/config/vlmaps_brain.yaml" />
     </group>
