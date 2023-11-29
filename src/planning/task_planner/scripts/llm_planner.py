@@ -17,6 +17,7 @@ from manipulation.msg import DrawerTriggerAction, DrawerTriggerFeedback, DrawerT
 from manipulation.msg import FindAlignAction, FindAlignResult, FindAlignGoal
 from manipulation.msg import DeticRequestAction, DeticRequestGoal, DeticRequestResult
 
+from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveGoal, VLMaps_primitiveResult, VLMaps_primitiveFeedback
 import numpy as np
 
 
@@ -24,23 +25,23 @@ class TaskPlanner:
     def __init__(self, test = True):
         rospy.init_node('task_planner')
 
-        # self.switch_to_manip_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
-        # self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        self.switch_to_manip_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+        self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        # self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.navigation_client_old = actionlib.SimpleActionClient('move_base', MoveBaseAction)
 
-        # rospy.loginfo( "Waiting for driver services")
-        # self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
-        # self.stow_robot_service.wait_for_service()
+        rospy.loginfo( "Waiting for driver services")
+        self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
+        self.stow_robot_service.wait_for_service()
 
-        # self.switch_to_manip_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
-        # self.switch_to_manip_mode.wait_for_service()
+        self.switch_to_manip_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
+        self.switch_to_manip_mode.wait_for_service()
 
-        # self.switch_to_nav_mode = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
-        # self.switch_to_nav_mode.wait_for_service()
+        self.switch_to_nav_mode = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
+        self.switch_to_nav_mode.wait_for_service()
 
-        # self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-        # self.trajectoryClient.wait_for_server()
+        self.trajectoryClient = actionlib.SimpleActionClient('alfred_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
+        self.trajectoryClient.wait_for_server()
         
         # # HRI Services
         
@@ -53,42 +54,45 @@ class TaskPlanner:
 
         # NAVIGATION CLIENTS
         # TODO Replace with VLMAPS stuff.
-        # rospy.loginfo( "Waiting for navigation services")
-        # self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
-        # self.navigation_client.wait_for_server()
         
-        # # MANIPULATION CLIENTS:
-        # rospy.loginfo("Waiting for manipulation services")
-        # self.pick_client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
-        # rospy.loginfo("Waiting for pick action server...")
-        # self.pick_client.wait_for_server()
+        rospy.loginfo( "Waiting for navigation services")
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        self.navigation_client.wait_for_server()
         
-        # self.place_client = actionlib.SimpleActionClient('place_action', PlaceTriggerAction)
-        # rospy.loginfo("Waiting for place action server...")
-        # self.place_client.wait_for_server()
+        # MANIPULATION CLIENTS:
+        rospy.loginfo("Waiting for manipulation services")
+        self.pick_client = actionlib.SimpleActionClient('pick_action', PickTriggerAction)
+        rospy.loginfo("Waiting for pick action server...")
+        self.pick_client.wait_for_server()
         
-        # self.drawer_client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
-        # rospy.loginfo("Waiting for drawer action server...")
-        # self.drawer_client.wait_for_server()
+        self.place_client = actionlib.SimpleActionClient('place_action', PlaceTriggerAction)
+        rospy.loginfo("Waiting for place action server...")
+        self.place_client.wait_for_server()
         
-        # self.align_client = actionlib.SimpleActionClient('find_align_action', FindAlignAction)
-        # self.align_client.wait_for_server()
+        self.drawer_client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
+        rospy.loginfo("Waiting for drawer action server...")
+        self.drawer_client.wait_for_server()
         
-        # rospy.loginfo("Waiting for DETIC services from scene_parser")
-        # self.detic_request_client = actionlib.SimpleActionClient('detic_request_scene_parser', DeticRequestAction)
-        # self.detic_request_client.wait_for_server()
+        self.align_client = actionlib.SimpleActionClient('find_align_action', FindAlignAction)
+        self.align_client.wait_for_server()
         
-        # self.class_list = rospy.get_param('/object_detection/class_list')
-            
+        rospy.loginfo("Waiting for DETIC services from scene_parser")
+        self.detic_request_client = actionlib.SimpleActionClient('detic_request_scene_parser', DeticRequestAction)
+        self.detic_request_client.wait_for_server()
         
+        
+        rospy.loginfo("Waiting for VLMAPS services")
+        self.vlmaps_client = actionlib.SimpleActionClient('vlmaps_primitive_server', VLMaps_primitiveAction)
+        self.vlmaps_client.wait_for_server()
+        
+        self.vlmaps_list = rospy.get_param('/vlmaps_brain/objects_list')
+        self.class_list = rospy.get_param('/object_detection/class_list')
         self.server = actionlib.SimpleActionServer('task_planner', PlanTriggerAction, self.execute, False)
         self.server.start()
         
         self.drawer_location = None
 
         rospy.loginfo( "Task planner ready to accept inputs...")
-    
-    
     
     def execute(self, planGoal: PlanTriggerGoal):
         rospy.loginfo("Received plan")
@@ -104,20 +108,20 @@ class TaskPlanner:
             self.server.set_aborted(result)
     
     def pick(self, object_name):
-        # self.switch_to_manip_mode()
-        # objectId = self.class_list.index(object_name)
+        self.switch_to_manip_mode()
+        objectId = self.class_list.index(object_name)
         natural_name = object_name.replace("_", " ")
         self.speak("Picking " + natural_name)
-        # goal = PickTriggerGoal(
-        #     objectId = objectId,
-        # )
-        # self.pick_client.send_goal(goal)
-        # self.pick_client.wait_for_result()
-        # result : PickTriggerResult = self.pick_client.get_result()
-        # return result.success
+        goal = PickTriggerGoal(
+            objectId = objectId,
+        )
+        self.pick_client.send_goal(goal)
+        self.pick_client.wait_for_result()
+        result : PickTriggerResult = self.pick_client.get_result()
+        return result.success
         
     def place(self, surface):
-        # self.switch_to_manip_mode()
+        self.switch_to_manip_mode()
         place_location = place_location
         fixed_place = False
         use_place_location = False
@@ -134,92 +138,120 @@ class TaskPlanner:
             use_place_location = True
             is_rotate = False
         self.speak("Placing on surface.")
-        # goal = PlaceTriggerGoal(
-        #     surface = surface,
-        #     fixed_place = fixed_place,
-        #     use_place_location = use_place_location,
-        #     is_rotate = is_rotate
+        goal = PlaceTriggerGoal(
+            surface = surface,
+            fixed_place = fixed_place,
+            use_place_location = use_place_location,
+            is_rotate = is_rotate
             
-        # )
-        # self.place_client.send_goal(goal)
-        # self.place_client.wait_for_result()
-        # result : PlaceTriggerResult = self.place_client.get_result()
-        # return result.success
+        )
+        self.place_client.send_goal(goal)
+        self.place_client.wait_for_result()
+        result : PlaceTriggerResult = self.place_client.get_result()
+        return result.success
     
     def go_to(self, location):
         # self.primitives_mapping = {"go_to_object": self.go_to_object,
         #                     "move_between_objects": self.move_between_objects,
         #                     "move_object_closest_to": self.move_object_closest_to}
         
-        # self.switch_to_nav_mode()
+        self.switch_to_nav_mode()
         natural_name = location.replace("_", " ")
+        
         self.speak("Going to " + natural_name)
-        pass
-        # goal = VLMaps_primitive(
-        #     primitive = "go_to",
-        #     obj1 = "",
-        #     obj2 = "",
-        # )
+
+        if location == "drawer":
+            natural_name = 'potted plant'
+        
+        goal = VLMaps_primitiveGoal(
+            primitive = "go_to_object",
+            obj1 = natural_name,
+            obj2 = "",
+        )
+        
+        self.vlmaps_client.send_goal(goal)
+        self.vlmaps_client.wait_for_result()
+        return True
+        
     
     def move_between_objects(self, loc1, loc2):
-        # self.switch_to_nav_mode()
+        self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
         self.speak("Moving between" + natural_name_1 + " and " + natural_name_2)
+        
+        goal = VLMaps_primitiveGoal(
+            primitive = "move_between_objects",
+            obj1 = loc1,
+            obj2 = loc2,
+        )
+        
+        self.vlmaps_client.send_goal(goal)
+        self.vlmaps_client.wait_for_result()
+        return True
     
     def move_object_closest_to(self, loc1, loc2):
         #move to obj1 that is closest to obj2
-        # self.switch_to_nav_mode()
+        self.switch_to_nav_mode()
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
         self.speak("Going to " + natural_name_1 + " closest to " + natural_name_2)
+        goal = VLMaps_primitiveGoal(
+            primitive = "move_object_closest_to",
+            obj1 = loc1,
+            obj2 = loc2,
+        )
+        
+        self.vlmaps_client.send_goal(goal)
+        self.vlmaps_client.wait_for_result()
+        return True
     
     
     def find_and_align_to_object(self, object_name):
-        # self.switch_to_manip_mode()
-        # objectId = self.class_list.index(object_name)
+        self.switch_to_manip_mode()
+        objectId = self.class_list.index(object_name)
         natural_name = object_name.replace("_", " ")
         self.speak("Searching for " + natural_name)
         
-        # goal = FindAlignGoal(
-        #     objectId = objectId,
-        # )
-        # self.align_client.send_goal(goal)
-        # self.align_client.wait_for_result()
-        # result : FindAlignResult = self.align_client.get_result()
-        # return result.success
+        goal = FindAlignGoal(
+            objectId = objectId,
+        )
+        self.align_client.send_goal(goal)
+        self.align_client.wait_for_result()
+        result : FindAlignResult = self.align_client.get_result()
+        return result.success
     
     def open_drawer(self):
-        # self.switch_to_manip_mode()
+        self.switch_to_manip_mode()
         self.speak("Opening the drawer")
         goal = DrawerTriggerGoal(
             to_open = True,
             aruco_id = 0,
         )
-        # self.drawer_client.send_goal(goal)
-        # self.drawer_client.wait_for_result()
-        # result : DrawerTriggerResult = self.drawer_client.get_result()
-        # self.drawer_location = result.saved_position
-        # return result.success
+        self.drawer_client.send_goal(goal)
+        self.drawer_client.wait_for_result()
+        result : DrawerTriggerResult = self.drawer_client.get_result()
+        self.drawer_location = result.saved_position
+        return result.success
         
             
     def close_drawer(self):
-        # self.switch_to_manip_mode()
+        self.switch_to_manip_mode()
         self.speak("Closing the drawer")
         goal = DrawerTriggerGoal(
             to_open = False,
             aruco_id = 0,
         )
-        # self.drawer_client.send_goal(goal)
-        # self.drawer_client.wait_for_result()
-        # result : DrawerTriggerResult = self.drawer_client.get_result()
-        # return result.success
+        self.drawer_client.send_goal(goal)
+        self.drawer_client.wait_for_result()
+        result : DrawerTriggerResult = self.drawer_client.get_result()
+        return result.success
     
     def get_detections(self):
-        # self.detic_request_client.send_goal(DeticRequestGoal(request = True))
-        # self.detic_request_client.wait_for_result()
-        # result : DeticRequestResult = self.detic_request_client.get_result()
-        # list_of_objects = result.list_of_objects
+        self.detic_request_client.send_goal(DeticRequestGoal(request = True))
+        self.detic_request_client.wait_for_result()
+        result : DeticRequestResult = self.detic_request_client.get_result()
+        list_of_objects = result.list_of_objects
         list_of_objects = []
         
         if len(list_of_objects) == 0:
@@ -234,9 +266,7 @@ class TaskPlanner:
                     strtospk += nat_name + ", "
 
         self.speak(strtospk)
-        
-        
-        
+
         return list_of_objects
     
     def speak(self, string_to_speak):
@@ -246,31 +276,8 @@ class TaskPlanner:
         self.tts_request_client(req)
     
     def execute_plan(self, plan):
-
-        
         rospy.loginfo("Executing plan")
         exec(plan)
-        
-        # items = plan.split("\n")
-        
-        # for idx, item in enumerate(items):
-        #     if item.strip() == "":
-        #         continue
-        #     try:
-        #         req = UpdateParamRequest(
-        #             path = "visualization/line_executing",
-        #             value = str(idx)
-        #         )
-        #         self.update_param_service(req)
-        #         exec(item)
-        #     except Exception as e:
-        #         rospy.logerr("Error executing plan: {}".format(e))
-        #         return False, idx
-            
-        
-        
-        
-            
         
 
 if __name__ == "__main__":

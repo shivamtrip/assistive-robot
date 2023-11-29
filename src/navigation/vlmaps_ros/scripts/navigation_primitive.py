@@ -110,7 +110,7 @@ class TestTaskPlanner:
             rospy.sleep(0.5)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
-        self.labels= ["table","chair","refrigerator","potted plant","floor","sofa","bed","sink","other"]
+        self.labels = rospy.get_param('/vlmaps_brain/objects_list')
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Starting Server...")

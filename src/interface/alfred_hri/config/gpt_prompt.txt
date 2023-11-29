@@ -1,0 +1,166 @@
+Available robot functions:
+self.go_to('object'), self.move_between_objects('object1', 'object2'), self.move_object_closest_to('object1', 'object2'), self.pick('object'), self.place('surface_name'), self.open_drawer(), self.close_drawer(), self.find_and_align_to_object('object'), self.get_detections(), speak(text) 
+Objects in the scene: table, chair, refrigerator, potted_plant,floor,sofa,bed,sink,
+Docstrings are as follows -
+def go_to(object):
+    Moves the robot to the object location
+    Parameters:
+    object (string): Object name
+    Returns:
+    bool: True if the robot was able to reach the object, False otherwise
+
+def move_between_objects(object1, object2):
+    Moves the robot to a location between object1 and object2
+    Parameters:
+    object1 (string): Object 1 name
+    object2 (string): Object 2 name
+    Returns:
+    bool: True if the robot was able to reach the location, False otherwise
+
+def move_object_closest_to(object1, object2):
+    Moves the robot close to object1 type that is closest to object2 type
+    Parameters:
+    object1 (string): Object 1 name
+    object2 (string): Object 2 name
+    Returns:
+    bool: True if the robot was able to reach the location, False otherwise
+
+def pick(object):
+    Makes the robot pick up an object
+    Parameters:
+    object (string): Object name
+    Returns:
+    bool: True if the robot was able to pick up the object, False otherwise
+
+def place(surface):
+    Makes the robot place the object that it is holding on to the target surface
+    Parameters:
+    surface (string): Surface name on which the object is to be placed
+    Returns:
+    bool: True if the robot was able to place the object, False otherwise
+
+def open_drawer():
+    Makes the robot open a nearby drawer
+
+def close_drawer():
+    Makes the robot close a nearby drawer
+
+def find_and_align_to_object(object):
+    Makes the robot find an object nearby and align itselt to the object
+    Parameters:
+    object (string): Object name
+    Returns:
+    bool: True if the robot was able to find the object, False otherwise
+
+def get_detections():
+    Returns an array of nearby objects that are currently being detected by the robot
+    Returns:
+    List: Array of detected object names as strings
+
+def speak(text):
+    Makes the robot speak the given text input using a speaker
+    Parameters:
+    text (string): Text to be spoken by the robot
+
+Always generate commands on a new line
+Single quotes within a string are preceded by a back slash - \'. Also, don't use double quotes and take care of python indentation (4 spaces) 
+If the user just says yes or affirms your code, just reply with a Yes, if they negate, just reply with a No
+If the user asks for a code sumamry, start reply with Summary: 
+Note that there is always a table close to the user
+Command: Yes
+Answer:
+Yes
+Command: That sounds about right
+Answer:
+Yes
+Command: That is correct
+Answer:
+Yes
+Command: No
+Answer:
+No
+Command: That doesn't sound right
+Answer:
+No
+Command: That is not correct
+Answer:
+No
+Command: Bring me an apple
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    if not go_to('apple'):
+        return False, 'I couldn't go to the apple'
+    success = find_and_align_to_object('apple')
+    if success:
+        pick('apple')
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        place('table')
+        speak('Enjoy your apple')
+    else:
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        speak('I couldn't find you an apple')
+    return True, 'Success'
+Command: Bring me a banana
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    if not go_to('banana'):
+        return False, 'I couldn't go to the banana'
+    success = find_and_align_to_object('banana')
+    if success:
+        pick('banana')
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        place('table')
+        speak('Enjoy your banana! Don\'t let it sit!')
+    else:
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        speak('I couldn't find you an banana')
+    return True, 'Success'
+Command: Move between sofa and potted plant and then move to the table closest to the sofa
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    if not move_between_objects('sofa', 'potted_plant'):
+        return False, 'I couldn't move between the sofa and the potted plant'
+    if not move_object_closest_to('table', 'sofa'):
+        return False, 'I couldn't go to the table'
+    return True, 'Success'
+Command: Crack a joke
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    speak('Why didn't the skeleton go to the party? Because he had nobody to go with!')
+    return True, 'Success'
+Command: Go to the drawer and place all items that you may find above it and place them all inside the drawer. Come back to me (user) and then crack a joke
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    if not go_to('drawer'):
+        return False, 'I couldn't go to the drawer'
+    open_drawer()
+    detections = get_detections()
+    for detection in detections:
+        pick(detection)
+        place('drawer')
+    close_drawer()
+    if not go_to('user'):
+        return False, 'I couldn't go to you'
+    speak('Why don't scientists trust atoms? Because they make up everything!')
+    return True, 'Success'
+Command: Go to the potted plant. You may find a teddy bear near it. If you find it, bring it back to me.
+Answer:
+def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, place, open_drawer, close_drawer, find_and_align_to_object, get_detections, speak)
+    if not go_to('potted_plant'):
+        return False, 'I couldn't go to the potted_plant'
+    success = find_and_align_to_object('teddy_bear')
+    if success:
+        pick('teddy_bear')
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        place('table')
+        speak('Here's your teddy bear. Have fun cuddling!')
+    else:
+        if not go_to('user'):
+            return False, 'I couldn't go to you'
+        speak('Sorry, I couldn't find your teddy bear')
+    return True, 'Success'

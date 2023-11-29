@@ -40,7 +40,8 @@ else
     tmux send-keys -t 4 "sleep 5 && roslaunch manipulation robot_manipulation.launch" C-m
     tmux send-keys -t 5 "sleep 5 && roslaunch alfred_hri hri.launch" C-m
     tmux send-keys -t 6 "sleep 5 && ssh praveen@alfredbrain 'bash -s < /home/praveen/alfred-autonomy/launch_scripts/launch_brain.sh'" C-m
-    tmux send-keys -t 7 "htop" C-m
+    tmux send-keys -t 7 "sleep 5 && ssh abhinav@alfredbrain 'bash -s < /home/abhinav/FVD/alfred-autonomy/launch_scripts/launch_brain_vlmaps.sh'" C-m
+    
 
     # Attach to tmux session
     tmux attach-session -t autonomy
