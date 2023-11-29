@@ -70,6 +70,8 @@ class SpeechRecognition():
         # Convert audio to text
         try:
             text = self.r.recognize_whisper_api(audio, api_key=self.openai_access_key)
+            # text = self.r.recognize_google(audio)
+            rospy.loginfo("Got text: {}".format(text))
             return text
         except sr.UnknownValueError:
             print("Google Speech Recognition could not understand audio")

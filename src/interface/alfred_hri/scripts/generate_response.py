@@ -270,17 +270,15 @@ class ResponseGenerator():
 
     def process_gpt_query(self, query):
         openai.api_key = self.openai_access_key
-
-        query = self.query_prefix + query
-        user_dict = {"role": "user", "content": query}
+        user_dict = {"role": "user", "content": f"Command: {query}. Answer:\n"}
         self.history.append(user_dict)
 
+        rospy.loginfo("Requesting GPT-4 completion")
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": self.query_prefix},
                 *self.history
-                
             ],
         )
         assistant_dict = {"role": "assistant", "content": response.choices[0].message.content}
@@ -313,7 +311,8 @@ class ResponseGenerator():
         else:
             response = "Sorry, I didn't catch that."
             primitive = '<none>'
-
+        rospy.loginfo("Response: " + response)
+        rospy.loginfo("Primitive: " + primitive)
         return (response, primitive)
     
     def similar(self, str1, str2):

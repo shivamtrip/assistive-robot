@@ -36,15 +36,15 @@ class HRI():
         )
         self.update_param = self.firebase_node.update_param
         
-        self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
+        # self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
         # self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
-        self.command_action_client = actionlib.SimpleActionClient('/robot_task_command', PlanTriggerAction)
+        self.command_action_client = actionlib.SimpleActionClient('task_planner', PlanTriggerAction)
         self.updateParamService = rospy.Service('/update_param', UpdateParam, self.firebase_node.update_param)
         
-        rospy.loginfo("Waiting for /startedListening service")
-        self.startedListeningService.wait_for_service()
+        # rospy.loginfo("Waiting for /startedListening service")
+        # self.startedListeningService.wait_for_service()
         
-        rospy.loginfo("Waiting for /robot_task_command server")
+        rospy.loginfo("Waiting for task_planner server")
         self.command_action_client.wait_for_server()
 
         self.attention_sounds = ["Uh yes?", "Yes?", "What's up?", "How's life?", "Hey!", "Hmm?"]
@@ -90,8 +90,8 @@ class HRI():
         self.clear_params()
         self.update_param("hri_params/wakeword", "1")
 
-        self.startedListeningService()
-        self.speech_recognition.suppress_noise()
+        # self.startedListeningService()
+        # self.speech_recognition.suppress_noise()
         ack = self.triggerWakewordThread()
         
         self.update_param("hri_params/ack", ack)
@@ -100,6 +100,7 @@ class HRI():
         self.update_param("hri_params/command", text)
 
         # send a trigger request to planning node saying that the wakeword has been triggered
+        self.responseGenerator.run_tts("hmm... let me think...")
         response, primitive = self.responseGenerator.processQuery(text)
 
         # if primitive == "engagement" or primitive == "<none>":
@@ -116,24 +117,30 @@ class HRI():
         #     return
         if primitive == "code":
             self.code = response
+            self.responseGenerator.run_tts("I think i know what to do...")
             self.wakeword_detector.startRecorder()
-            return
-        elif primitive == "summary":
+            response, primitive = self.responseGenerator.processQuery("summarize the generated code in 1 sentence.")
             self.responseGenerator.run_tts(response)
-            self.wakeword_detector.startRecorder()
-            return
-        elif primitive == "affirm":
-            phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
-            self.responseGenerator.run_tts(random.choice(phrases))
-        elif primitive == "negate":
-            self.code = ""
-            phrases = ["Closing the task", "Ok, I won't do that", "Ok, I'll stop", "Ok, I'll stop doing that"]
-            self.responseGenerator.run_tts(random.choice(phrases))
-            self.wakeword_detector.startRecorder()
-            return
+            self.responseGenerator.run_tts("Shall I execute this plan?")
+            text = self.speech_recognition.speech_to_text()
+            response, primitive = self.responseGenerator.processQuery(text)
+            if 'affirm' == primitive:
+                phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
+                self.responseGenerator.run_tts(random.choice(phrases))
+            else:
+                self.code = ""
+                phrases = ["Closing the task", "Ok, I won't do that", "Ok, I'll stop", "Ok, I'll stop doing that"]
+                self.responseGenerator.run_tts(random.choice(phrases))
+                self.wakeword_detector.startRecorder()
+                return 
         else:
             self.wakeword_detector.startRecorder()
-            return
+            return 
+        
+        # if primitive == "summary":
+        #     self.responseGenerator.run_tts(response)
+        #     self.wakeword_detector.startRecorder()
+        #     return
         
         print(text, primitive, response)
         
