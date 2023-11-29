@@ -32,6 +32,7 @@ class ManipulationManager:
         self.pick_manager   = PickManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.place_manager  = PlaceManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods)
         self.find_manager = FindAndAlignManager(self.scene_parser, self.trajectoryClient, self.manipulationMethods, self.planner)
+        self.stow_manager.stow()
         rospy.loginfo( "Manipulation subsystem up.")
     
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
 vs_range : [-60, 60, 6, 1] # [left angle, right angle, n_steps, settling time]. Angles in degrees, converted to rad in code. 
 
 pid_gains:
-  kp : 0.7
+  kp : 0.3
   kd : 0.2
 
 # move_towards_object

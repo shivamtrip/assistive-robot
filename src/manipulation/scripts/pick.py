@@ -37,7 +37,7 @@ class PickManager():
     
     
 
-    def pick(self, objectId, use_planner = True, isPublish = True):
+    def pick(self, objectId, use_planner = False, isPublish = True):
         
         rospy.loginfo("Picking object" + str(objectId))
         starttime = time.time()

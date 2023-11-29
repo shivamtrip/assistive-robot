@@ -2,7 +2,9 @@
     "global_state" : "IDLE",
     "local_state"  : "IDLE",
     "visualization": {
-        "line_executing" : 0
+        "line_executing" : 0,
+        "code": "",
+        "active_primitive": ""
     },
     "hri_params": {
         "listening" : false,

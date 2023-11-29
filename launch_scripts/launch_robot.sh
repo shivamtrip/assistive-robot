@@ -36,11 +36,11 @@ else
     tmux send-keys -t 0 "sleep 1 && roslaunch alfred_core driver.launch " C-m
     tmux send-keys -t 1 "sleep 5 && roslaunch alfred_core perception_robot_tuned.launch" C-m
     tmux send-keys -t 2 "sleep 5 && roslaunch alfred_navigation navigation_no_driver.launch" C-m
-    tmux send-keys -t 3 "sleep 5 && rosrun task_planner task_planner.py" C-m
+    tmux send-keys -t 3 "sleep 5 && roslaunch task_planner task_planner.launch" C-m
     tmux send-keys -t 4 "sleep 5 && roslaunch manipulation robot_manipulation.launch" C-m
     tmux send-keys -t 5 "sleep 5 && roslaunch alfred_hri hri.launch" C-m
     tmux send-keys -t 6 "sleep 5 && ssh praveen@alfredbrain 'bash -s < /home/praveen/alfred-autonomy/launch_scripts/launch_brain.sh'" C-m
-    tmux send-keys -t 7 "sleep 5 && ssh abhinav@alfredbrain 'bash -s < /home/abhinav/FVD/alfred-autonomy/launch_scripts/launch_brain_vlmaps.sh'" C-m
+    # tmux send-keys -t 7 "sleep 5 && ssh abhinav@alfredbrain 'bash -s < /home/abhinav/FVD/alfred-autonomy/launch_scripts/launch_brain_vlmaps.sh'" C-m
     
 
     # Attach to tmux session

@@ -85,7 +85,7 @@ class ManipulationMethods:
                 av_effort = np.mean(self.efforts[k])
                 if av_effort < self.contact_threshold[k]:
                     self.isContact = True
-                    rospy.logdebug("Lift effort is too low: {}, there is contact".format(av_effort))
+                    rospy.loginfo("Lift effort is too low: {}, there is contact".format(av_effort))
                 else:
                     self.isContact = False
                     
@@ -107,7 +107,7 @@ class ManipulationMethods:
         # print("arm avg effort = ", av_effort)
         if av_effort > self.contact_threshold['joint_arm']:
             self.isContact = True
-            rospy.logdebug("Arm effort is too high: {}, there is contact".format(av_effort))
+            rospy.loginfo("Arm effort is too high: {}, there is contact".format(av_effort))
 
         transform = self.get_transform('link_arm_l4', 'link_arm_l0')
         self.states['joint_arm'].append(self.cur_robot_state[5])
