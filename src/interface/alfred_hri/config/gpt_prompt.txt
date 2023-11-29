@@ -93,7 +93,8 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the apple'
     success = find_and_align_to_object('apple')
     if success:
-        pick('apple')
+        if not pick('apple'):
+            return False, 'I cannot pick the apple'
         if not go_to('user'):
             return False, 'I cannot go to you'
         place('table')
@@ -110,7 +111,8 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the banana'
     success = find_and_align_to_object('banana')
     if success:
-        pick('banana')
+        if not pick('banana'):
+            return False, 'I cannot pick the banana'
         if not go_to('user'):
             return False, 'I cannot go to you'
         place('table')
@@ -128,7 +130,8 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
     detections = get_detections()
     open_drawer()
     for detection in detections:
-        pick(detection)
+        if not pick(detection):
+            return False, 'I cannot pick the object'
         place('drawer')
     close_drawer()
     return True, 'Success'
@@ -153,7 +156,8 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
     detections = get_detections()
     open_drawer()
     for detection in detections:
-        pick(detection)
+        if not pick(detection):
+            return False, 'I cannot pick the object'
         place('drawer')
     close_drawer()
     if not go_to('user'):
@@ -167,7 +171,8 @@ def execute_plan(go_to, move_between_objects, move_object_closest_to, pick, plac
         return False, 'I cannot go to the potted_plant'
     success = find_and_align_to_object('teddy_bear')
     if success:
-        pick('teddy_bear')
+        if not pick('teddy_bear'):
+            return False, 'I cannot pick the teddy_bear'
         if not go_to('user'):
             return False, 'I cannot go to you'
         place('table')

@@ -39,7 +39,7 @@ class PickManager():
 
     def pick(self, objectId, use_planner = False, isPublish = True):
         
-        rospy.loginfo("Picking object" + str(objectId))
+        rospy.loginfo("Picking object " + str(objectId))
         starttime = time.time()
         self.manipulationMethods.move_to_pregrasp()
         self.scene_parser.set_point_cloud(publish_scene = True, use_detic = True) 

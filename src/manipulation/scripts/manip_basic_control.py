@@ -86,8 +86,8 @@ class ManipulationMethods:
                 if av_effort < self.contact_threshold[k]:
                     self.isContact = True
                     rospy.loginfo("Lift effort is too low: {}, there is contact".format(av_effort))
-                else:
-                    self.isContact = False
+                # else:
+                #     self.isContact = False
                     
                 self.cur_robot_state[3] = msg.position[i]
             
@@ -204,14 +204,14 @@ class ManipulationMethods:
     
     
     def close_drawer(self, x):
-        move_to_pose(self.trajectory_client, {
-            'base_translate;by' : x
-        })
+        # move_to_pose(self.trajectory_client, {
+        #     'base_translate;by' : x
+        # })
         move_to_pose(self.trajectory_client, {
             'arm;to' : 0.01,
         })
         move_to_pose(self.trajectory_client, {
-            'lift;to' : 0.66,
+            'lift;to' : 0.74,
             'wrist_yaw;to' : np.pi/2,
         })
         rospy.sleep(2)
@@ -268,6 +268,7 @@ class ManipulationMethods:
         while not self.isContact or curz >= pose['lift;to']:
             curz = self.states['joint_lift'][-1]
             if self.isContact:
+                self.isContact = False
                 break
             move_to_pose(trajectory_client, {
                 'lift;by': -0.01,
