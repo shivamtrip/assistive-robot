@@ -169,10 +169,10 @@ class TestTaskPlanner:
         """ Inferences over vlmaps and navigates to object location """
 
         if(obj1=='user'):
-            homeGoal2d = (self.home_pos[0],self.home_pos[1],0)
-            home_navman_goal = convertToNavManGoals(homeGoal2d)
-            rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(home_navman_goal))
-            status = self.navigate_to_location(home_navman_goal)
+            usergoal2D = get_default_location(self.data_config_dir,label='user')
+            user_navman_goal = convertToNavManGoals(usergoal2D)
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(user_navman_goal))
+            status = self.navigate_to_location(user_navman_goal)
             return status
         
         assert obj1 in self.labels, "Object not in vlmaps labels"
@@ -736,7 +736,7 @@ def get_default_location(data_config_dir:str, label:str):
         pos = locations_dict[label]
         roll, pitch, yaw = pos['roll'], pos['pitch'], pos['yaw']
         x, y, z = pos['x'], pos['y'], pos['z']
-        goal2D = (x,y,yaw)
+        goal2D = (x,y,math.radians(yaw))
         return goal2D
     else:
         rospy.logerr(f"[{rospy.get_name()}]:" +"Label {} not found in locations dict".format(label))
