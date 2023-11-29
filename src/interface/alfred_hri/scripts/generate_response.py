@@ -69,25 +69,152 @@ class ResponseGenerator():
         
         self.sounds = {}
 
-        self.primitives_file = rospy.get_param("primitives_file_name", "resources/commands/primitives.json")
-        self.primitives_file_path = os.path.join(rospkg.RosPack().get_path("alfred_hri"), self.primitives_file)
+        # self.primitives_file = rospy.get_param("primitives_file_name", "resources/commands/primitives.json")
+        # self.primitives_file_path = os.path.join(rospkg.RosPack().get_path("alfred_hri"), self.primitives_file)
 
-        self.primitives = json.load(open(self.primitives_file_path))
+        # self.primitives = json.load(open(self.primitives_file_path))
         
         uh_huh_file = rospy.get_param("uhuh_file", "resources/media/uh-huh.mp3")
         uh_huh_file = os.path.join(rospkg.RosPack().get_path("alfred_hri"), uh_huh_file)
         self.sounds["uh_huh"] = uh_huh_file
-        self.commands = []
-        self.match_command_to_primitive = {}
-        for primitive in self.primitives.keys():
-            for command in self.primitives[primitive]:
-                self.commands.append(command)
-                self.match_command_to_primitive[command] = primitive
+        # self.commands = []
+        # self.match_command_to_primitive = {}
+        # for primitive in self.primitives.keys():
+        #     for command in self.primitives[primitive]:
+        #         self.commands.append(command)
+        #         self.match_command_to_primitive[command] = primitive
 
-        self.query_prefix = '''
-        You are Alfred, a friendly indoor robot designed 
-        to assist the elderly in nursing homes. Start acting like Alfred. You don't need to introduce yourself. Respond concisely.
-        '''
+        self.query_prefix = """
+            Available robot functions:\n
+            self.go_to('object'), self.move_between_objects('object1', 'object2'), self.move_object_closest_to('object1', 'object2'), self.pick('object'), self.place('surface_name'), self.open_drawer(), self.close_drawer(), self.find_and_align_to_object('object'), self.get_detections(), speak(text) \n
+            Objects in the scene: potted_plant, sofa, apple, banana, remote, water_bottle, teddy_bear\n
+            Docstrings are as follows -\n
+            def go_to(object):
+                Moves the robot to the object location
+                Parameters:
+                object (string): Object name
+
+            def move_between_objects(object1, object2):
+                Moves the robot to a location between object1 and object2
+                Parameters:
+                object1 (string): Object 1 name
+                object2 (string): Object 2 name
+
+            def move_object_closest_to(object1, object2):
+                Moves the robot close to object1 type that is closest to object2 type
+                Parameters:
+                object1 (string): Object 1 name
+                object2 (string): Object 2 name
+
+            def pick(object):
+                Makes the robot pick up an object
+                Parameters:
+                object (string): Object name
+            
+            def place(surface):
+                Makes the robot place the object that it is holding on to the target surface
+                Parameters:
+                surface (string): Surface name on which the object is to be placed
+
+            def open_drawer():
+                Makes the robot open a nearby drawer
+
+            def close_drawer():
+                Makes the robot close a nearby drawer
+
+            def find_and_align_to_object(object):
+                Makes the robot find an object nearby and align itselt to the object
+                Parameters:
+                object (string): Object name
+
+            def get_detections():
+                Returns an array of nearby objects that are currently being detected by the robot
+                Returns:
+                List: Array of detected object names as strings
+
+            def speak(text):
+                Makes the robot speak the given text input using a speaker
+                Parameters:
+                text (string): Text to be spoken by the robot
+            
+            Always generate commands on a new line\n
+            Single quotes within a string are preceded by a back slash - \'. Also, don't use double quotes and take care of python indentation (4 spaces) \n
+            If the user just says yes or affirms your code, just reply with a Yes, if they negate, just reply with a No\n
+            If the user asks for a code sumamry, start reply with Summary: \n
+            Note that there is always a table close to the user\n
+            Command: Yes
+            Answer:\n
+            Yes
+            Command: That sounds about right
+            Answer:\n
+            Yes
+            Command: That is correct
+            Answer:\n
+            Yes
+            Command: No
+            Answer:\n
+            No
+            Command: That doesn't sound right
+            Answer:\n
+            No
+            Command: That is not correct
+            Answer:\n
+            No
+            Command: Bring me an apple\n
+            Answer:\n
+            self.go_to('apple')
+            success = self.find_and_align_to_object('apple')
+            if success:
+                self.pick('apple')
+                self.go_to('user')
+                self.place('table')
+                self.speak('Enjoy your apple')
+            else:
+                self.go_to('user')
+                self.speak('I couldn't find you an apple')
+            Command: Bring me a banana\n
+            Answer:\n
+            self.go_to('banana')
+            success = self.find_and_align_to_object('banana')
+            if success:
+                self.pick('banana')
+                self.go_to('user')
+                self.place('table')
+                self.speak('Enjoy your banana! Don\'t let it sit!')
+            else:
+                self.go_to('user')
+                self.speak('I couldn't find you an banana')
+            Command: Move between sofa and potted plant and then move to the table closest to the sofa
+            Answer:\n
+            self.move_between_objects('sofa', 'potted_plant')
+            self.move_object_closest_to('table', 'sofa')
+            Command: Crack a joke
+            Answer:\n
+            self.speak('Why didn't the skeleton go to the party? Because he had nobody to go with!')
+            Command: Go to the drawer and place all items that you may find above it and place them all inside the drawer. Come back to me (user) and then crack a joke
+            Answer:\n
+            self.go_to('drawer')
+            self.open_drawer()
+            detections = self.get_detections()
+            for detection in detections:
+                self.pick(detection)
+                self.place('drawer')
+            self.close_drawer()
+            self.go_to('user')
+            self.speak('Why don't scientists trust atoms? Because they make up everything!')
+            Command: Go to the potted plant. You may find a teddy bear near it. If you find it, bring it back to me.
+            Answer:\n
+            self.go_to('potted_plant')
+            success = self.find_and_align_to_object('teddy_bear')
+            if success:
+                self.pick('teddy_bear')
+                self.go_to('user')
+                self.place('table')
+                self.speak('Here's your teddy bear. Have fun cuddling!')
+             else:
+                self.go_to('user')
+                self.speak('Sorry, I couldn't find your teddy bear')
+            """
         self.history = []
 
     def playSound(self, phrase = 'uh_huh'):
@@ -149,7 +276,7 @@ class ResponseGenerator():
         self.history.append(user_dict)
 
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": self.query_prefix},
                 *self.history
@@ -162,18 +289,27 @@ class ResponseGenerator():
     
     def processQuery(self, text):
         if text is not None:
-            rospy.loginfo("Heard: " + text)
+            # rospy.loginfo("Heard: " + text)
             
-            closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.85)
-            if len(closest_command) > 0:
-                rospy.loginfo("Closest command: " + closest_command[0])
-                cmd = closest_command[0]
-                primitive = self.match_command_to_primitive[cmd]
-                response = 'On it!'
+            # closest_command = difflib.get_close_matches(text, self.commands, n=1, cutoff=0.85)
+            # if len(closest_command) > 0:
+            #     rospy.loginfo("Closest command: " + closest_command[0])
+            #     cmd = closest_command[0]
+            #     primitive = self.match_command_to_primitive[cmd]
+            #     response = 'On it!'
+            # else:
+            #     rospy.loginfo("Not in diction. Offloading to GPT.")
+            #     response = self.process_gpt_query(text)
+            #     primitive = 'engagement'
+            response = self.process_gpt_query(text)
+            if response == "Yes":
+                primitive = "affirm"
+            elif response == "No":
+                primitive = "negate"
+            elif "summary" in response.lower():
+                primitive = "summary"
             else:
-                rospy.loginfo("Not in diction. Offloading to GPT.")
-                response = self.process_gpt_query(text)
-                primitive = 'engagement'
+                primitive = "code"
         else:
             response = "Sorry, I didn't catch that."
             primitive = '<none>'

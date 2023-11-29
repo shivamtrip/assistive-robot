@@ -63,7 +63,7 @@ class SpeechRecognition():
         m = sr.Microphone()
         with m as source:
             print("Listening...")
-            audio = self.r.listen(source, timeout=5, phrase_time_limit=5)
+            audio = self.r.listen(source, timeout=5, phrase_time_limit=20)
         
         rospy.loginfo("Recognized speech. Transcribing...")
 

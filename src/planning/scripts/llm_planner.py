@@ -24,9 +24,6 @@ import numpy as np
 class TaskPlanner:
     def __init__(self):
         rospy.init_node('task_planner')
-        
-        
-        
 
         self.switch_to_manip_mode = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
@@ -91,6 +88,8 @@ class TaskPlanner:
         self.drawer_location = None
 
         rospy.loginfo( "Task planner ready to accept inputs...")
+    
+    
     
     def execute(self, planGoal: PlanTriggerGoal):
         rospy.loginfo("Received plan")

@@ -15,8 +15,11 @@ from generate_response import ResponseGenerator
 from recognize_speech import SpeechRecognition
 from wakeword_detector import WakewordDetector
 
-from firebase_node import FirebaseNode
+from task_planner.msg import PlanTriggerAction, PlanTriggerGoal, PlanTriggerResult, PlanTriggerFeedback
 
+
+from firebase_node import FirebaseNode
+import actionlib
 class HRI():
     def __init__(self):
         rospy.init_node("alfred_hri")
@@ -34,17 +37,20 @@ class HRI():
         self.update_param = self.firebase_node.update_param
         
         self.startedListeningService = rospy.ServiceProxy('/startedListening', Trigger)
-        self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
+        # self.commandService = rospy.ServiceProxy('/robot_task_command', GlobalTask)
+        self.command_action_client = actionlib.SimpleActionClient('/robot_task_command', PlanTriggerAction)
         self.updateParamService = rospy.Service('/update_param', UpdateParam, self.firebase_node.update_param)
         
         rospy.loginfo("Waiting for /startedListening service")
         self.startedListeningService.wait_for_service()
         
-        rospy.loginfo("Waiting for /robot_task_command service")
-        self.commandService.wait_for_service()
+        rospy.loginfo("Waiting for /robot_task_command server")
+        self.command_action_client.wait_for_server()
 
         self.attention_sounds = ["Uh yes?", "Yes?", "What's up?", "How's life?", "Hey!", "Hmm?"]
         rospy.loginfo("HRI Node ready")
+
+        self.code = ""
 
     def verbal_response_callback(self, req : VerbalResponseRequest):
         # call the response generator to generate a response
@@ -96,25 +102,44 @@ class HRI():
         # send a trigger request to planning node saying that the wakeword has been triggered
         response, primitive = self.responseGenerator.processQuery(text)
 
-        if primitive == "engagement" or primitive == "<none>":
+        # if primitive == "engagement" or primitive == "<none>":
+        #     self.responseGenerator.run_tts(response)
+        #     self.wakeword_detector.startRecorder()
+        #     return
+        # elif primitive == "video_call_start":
+        #     self.responseGenerator.run_tts("Starting a video call")
+        #     self.update_param("hri_params/response", "Starting a video call")
+        #     self.update_param("hri_params/operation_mode", "TELEOPERATION")
+        #     return
+        # elif primitive == "video_call_stop":
+        #     self.update_param("hri_params/operation_mode", "AUTONOMOUS")
+        #     return
+        if primitive == "code":
+            self.code = response
+            self.wakeword_detector.startRecorder()
+            return
+        elif primitive == "summary":
             self.responseGenerator.run_tts(response)
             self.wakeword_detector.startRecorder()
             return
-        elif primitive == "video_call_start":
-            self.responseGenerator.run_tts("Starting a video call")
-            self.update_param("hri_params/response", "Starting a video call")
-            self.update_param("hri_params/operation_mode", "TELEOPERATION")
+        elif primitive == "affirm":
+            phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
+            self.responseGenerator.run_tts(random.choice(phrases))
+        elif primitive == "negate":
+            self.code = ""
+            phrases = ["Closing the task", "Ok, I won't do that", "Ok, I'll stop", "Ok, I'll stop doing that"]
+            self.responseGenerator.run_tts(random.choice(phrases))
+            self.wakeword_detector.startRecorder()
             return
-        elif primitive == "video_call_stop":
-            self.update_param("hri_params/operation_mode", "AUTONOMOUS")
+        else:
+            self.wakeword_detector.startRecorder()
             return
         
         print(text, primitive, response)
-
-        task = GlobalTaskRequest(speech = text, type = primitive, primitive = primitive)
+        
+        task = PlanTriggerGoal(plan = self.code )
+        self.command_action_client.send_goal(task)
         self.wakeword_detector.startRecorder()
-        self.commandService(task)
-
         self.clear_params()
 
 
