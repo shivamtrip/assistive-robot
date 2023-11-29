@@ -96,7 +96,7 @@ class VLMapsGenerator():
         """
 
         labels = goal.labels
-        rospy.logdebug(f"[{rospy.get_name()}] " + "Received labels {}".format(labels))
+        rospy.loginfo(f"[{rospy.get_name()}] " + "Received labels {}".format(labels))
 
         assert isinstance(labels, list), "Labels should be a list but found {}".format(type(labels))
         assert len(labels) > 0, "Labels should not be empty"
@@ -130,6 +130,8 @@ class VLMapsGenerator():
             mask_list.append(label_mask)
 
         heatmaps_list = self.get_heatmap_results(mask_list,labels)
+
+        print("length of heat list: ", len(heatmaps_list))
 
         # Publish masks
         # self.publish_masks(mask_list,labels)
@@ -180,7 +182,7 @@ class VLMapsGenerator():
             heatmap_msg = self.cv2_to_imgmsg(heatmap)
             vlmaps_msg.masks.append(mask_msg)
             vlmaps_msg.heatmaps.append(heatmap_msg)
-            rospy.logdebug(f"[{rospy.get_name()}] " + "Published mask for label {}".format(labels[i]))
+            rospy.logdebug(f"[{rospy.get_name()}] " + "Published mask and heatmap for label {}".format(labels[i]))
 
         vlmaps_msg.success = True
         self.action_server.set_succeeded(vlmaps_msg)

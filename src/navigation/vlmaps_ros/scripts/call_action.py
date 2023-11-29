@@ -23,9 +23,9 @@ class vlmaps_fsm():
         self.vlmaps_client = actionlib.SimpleActionClient('lseg_server', VLMapsAction)
 
         # wait for server
-        rospy.loginfo("Waiting for VLMAPS server...")
+        rospy.loginfo("Waiting for Lseg server...")
         self.vlmaps_client.wait_for_server()
-        rospy.loginfo("Connected to VLMAPS server")
+        rospy.loginfo("Connected to Lseg server")
 
         # Initialize results
         self.results = None
@@ -57,7 +57,7 @@ class vlmaps_fsm():
             mask = np.frombuffer(result.masks[i].data, 
                                  dtype=np.uint8).reshape(height_mask, width_mask)
             heatmap = np.frombuffer(result.heatmaps[i].data, 
-                                    dtype=np.float32).reshape(height_heatmap, width_heatmap)
+                                    dtype=np.uint8).reshape(height_heatmap, width_heatmap,3)
             mask_list.append(mask)
             heatmaps_list.append(heatmap)
 
@@ -67,14 +67,12 @@ class vlmaps_fsm():
 
         mask_list = np.array(mask_list)
         heatmaps_list = np.array(heatmaps_list)
-
         self.results = {"masks": mask_list, "heatmaps": heatmaps_list}
 
 if __name__ == "__main__":
     rospy.init_node('vlmaps_caller', anonymous=True)
 
     # get the labels
-    LABELS = "table, chair, floor, sofa, bed, other"
-    LABELS = LABELS.split(",")
-    vlmaps_caller = vlmaps_fsm(LABELS)
-    vlmaps_caller.send_goal(LABELS)
+    # LABELS =["sofa", "potted plant", "sink", "refrigerator", "table", "kitchen", "floor"]
+    # vlmaps_caller = vlmaps_fsm(LABELS)
+    # vlmaps_caller.send_goal(LABELS)

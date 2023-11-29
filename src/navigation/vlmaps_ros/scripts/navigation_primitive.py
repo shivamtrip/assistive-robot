@@ -1,5 +1,5 @@
+#!/home/abhinav/miniconda3/envs/vlmaps/bin/python3
 #Author: Abhinav Gupta
-#!/usr/local/lib/robot_env/bin/python3
 
 #
 # Copyright (C) 2023 Auxilio Robotics
@@ -39,8 +39,10 @@ from landmark_index import *
 from utils.clip_mapping_utils import *
 from vis_tools import *
 from cv_bridge import CvBridge
+from matplotlib import pyplot as plt
 from geometry_msgs.msg import Quaternion, PoseWithCovarianceStamped
 from vlmaps_ros.msg import VLMaps_primitiveAction, VLMaps_primitiveResult, VLMaps_primitiveFeedback
+from alfred_navigation.msg import NavManAction, NavManGoal, NavManResult, NavManFeedback
 from sensor_msgs.msg import Image
 import sensor_msgs.msg
 
@@ -52,15 +54,23 @@ class TestTaskPlanner:
         self.action_server = actionlib.SimpleActionServer(
             'vlmaps_primitive_server', VLMaps_primitiveAction, execute_cb=self.execute_cb, auto_start=False)
         self.bridge = CvBridge()
-        self.root_dir = rospy.get_param('/vlmaps_robot/root_dir')
-        self.data_dir = rospy.get_param('/vlmaps_robot/data_dir')
-        self.cs =   rospy.get_param('/vlmaps_robot/cs')
-        self.gs =  rospy.get_param('/vlmaps_robot/gs')
-        self.area_threshold_to_match = rospy.get_param('/vlmaps_robot/area_threshold_to_match')
-        self.inference = rospy.get_param('/vlmaps_robot/inference')
-        self.cuda_device = rospy.get_param('/vlmaps_robot/cuda_device')
-        self.show_vis = rospy.get_param('/vlmaps_robot/show_vis')
-        self.data_config_dir = os.path.join(self.data_dir, "config/data_configs")
+        self.root_dir = rospy.get_param('/vlmaps_brain/root_dir')
+        self.data_dir = rospy.get_param('/vlmaps_brain/data_dir')
+        self.cs =   rospy.get_param('/vlmaps_brain/cs')
+        self.gs =  rospy.get_param('/vlmaps_brain/gs')
+        self.area_threshold_to_match = rospy.get_param('/vlmaps_brain/area_threshold_to_match')
+        self.inference = rospy.get_param('/vlmaps_brain/inference')
+        self.cuda_device = rospy.get_param('/vlmaps_brain/cuda_device')
+        self.show_vis = rospy.get_param('/vlmaps_brain/show_vis')
+        self.data_config_dir = os.path.join(self.root_dir, "config/data_configs")
+
+        ## offsets from objects.
+        self.offsets = {'sofa': 1.2, 'table': 0.8, 'potted plant': 1, 'sink': 1.1, 'refrigerator': 1.1}
+
+        # Store locations
+        # Load location priors to get orientation
+        file_path = os.path.join(self.data_config_dir, "locations.json")
+        self.location_priors = load_json(file_path)
 
         # Stores update time
         self.last_update_time = time.time()
@@ -76,7 +86,7 @@ class TestTaskPlanner:
         # Initialize navigation services and clients
         self.startNavService = rospy.ServiceProxy('/switch_to_navigation_mode', Trigger)
 
-        self.navigation_client = actionlib.SimpleActionClient('nav_man', MoveBaseAction)
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
  
         self.stow_robot_service = rospy.ServiceProxy('/stow_robot', Trigger)
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for stow robot service...")
@@ -88,24 +98,25 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing costmap processor node...")
         self.costmap_processor = ProcessCostmap()
 
+        # heatmap publisher node
+        self.heatmap_pub = rospy.Publisher('/heatmap', Image, queue_size=10)
+
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing amcl pose subscriber...")
         self.curr_pos = None
         self.RECEIVED_AMCL_POSE = False
         self.amcl_pose_sub = rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.amcl_pose_callback)
 
-        while not self.RECEIVED_AMCL_POSE:
+        while not self.RECEIVED_AMCL_POSE and not rospy.is_shutdown():
             rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for amcl pose...")
             rospy.sleep(0.5)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Initializing vlmaps node...")
-
-        self.labels= "table, chair, floor, sofa, bed, other"
-        self.labels = self.labels.split(",")
+        self.labels= ["table","chair","refrigerator","potted plant","floor","sofa","bed","sink","other"]
         self.vlmaps_caller = vlmaps_fsm(self.labels)
 
         rospy.loginfo(f"[{rospy.get_name()}]:" + "Starting Server...")
         self.start()
-        rospy.loginfo(f"[{rospy.get_name()}]:" + "Server Started.")
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "VLMaps Primitive Server Started.")
         rospy.loginfo(f"[{rospy.get_name()}]:" + "VLMaps Primitive Node Ready.")
 
     def execute_cb(self, goal):
@@ -125,8 +136,6 @@ class TestTaskPlanner:
         
         else:
             safe_movebase_goal = self.primitives_mapping[self.goal_primitive](self.goal_obj1, self.goal_obj2)
-            
-        self.publish_goal(safe_movebase_goal)
 
     def amcl_pose_callback(self, msg):
         """Callback for amcl pose subscriber"""
@@ -134,7 +143,7 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Current position: {}".format(self.curr_pos))
         self.RECEIVED_AMCL_POSE = True
 
-    def publish_goal(self, status):
+    def publish_result(self, status):
 
         msg = VLMaps_primitiveResult()
         msg.header = rospy.Header()
@@ -172,20 +181,19 @@ class TestTaskPlanner:
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
         safe_goal2D = self.get_2D_goal_rtabmap(outputs,label=obj1,safe=True)
-        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
+        safe_navman_goal = convertToNavManGoals(safe_goal2D)
         goals_vis.append(safe_goal2D)
 
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to Nav Man{}".format(safe_navman_goal))
         
-        # Send goal to movebase
-        # self.navigate_to_location(safe_movebase_goal)
+        # Send goal to navman
+        self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1]
-            publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
-            # self.show_vlmaps_results(mask_list,outputs,self.labels)
+            self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
 
     def move_between_objects(self, obj1, obj2,safe=False):
         """ Inferences over vlmaps and navigates between the two objects in the scene."""
@@ -228,18 +236,18 @@ class TestTaskPlanner:
 
         goals_vis.append(safe_goal2D)
 
-        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+        safe_navman_goal = convertToNavManGoals(safe_goal2D)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(safe_navman_goal))
+
+        self.navigate_to_location(safe_navman_goal)
 
         ##### Publish to Rviz for debugging #####
         if(self.show_vis):
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1,obj2]
-            publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
+            self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
             return
-        else:
-            self.navigate_to_location(safe_movebase_goal)
         
     def move_object_closest_to(self, obj1, obj2):
         """ Navigates to the object of category 'obj1' 
@@ -263,16 +271,21 @@ class TestTaskPlanner:
         # Postprocess the results
         outputs = postprocess_masks(masks,self.labels)
         safe_goal2D = self.find_closest_pair_2D_goal(outputs,obj1,obj2,safe=False)
-        safe_movebase_goal = convertToMovebaseGoals(safe_goal2D)
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to movebase {}".format(safe_movebase_goal))
+        safe_navman_goal = convertToNavManGoals(safe_goal2D)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(safe_navman_goal))
 
-        # Send goal to movebase
-        # self.navigate_to_location(safe_movebase_goal)
+        # Send goal to navman
+        self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
-            # labels of interest
+            # Publish markers
+            goals_vis = []
+            goals_vis.append(safe_goal2D)
+            publish_markers(goals_vis)
+            ## bug here: Will always publish the heatmap for largest object not closest one
+            ## TODO: ag6 - Fix this
             USEFUL_LABELS = [obj1,obj2]
-            publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
+            self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
 
     def find_closest_pair_2D_goal(self,results:dict,obj1:str,obj2:str,safe:False)-> tuple:
         """ Finds the object of category 'obj1' 
@@ -305,19 +318,24 @@ class TestTaskPlanner:
             X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z,ref_cost_min=10, ref_cost_max=50)
             rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {}".format(X,Y,Z))
 
+        else:
+            home_pos = self.home_pos
+            goal_des = (X,Y,Z)
+
+            if(obj1 in self.offsets.keys()):
+                radius = self.offsets[obj1]
+                X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100,radius=radius)
+            else:
+                X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100)
+
+            rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,obj1))
+
         theta_goal = self.find_theta(obj1)
         goal2D = (X,Y,theta_goal)
-
-        # Publish markers
-        if(self.show_vis):
-            goals_vis = []
-            goals_vis.append(goal2D)
-            goals_vis.append(goal2d_obj2)
-            publish_markers(goals_vis)
            
         return goal2D
 
-    def navigation_feedback(self, msg : MoveBaseFeedback):
+    def navigation_feedback(self, msg : NavManFeedback):
         self.position = msg.base_position.pose.position
         self.orientation = msg.base_position.pose.orientation
         
@@ -385,13 +403,11 @@ class TestTaskPlanner:
         # Vlmap to rtabmap world coordinate
         YY =0 # 2d navigation
         XX,ZZ = grid_id2pos(self.gs,self.cs,x,y)
-        print("XX,YY,ZZ: ", XX,YY,ZZ)
         pos_des_cam_frame = np.array([XX,YY,ZZ,1]).reshape(-1,1)
 
         # Position in world frame
         pos_des_world_frame = self.transform_to_world_frame(pos_des_cam_frame)
         assert pos_des_world_frame.shape == (4,1), "pos_des_world_frame should be of shape (4,1) but found {}".format(pos_des_world_frame.shape)
-
         X, Y ,Z = pos_des_world_frame[:3,0]
 
         return X,Y,Z
@@ -403,7 +419,6 @@ class TestTaskPlanner:
         #TODO: @ag6 - Get the initial pose of the robot and associated transforms from the vlmaps action server
 
         assert label in results.keys(), "Label {} not found in the results {}".format(label, results.keys())
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Running test goal")
 
         ### Get the largest bbox and find the centroid of the bbox
         mask = results[label]['mask'].astype(np.uint8)
@@ -416,8 +431,14 @@ class TestTaskPlanner:
             home_pos = self.home_pos
             # X, Y, Z = self.costmap_processor.findNearestSafePoint(X,Y,Z,ref_cost_min=10, ref_cost_max=15)
             # X, Y, Z = self.costmap_processor.findStraightLineSafePoint(goal_des,curr_pos,num_points=100,ref_cost_min=10, ref_cost_max=20)
-            X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100)
-            rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
+            if(label in self.offsets.keys()):
+                radius = self.offsets[label]
+                X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100,radius=radius)
+                rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
+
+            else:
+                X, Y, Z = self.findStraightLinePoint(goal_des,home_pos,num_points=100)
+                rospy.loginfo(f"[{rospy.get_name()}]:" +" Computed safe goal point: {}, {}, {} for label {}".format(X,Y,Z,label))
 
         theta = self.find_theta(label)
         goal2D = (X,Y,theta)
@@ -426,7 +447,7 @@ class TestTaskPlanner:
 
         return goal2D
     
-    def findStraightLinePoint(self, goal_des, curr_pos, num_points=100,radius = 1):
+    def findStraightLinePoint(self, goal_des, curr_pos, num_points=100,radius = 1.1):
         """Finds a point on the straight line connecting the goal and current position"""
 
         assert len(goal_des) == 3, "goal_des should be of length 3 but found {}".format(len(goal_des))
@@ -473,25 +494,47 @@ class TestTaskPlanner:
             res['z_locs'].append(Z)
             res['theta'].append(theta)
             res['areas'].append(centroids_dict['areas'][i])
-            rospy.loginfo(f"[{rospy.get_name()}]:" +" Area of mask: {}".format(centroids_dict['areas'][i]))
 
         return res
     
-    def navigate_to_location(self, goal:MoveBaseGoal):
+    def navigate_to_location(self, goal:NavManGoal):
         """Navigates to the given location"""
         self.navigation_client.send_goal(goal, feedback_cb = self.navigation_feedback)
         wait = self.navigation_client.wait_for_result()
 
         if self.navigation_client.get_state() != actionlib.GoalStatus.SUCCEEDED:
-            rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Failed to reach goal at X = {}, Y = {}".format(goal.x, goal.y))
             # cancel navigation
             self.navigation_client.cancel_goal()
-            self.publish_goal(False)
+            self.publish_result(False)
+    
             return False
         
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached goal at X = {}, Y = {}".format(goal.target_pose.pose.position.x, goal.target_pose.pose.position.y))
-        self.publish_goal(True)
+        rospy.loginfo(f"[{rospy.get_name()}]:" +"Reached goal at X = {}, Y = {}".format(goal.x, goal.y))
+        self.publish_result(True)
+     
         return True
+    
+    def publish_heatmap(self,heatmaps, labels, useful_labels):
+
+        height = heatmaps.shape[1]
+        width = heatmaps.shape[2]
+        heatmap_img = []
+        for idx,label in enumerate(labels):
+            if label in useful_labels:
+                heatmap_img.append(heatmaps[idx])
+
+        heatmap_img = np.mean(heatmap_img, axis=0,keepdims=False)
+        heatmap_img = np.reshape(heatmap_img, (height,width,3))
+        heatmap_img = np.uint8(heatmap_img)
+
+        heatmap_img_msg = self.bridge.cv2_to_imgmsg(heatmap_img, encoding="passthrough")
+
+        for i in range(5):
+            self.heatmap_pub.publish(heatmap_img_msg)
+            rospy.sleep(0.5)
+
+        return
     
     def show_vlmaps_results(self, mask_list, outputs, labels):
 
@@ -531,7 +574,6 @@ class TestTaskPlanner:
 
     def find_theta(self, label):
         """ Takes hardcoded orientations"""
-
         if (label in self.location_priors.keys()): # hardcoding the orientation for now
             theta = self.location_priors[label]['yaw']
             theta = np.deg2rad(theta)
@@ -604,6 +646,22 @@ def convertToMovebaseGoals(goals2D: tuple)-> MoveBaseGoal:
 
     return goal
 
+def convertToNavManGoals(goals2D: tuple)-> MoveBaseGoal:
+    """Converts 2D goals to movebase goals"""
+
+    assert isinstance(goals2D, tuple), "goals2D should be of type tuple but found {}".format(type(goals2D))
+    assert len(goals2D) == 3, "goals2D should be of length 3 (x,y,theta) but found {}".format(len(goals2D))
+
+    goal = NavManGoal()
+    goal.x = goals2D[0]
+    goal.y = goals2D[1]
+    goal.z=0
+    # NavMan takes in degrees
+    theta = math.degrees(goals2D[2])
+    goal.theta = theta
+
+    return goal
+
 def get_marker(pose: Pose, marker_id:int = 0):
     """Creates a marker message for visualization in rviz"""
 
@@ -649,32 +707,7 @@ def publish_markers(goals2D: list):
         marker_array_pub.publish(marker_array_msg)
         rospy.sleep(0.5)
 
-def publish_heatmap(heatmaps, labels, useful_labels):
 
-    height = heatmaps.shape[1]
-    width = heatmaps.shape[2]
-    heatmap_img = []
-    for idx,label in enumerate(labels):
-        if label in useful_labels:
-            heatmap_img.append(heatmaps[idx])
-
-    heatmap_img = np.mean(heatmap_img, axis=0,keepdims=False)
-    heatmap_img = np.reshape(heatmap_img, (height,width,3))
-
-    # Publish heatmap
-    heatmap_img_msg = sensor_msgs.msg.Image()
-    heatmap_img_msg.height = heatmap_img.shape[0]
-    heatmap_img_msg.width = heatmap_img.shape[1]
-    heatmap_img_msg.encoding = "bgr8"
-    heatmap_img_msg.is_bigendian = 0
-    heatmap_img_msg.data = heatmap_img.tostring()
-    heatmap_img_msg.step = len(heatmap_img_msg.data) // heatmap_img_msg.height
-
-    rospy.loginfo(f"[{rospy.get_name()}]:" +"Publishing heatmap")
-    heatmap_pub = rospy.Publisher('/heatmap', Image, queue_size=10)
-    heatmap_pub.publish(heatmap_img_msg)
-
-    return
 
 def read_home_pos(data_config_dir:str):
     """ Reads home amcl location from json file"""
@@ -690,23 +723,31 @@ def read_home_pos(data_config_dir:str):
 
     return home_pos
 
+def load_json(file_path:str):
+    """Loads json file"""
+
+    assert os.path.exists(file_path), "File not found at {}".format(file_path)
+    f = open(file_path)
+    data = json.load(f)
+    return data
+
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
-    obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table"]
+    obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table", "floor"]
 
     # go to object
-    for obj in obj_list:
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
-        task_planner.go_to_object(obj, None)
-        rospy.sleep(1)
+    # for obj in obj_list:
+    #     rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
+    #     task_planner.go_to_object(obj, None)
+    #     rospy.sleep(1)
     
     # task_planner.go_to_object("table")
     # task_planner.move_between_objects("sofa", "refrigerator")
     # task_planner.move_between_objects("sofa", "potted plant")
     # task_planner.move_between_objects("potted plant", "table")
     # task_planner.move_between_objects("table", "sink")
-    # task_planner.move_object_closest_to("table", "sofa")
+    task_planner.move_object_closest_to("table", "sofa")
 
     # rospy.sleep(2)
     try:
