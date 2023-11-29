@@ -88,9 +88,14 @@ class FindAndAlignManager():
             box_classes = np.array(msg['box_classes']).astype(np.uint8)
             for clas in box_classes:
                 list_of_objects.append(self.class_list[clas])
+            rospy.sleep(1)
 
         list_of_objects = list(set(list_of_objects))
         result.list_of_objects = list_of_objects
+        if not goal.get_surface:
+            if "surface" in list_of_objects:
+                list_of_objects.remove("surface")
+            
         rospy.loginfo("Got objects: " + str(list_of_objects))
         self.detic_request_server.set_succeeded(result)
     

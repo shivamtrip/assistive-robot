@@ -616,7 +616,7 @@ class SceneParser:
         
         return marker
     
-    def capture_shot(self, publish = False):
+    def capture_shot(self, publish = False, use_detic = False):
         rospy.sleep(0.1)
         extrinsics = self.get_transform('camera_color_optical_frame', 'base_link')
         extrinsics = np.concatenate((extrinsics, np.array([[0, 0, 0, 1]])), axis=0)
@@ -630,6 +630,8 @@ class SceneParser:
                 mtype = Marker.SPHERE
             )
             self.marker_pub.publish(marker)
+            
+        self.get_detic_detections()
 
         depthimg = self.depth_image.copy()
         rgbimg = self.color_image.copy()  
@@ -973,19 +975,23 @@ class SceneParser:
                 x1, y1, x2, y2 =  result
                 self.ws_mask = seg_mask 
                 rospy.loginfo("Object found")
-        
+        else:
+            self.ws_mask = np.zeros_like(self.depth_image)
+            
+
         object_publisher = None
         scene_publisher = None
         if publish_object:
             object_publisher = self.obj_cloud_pub
         if publish_scene:
             scene_publisher = self.scene_cloud_pub
-            
+
+
         self.object_points = self.get_point_cloud_o3d(ws_mask = self.ws_mask, publisher = object_publisher)
-        
+
         no_object_mask = np.ones_like(self.depth_image) - self.ws_mask
         self.scene_points = self.get_point_cloud_o3d(ws_mask = no_object_mask, publisher = scene_publisher)
-        
+
         if visualize:
             scene_pcd = o3d.geometry.PointCloud()
             scene_pcd.points = o3d.utility.Vector3dVector(self.object_points)
@@ -1140,9 +1146,9 @@ if __name__ == "__main__":
     parser = SceneParser()
     # parser.set_parse_mode("YOLO", 9)
     
-    # for i in range(100):
-    #     parser.get_detic_detections()
-    #     rospy.sleep(1)
+    for i in range(100):
+        parser.get_detic_detections()
+        rospy.sleep(1)
     rospy.spin()
     # idx = str(12).zfill(6)
     

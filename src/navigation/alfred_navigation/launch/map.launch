@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+  <arg 
+    name="map_yaml" doc="filepath to previously captured map (required)" 
+    default="/home/hello-robot/alfred-autonomy/src/navigation/alfred_navigation/config/maps/ai_ms.yaml"
+  /> 
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_yaml)" />
+
+</launch>

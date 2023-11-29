@@ -50,8 +50,7 @@ class PlaceManager():
                 'base_rotate;by': base_rotate,
             }
         )
-        if base_rotate != 0:
-            rospy.sleep(5)
+        rospy.sleep(5)
 
         if location is not None:
             rospy.loginfo("Placing at location: {}".format(location))
@@ -59,10 +58,16 @@ class PlaceManager():
         else:
             if not fixed_place:
                 rospy.loginfo("Scanning for planes")
-                self.scene_parser.set_point_cloud(publish = True) #converts depth image into point cloud
+                self.scene_parser.set_point_cloud(publish_object = False, get_object = False, publish_scene = False) #converts depth image into point cloud
                 plane = self.scene_parser.get_plane(publish = True)
-                placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
-                rospy.loginfo("Obtained placing location: {}".format(placingLocation))
+                if plane is not None:
+                    placingLocation = self.scene_parser.get_placing_location(plane, self.heightOfObject, publish = True)
+                    rospy.loginfo("Obtained placing location: {}".format(placingLocation))
+                else:
+                    rospy.loginfo("No plane detected, using fixed placing location")
+                    placingLocation = np.array([
+                        0.0, 0.7, 0.9
+                    ])
             else:
                 placingLocation = np.array([
                     0.0, 0.7, 0.9

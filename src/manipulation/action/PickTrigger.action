@@ -1,5 +1,6 @@
 #input  
 int64 objectId
+bool use_planner
 ---
 #output
 float64 heightOfObject

@@ -1,5 +1,6 @@
 #!/usr/local/lib/robot_env/bin/python3
 
+import base64
 import json
 import os
 import random
@@ -86,6 +87,15 @@ class HRI():
         self.update_param("hri_params/response", "")
         self.update_param("hri_params/ack", "")
         self.update_param("visualization/code", "")
+        self.update_param("visualization/active_primitive")
+
+    def encode_code(self):
+        code_bytes = self.code.encode("ascii") 
+        
+        base64_bytes = base64.b64encode(code_bytes) 
+        base64_string = base64_bytes.decode("ascii") 
+        
+        return base64_string
 
     def wakeword_triggered(self):
         self.clear_params()
@@ -118,7 +128,7 @@ class HRI():
         #     return
         if primitive == "code":
             self.code = response
-            self.update_param("visualization/code", self.code)
+            self.update_param("visualization/code", self.encode_code())
             self.responseGenerator.run_tts("I think I know what to do...")
             self.wakeword_detector.startRecorder()
             # response, primitive = self.responseGenerator.processQuery("summarize the generated code in 1 sentence.")
@@ -151,7 +161,7 @@ class HRI():
         task = PlanTriggerGoal(plan = self.code )
         self.command_action_client.send_goal(task)
         self.wakeword_detector.startRecorder()
-        self.clear_params()
+        # self.clear_params()
 
 
     def run(self):

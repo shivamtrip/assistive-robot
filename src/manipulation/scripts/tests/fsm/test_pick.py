@@ -19,6 +19,7 @@ import json
 from control_msgs.msg import FollowJointTrajectoryAction
 from plane_detector.msg import PlaneDetectAction, PlaneDetectResult, PlaneDetectGoal
 from helpers import move_to_pose
+from manipulation.msg import FindAlignAction, FindAlignResult, FindAlignGoal
 
 from fsm import ManipulationManager
 
@@ -54,8 +55,8 @@ from fsm import ManipulationManager
 if __name__ == '__main__':
     from std_srvs.srv import Trigger, TriggerResponse
     
-    node = ManipulationManager()
-    
+    # node = ManipulationManager()
+    rospy.init_node("test")
     
     startManipService = rospy.ServiceProxy('/switch_to_manipulation_mode', Trigger)
     startManipService.wait_for_service()
@@ -76,9 +77,19 @@ if __name__ == '__main__':
     drawer_client = actionlib.SimpleActionClient('drawer_action', DrawerTriggerAction)
     drawer_client.wait_for_server()
     
+    align_client = actionlib.SimpleActionClient('find_align_action', FindAlignAction)
+    align_client.wait_for_server()
+    
+    goal = FindAlignGoal()
+    goal.objectId = 10
+    
+    align_client.send_goal(goal)
+    align_client.wait_for_result()
+    
+    
     goal = PickTriggerGoal()
-    goal.objectId = 9
-    # goal.use_planner = False
+    goal.objectId = 10
+    goal.use_planner = False
 
     pick_client.send_goal(goal)
     pick_client.wait_for_result()

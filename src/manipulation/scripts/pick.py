@@ -71,7 +71,6 @@ class PickManager():
                     moveUntilContact = self.isContactDict[self.label2name[objectId]]
                 ) 
             
-            manip_method
             success = self.scene_parser.is_grasp_success()
             return success
         return False
@@ -80,7 +79,7 @@ class PickManager():
         starttime = time.time()
         self.goal = goal
         self.scene_parser.set_parse_mode("YOLO", goal.objectId)
-        success = self.pick(goal.objectId)
+        success = self.pick(goal.objectId, goal.use_planner)
         rospy.loginfo("Pick action took " + str(time.time() - starttime) + " seconds.")
         result = PickTriggerResult()
         result.success = success
