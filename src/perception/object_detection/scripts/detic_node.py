@@ -175,7 +175,7 @@ class DeticNode:
             cls = classes[i]
             vizimg = cv2.rectangle(vizimg, (int(b[0]),int(b[1])),(int(b[2]),int(b[3])) , (255,0,0), 2)
             
-            vizimg = cv2.putText(vizimg, str(self.class_list[cls]),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
+            vizimg = cv2.putText(vizimg, str(self.class_list[cls]) + "|" + str(cls),(int(b[0]),int(b[1])),  cv2.FONT_HERSHEY_SIMPLEX, 
                         0.5, (0,0,255), 1, cv2.LINE_AA)
 
         

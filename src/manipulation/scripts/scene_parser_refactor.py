@@ -664,7 +664,50 @@ class SceneParser:
             'base_link_point' : []
         }
         
+        final_msg = {
+            "boxes" : [],
+            "box_classes" : [],
+            'confidences' : [],
+            "radii" : [],
+            'base_link_point' : []
+        }
+        
         for i in range(num_detections):
+            box = np.squeeze(msg['boxes'][i]).astype(int)
+            confidence = np.squeeze(msg['confidences'][i])
+            x1, y1, x2, y2 =  box
+            crop = self.depth_image[y1 : y2, x1 : x2]
+            
+            instance_id = i + 1
+            
+            mask = self.bridge.imgmsg_to_cv2(detection.seg_mask, desired_encoding="passthrough")
+            mask = np.array(mask).copy()
+            
+            mask[mask != instance_id] = 0
+            mask[mask == instance_id] = 1
+            z_f = np.median(crop[crop != 0])/1000.0
+
+            x_f = (x1 + x2)/2
+            y_f = (y1 + y2)/2
+            
+            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
+            x, y, z = point.x, point.y, point.z
+
+            radius = np.sqrt(x**2 + y**2)
+            
+            msg['base_link_point'].append([x, y, z])
+            msg['radii'].append(radius)
+            if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
+                final_msg['boxes'].append([x1, y1, x2, y2])
+                final_msg['box_classes'].append(msg['box_classes'][i])
+                final_msg['confidences'].append(msg['confidences'][i])
+                final_msg['radii'].append(msg['radii'][i])
+                final_msg['base_link_point'].append(msg['base_link_point'][i])
+        # print(msg['box_classes'])
+        # print(np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId))
+        loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
+        if len(loc) > 0:
+            loc = loc[0]
             box = np.squeeze(msg['boxes'][loc]).astype(int)
             confidence = np.squeeze(msg['confidences'][loc])
             x1, y1, x2, y2 =  box
@@ -677,37 +720,11 @@ class SceneParser:
             
             mask[mask != instance_id] = 0
             mask[mask == instance_id] = 1
-            z_f = np.median(crop[crop != 0])/1000.0
             
+            z_f = np.median(crop[crop != 0])/1000.0
             x_f = (x1 + x2)/2
             y_f = (y1 + y2)/2
-            
-            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
-            x, y, z = point.x, point.y, point.z
-            msg['base_link_point'].append([x, y, z])
 
-            radius = np.sqrt(x**2 + y**2)
-            msg['radii'].append(radius)
-            
-        loc = np.where(np.array(msg['box_classes']).astype(np.uint8) == self.objectId)[0]
-        if len(loc) > 0:
-            loc = loc[0]
-            box = np.squeeze(msg['boxes'][loc]).astype(int)
-            confidence = np.squeeze(msg['confidences'][loc])
-            # x1, y1, x2, y2 =  box
-            # crop = self.depth_image[y1 : y2, x1 : x2]
-            
-            # instance_id = loc + 1
-            
-            # mask = self.bridge.imgmsg_to_cv2(detection.seg_mask, desired_encoding="passthrough")
-            # mask = np.array(mask).copy()
-            
-            # mask[mask != instance_id] = 0
-            # mask[mask == instance_id] = 1
-            # z_f = np.median(crop[crop != 0])/1000.0
-            
-            # x_f = (x1 + x2)/2
-            # y_f = (y1 + y2)/2
             
             viz = self.color_image.copy().astype(np.float32)
             viz /= np.max(viz)
@@ -720,8 +737,8 @@ class SceneParser:
             cv2.imwrite('/home/hello-robot/alfred-autonomy/src/manipulation/scripts/detic.png', viz)
             self.prevtime = time.time()
         
-            # point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
-            # x, y, z = point.x, point.y, point.z
+            point = self.convertPointToFrame(x_f, y_f, z_f, "base_link")
+            x, y, z = point.x, point.y, point.z
 
             self.tf_broadcaster.sendTransform(msg['base_link_point'][loc],
                 tf.transformations.quaternion_from_euler(0, 0, 0),
@@ -729,16 +746,13 @@ class SceneParser:
                 "object_pose",
                 "base_link"
             )
-            x, y, z = msg['base_link_point'][loc]
-            x1, y1, x2, y2 = msg['boxes'][loc]
-            radius = msg['radii'][loc]            
-            # radius = np.sqrt(x**2 + y**2)
+            radius = np.sqrt(x**2 + y**2)
             confidence /= radius
             
             if (z > self.object_filter['height']  and radius < self.object_filter['radius']): # to remove objects that are not in field of view
-                return [x1, y1, x2, y2], mask, msg, True
+                return [x1, y1, x2, y2], mask, final_msg, True
                 
-        return None, None, msg, False
+        return None, None, final_msg, False
     
     def get_point_cloud_from_image(self, depth_image, rgb_image, workspace_mask):
         """
@@ -944,6 +958,7 @@ class SceneParser:
             if not success:
                 self.object_points = None
                 self.scene_points = None
+                rospy.loginfo("No object found")
                 return
                 # if self.current_detection:
                 #     x1, y1, x2, y2 =  np.array(self.current_detection).astype(int)
@@ -957,6 +972,7 @@ class SceneParser:
             else:
                 x1, y1, x2, y2 =  result
                 self.ws_mask = seg_mask 
+                rospy.loginfo("Object found")
         
         object_publisher = None
         scene_publisher = None
@@ -1122,7 +1138,11 @@ if __name__ == "__main__":
     rospy.init_node("scene_parser")
     import json
     parser = SceneParser()
+    # parser.set_parse_mode("YOLO", 9)
     
+    # for i in range(100):
+    #     parser.get_detic_detections()
+    #     rospy.sleep(1)
     rospy.spin()
     # idx = str(12).zfill(6)
     

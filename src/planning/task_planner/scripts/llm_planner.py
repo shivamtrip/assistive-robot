@@ -290,6 +290,7 @@ class TaskPlanner:
     
     def run_plan(self, plan):
         rospy.loginfo("Executing plan")
+        
         plan += """\nexecute_plan(
             self.go_to, 
             self.move_between_objects, 
@@ -303,6 +304,7 @@ class TaskPlanner:
         )
         """
         exec(plan)
+        self.speak("task completed.")
         
         
 
