@@ -93,10 +93,17 @@ class TaskPlanner:
         self.drawer_location = None
 
         rospy.loginfo( "Task planner ready to accept inputs...")
+
+    def update_param(self, param_path, param_value):
+        req = UpdateParamRequest(
+            path = param_path,
+            value = param_value
+        )
+        self.update_param_service(req)
     
     def execute(self, planGoal: PlanTriggerGoal):
         rospy.loginfo("Received plan")
-        self.execute_plan(planGoal.plan)
+        self.run_plan(planGoal.plan)
         result = PlanTriggerResult()
         
         success = True
@@ -122,11 +129,10 @@ class TaskPlanner:
         
     def place(self, surface):
         self.switch_to_manip_mode()
-        place_location = place_location
         fixed_place = False
         use_place_location = False
         is_rotate = False
-        
+        place_location = []
         if surface == "drawer":
             self.speak("Placing inside drawer.")
             place_location = [
@@ -137,13 +143,13 @@ class TaskPlanner:
             fixed_place = False
             use_place_location = True
             is_rotate = False
-        self.speak("Placing on surface.")
+
         goal = PlaceTriggerGoal(
-            surface = surface,
+            place_location = place_location,
             fixed_place = fixed_place,
             use_place_location = use_place_location,
             is_rotate = is_rotate
-            
+
         )
         self.place_client.send_goal(goal)
         self.place_client.wait_for_result()
@@ -160,7 +166,7 @@ class TaskPlanner:
         
         self.speak("Going to " + natural_name)
 
-        if location == "drawer":
+        if natural_name == "drawer":
             natural_name = 'potted plant'
         
         goal = VLMaps_primitiveGoal(
@@ -179,11 +185,14 @@ class TaskPlanner:
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
         self.speak("Moving between" + natural_name_1 + " and " + natural_name_2)
-        
+        if natural_name_1 == "drawer":
+            natural_name_1 = "potted plant"
+        if natural_name_2 == "drawer":
+            natural_name_2 = "potted plant"
         goal = VLMaps_primitiveGoal(
             primitive = "move_between_objects",
-            obj1 = loc1,
-            obj2 = loc2,
+            obj1 = natural_name_1,
+            obj2 = natural_name_2,
         )
         
         self.vlmaps_client.send_goal(goal)
@@ -196,10 +205,15 @@ class TaskPlanner:
         natural_name_1 = loc1.replace("_", " ")
         natural_name_2 = loc2.replace("_", " ")
         self.speak("Going to " + natural_name_1 + " closest to " + natural_name_2)
+        
+        if natural_name_1 == "drawer":
+            natural_name_1 = "potted plant"
+        if natural_name_2 == "drawer":
+            natural_name_2 = "potted plant"
         goal = VLMaps_primitiveGoal(
             primitive = "move_object_closest_to",
-            obj1 = loc1,
-            obj2 = loc2,
+            obj1 = natural_name_1,
+            obj2 = natural_name_2,
         )
         
         self.vlmaps_client.send_goal(goal)
@@ -252,8 +266,7 @@ class TaskPlanner:
         self.detic_request_client.wait_for_result()
         result : DeticRequestResult = self.detic_request_client.get_result()
         list_of_objects = result.list_of_objects
-        list_of_objects = []
-        
+
         if len(list_of_objects) == 0:
             strtospk = "I don't see anything."
         else:
@@ -275,9 +288,22 @@ class TaskPlanner:
         )
         self.tts_request_client(req)
     
-    def execute_plan(self, plan):
+    def run_plan(self, plan):
         rospy.loginfo("Executing plan")
+        plan += """\nexecute_plan(
+            self.go_to, 
+            self.move_between_objects, 
+            self.move_object_closest_to, 
+            self.pick, self.place, 
+            self.open_drawer, 
+            self.close_drawer, 
+            self.find_and_align_to_object, 
+            self.get_detections, 
+            self.speak
+        )
+        """
         exec(plan)
+        
         
 
 if __name__ == "__main__":

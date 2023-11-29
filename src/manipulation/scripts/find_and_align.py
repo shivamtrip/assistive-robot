@@ -15,6 +15,9 @@ import time
 import actionlib
 import open3d as o3d
 
+from yolo.msg import DeticDetectionsGoal, DeticDetectionsAction, DeticDetectionsActionResult
+from manipulation.msg import DeticRequestAction, DeticRequestGoal, DeticRequestResult
+
 class FindAndAlignManager():
     def __init__(self, scene_parser : SceneParser, trajectory_client, manipulation_methods : ManipulationMethods, planner):
         self.node_name = 'pick_manager'
@@ -46,16 +49,51 @@ class FindAndAlignManager():
         self.head_tilt_angle_search = rospy.get_param('/manipulation/head_tilt_angle_search')
         self.head_tilt_angle_grasp = rospy.get_param('/manipulation/head_tilt_angle_grasp')
         
-        # self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
-        # rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
-        # self.navigation_client.wait_for_server()
+        self.navigation_client = actionlib.SimpleActionClient('nav_man', NavManAction)
+        rospy.loginfo(f"[{rospy.get_name()}]:" + "Waiting for Navigation Manager server...")
+        self.navigation_client.wait_for_server()
         
+        
+        self.detic_request_server = actionlib.SimpleActionServer(
+            'detic_request_scene_parser', 
+            DeticRequestAction, 
+            execute_cb=self.detic_request_callback, 
+            auto_start = True
+        )
         
         self.class_list = rospy.get_param('/object_detection/class_list')
         self.label2name = {i : self.class_list[i] for i in range(len(self.class_list))}
         self.server.start()
         
         rospy.loginfo("Loaded FindAndAlignManager")    
+    
+    def detic_request_callback(self, goal : DeticRequestGoal):
+        rospy.loginfo("DETIC callback requested")
+        result = DeticRequestResult()
+        list_of_objects = []
+        
+        move_to_pose(self.trajectory_client, {
+            'head_tilt;to' : - self.head_tilt_angle_grasp * np.pi/180,
+            'head_pan;to' : self.vs_range[0],
+        })
+        rospy.sleep(2)
+        
+        for i, angle in enumerate(np.linspace(-np.pi/2, np.pi/2, 5)):
+            rospy.loginfo("Rotating head to angle: " + str(angle))
+            move_to_pose(self.trajectory_client, {
+                'head_pan;to' : angle,
+            })
+            rospy.sleep(2) #settling time.
+            _, _, msg, _ = self.scene_parser.get_detic_detections()
+            box_classes = np.array(msg['box_classes']).astype(np.uint8)
+            for clas in box_classes:
+                list_of_objects.append(self.class_list[clas])
+
+        list_of_objects = list(set(list_of_objects))
+        result.list_of_objects = list_of_objects
+        rospy.loginfo("Got objects: " + str(list_of_objects))
+        self.detic_request_server.set_succeeded(result)
+    
     
     def find_renav_location(self):
         rospy.loginfo(f"Finding and orienting to object")
@@ -103,7 +141,7 @@ class FindAndAlignManager():
             self.scene_parser.clear_observations()
             nRotates += 1
             if nRotates >= self.recoveries['n_scan_attempts']:
-                return False
+                return None, None,  False
             
     def align_to_object_for_manipulation(self, object_location):
         x, y, z, theta = object_location

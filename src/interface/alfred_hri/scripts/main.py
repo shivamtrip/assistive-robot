@@ -85,13 +85,14 @@ class HRI():
         self.update_param("hri_params/command", "")
         self.update_param("hri_params/response", "")
         self.update_param("hri_params/ack", "")
+        self.update_param("visualization/code", "")
 
     def wakeword_triggered(self):
         self.clear_params()
         self.update_param("hri_params/wakeword", "1")
 
         # self.startedListeningService()
-        # self.speech_recognition.suppress_noise()
+        self.speech_recognition.suppress_noise()
         ack = self.triggerWakewordThread()
         
         self.update_param("hri_params/ack", ack)
@@ -117,22 +118,25 @@ class HRI():
         #     return
         if primitive == "code":
             self.code = response
-            self.responseGenerator.run_tts("I think i know what to do...")
+            self.update_param("visualization/code", self.code)
+            self.responseGenerator.run_tts("I think I know what to do...")
             self.wakeword_detector.startRecorder()
-            response, primitive = self.responseGenerator.processQuery("summarize the generated code in 1 sentence.")
-            self.responseGenerator.run_tts(response)
-            self.responseGenerator.run_tts("Shall I execute this plan?")
-            text = self.speech_recognition.speech_to_text()
-            response, primitive = self.responseGenerator.processQuery(text)
-            if 'affirm' == primitive:
-                phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
-                self.responseGenerator.run_tts(random.choice(phrases))
-            else:
-                self.code = ""
-                phrases = ["Closing the task", "Ok, I won't do that", "Ok, I'll stop", "Ok, I'll stop doing that"]
-                self.responseGenerator.run_tts(random.choice(phrases))
-                self.wakeword_detector.startRecorder()
-                return 
+            # response, primitive = self.responseGenerator.processQuery("summarize the generated code in 1 sentence.")
+            # self.responseGenerator.run_tts(response)
+            # self.speech_recognition.suppress_noise()
+            # self.responseGenerator.run_tts("Shall I execute this plan?")
+            # text = self.speech_recognition.speech_to_text()
+            # response, primitive = self.responseGenerator.processQuery(text)
+            # if 'affirm' == primitive:
+            #     phrases = ["Ok", "Okay", "Sure", "Alright", "I'll do that"]
+            #     self.responseGenerator.run_tts(random.choice(phrases))
+            # else:
+            #     self.code = ""
+            #     self.update_param("visualization/code", "")
+            #     phrases = ["Closing the task", "Ok, I won't do that", "Ok, I'll stop", "Ok, I'll stop doing that"]
+            #     self.responseGenerator.run_tts(random.choice(phrases))
+            #     self.wakeword_detector.startRecorder()
+            #     return 
         else:
             self.wakeword_detector.startRecorder()
             return 
