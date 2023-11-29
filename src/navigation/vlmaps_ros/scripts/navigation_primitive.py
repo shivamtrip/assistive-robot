@@ -188,14 +188,14 @@ class TestTaskPlanner:
         rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to Nav Man{}".format(safe_navman_goal))
         
         # Send goal to navman
-        # status = self.navigate_to_location(safe_navman_goal)
+        status = self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1]
             self.publish_heatmap(heatmaps, self.labels, USEFUL_LABELS)
-        status = True
+    
         return status
 
     def move_between_objects(self, obj1, obj2,safe=False):
@@ -733,13 +733,13 @@ def load_json(file_path:str):
 if __name__ == "__main__":
     task_planner = TestTaskPlanner()
 
-    obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table", "floor"]
+    # obj_list = ["sofa", "potted plant", "sink", "refrigerator", "table", "floor"]
 
-    # go to object
-    for obj in obj_list:
-        rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
-        task_planner.go_to_object(obj, None)
-        rospy.sleep(1)
+    # # go to object
+    # for obj in obj_list:
+    #     rospy.loginfo(f"[{rospy.get_name()}]:" +"Going to object {}".format(obj))
+    #     task_planner.go_to_object(obj, None)
+    #     rospy.sleep(1)
     
     # task_planner.go_to_object("table")
     # task_planner.move_between_objects("sofa", "refrigerator")
