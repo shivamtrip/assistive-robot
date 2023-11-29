@@ -1,6 +1,5 @@
 #!/home/abhinav/miniconda3/envs/vlmaps/bin/python3
 #Author: Abhinav Gupta
-
 #
 # Copyright (C) 2023 Auxilio Robotics
 # 
