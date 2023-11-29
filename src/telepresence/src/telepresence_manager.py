@@ -14,7 +14,9 @@ import actionlib
 from visual_servoing import AlignToObject
 from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, TriggerGoal
 from human_detection import HumanDetector
+from teleoperation import TeleopController
 from std_msgs.msg import Bool
+from alfred_msgs.msg import TeleopCommands
 
 
 class State(Enum):
@@ -57,8 +59,11 @@ class TelepresenceManager():
 
         self.human_detector = HumanDetector()
         self.visual_servoing = AlignToObject(self.trajectoryClient, self.human_detector)
+        self.teleop_controller = TeleopController(self.trajectoryClient, self.visual_servoing)
 
         self.tele_man_server = actionlib.SimpleActionServer('telepresence_manager', TriggerAction, execute_cb=self.main, auto_start=False)
+        self.teleop_command_subscriber = rospy.Subscriber('teleop_command_info', TeleopCommands, self.get_teleop_commands)
+        self.teleop_status_control_sub = rospy.Subscriber('teleop_status_control', Bool, self.teleop_status_control)
         self.tele_man_result = TriggerResult()
         self.tele_man_server.start()
 
@@ -66,60 +71,84 @@ class TelepresenceManager():
 
 
 
+    def get_teleop_commands(self, teleop_commands):
+        self.teleop_controller.teleop_commands = teleop_commands 
+
+
+    def teleop_status_control(self, msg):
+        
+        if msg.data == True:
+            self.perform_teleop = True
+        else:
+            self.perform_teleop = False
+
+
     def main(self,  goal: TriggerGoal):
         
         print("Telepresence Manager received goal from Mission Planner")
 
+        if goal.isTeleop:
+            
+            print("Teleop Capability ENABLED")
+            
+            while self.perform_teleop == True:
+                self.teleop_controller.maintainvelocities()
+                
+            print("Teleop Capability DISABLED")
+            self.tele_man_result.success = True
+            self.tele_man_server.set_succeeded(self.tele_man_result)
+            print("Successfully completed Telepresence!")
+            return True
+            
+        else:
 
-        self.yolo_status_control_pub.publish(True)      
-    
+            self.yolo_status_control_pub.publish(True)     
+            self.human_detector.objectId = goal.objectId
 
-        self.human_detector.objectId = goal.objectId
+            self.current_state = State.SEARCH
+            self.num_retries = 0
 
-        self.current_state = State.SEARCH
-        self.num_retries = 0
+            while self.current_state != State.COMPLETE and not rospy.is_shutdown():
 
-        while self.current_state != State.COMPLETE and not rospy.is_shutdown():
+                self.prev_state = self.current_state
 
-            self.prev_state = self.current_state
+                if self.current_state == State.SEARCH:
+                    success = self.visual_servoing.findAndOrientToObject()                
+                    self.current_state = State.MOVE_TO_OBJECT if success else State.FAILED
 
-            if self.current_state == State.SEARCH:
-                success = self.visual_servoing.findAndOrientToObject()                
-                self.current_state = State.MOVE_TO_OBJECT if success else State.FAILED
+                elif self.current_state == State.MOVE_TO_OBJECT:
+                    rospy.sleep(5)
+                    success = self.visual_servoing.moveTowardsObject()
+                    self.current_state = State.COMPLETE if success else State.FAILED
 
-            elif self.current_state == State.MOVE_TO_OBJECT:
-                rospy.sleep(5)
-                success = self.visual_servoing.moveTowardsObject()
-                self.current_state = State.COMPLETE if success else State.FAILED
-
-            rospy.loginfo(f"Completed {self.prev_state.name}. Will now do {self.current_state.name}")
-            rospy.sleep(2)
+                rospy.loginfo(f"Completed {self.prev_state.name}. Will now do {self.current_state.name}")
+                rospy.sleep(2)
 
 
-            if self.current_state == State.FAILED:
-                # Stop ArUco detector
-                print("Stopping Alignment to User")
+                if self.current_state == State.FAILED:
+                    # Stop ArUco detector
+                    print("Stopping Alignment to User")
 
-                if self.num_retries > 5:
-                    self.human_detector.objectId = None
-                    self.yolo_status_control_pub.publish(False)
-                    
-                    print(f"Aligning to user failed during the {self.prev_state.name} state.")
-                    self.tele_man_result.success = False
-                    self.tele_man_server.set_succeeded(self.tele_man_result)
-                    return False
+                    if self.num_retries > 5:
+                        self.human_detector.objectId = None
+                        self.yolo_status_control_pub.publish(False)
+                        
+                        print(f"Aligning to user failed during the {self.prev_state.name} state.")
+                        self.tele_man_result.success = False
+                        self.tele_man_server.set_succeeded(self.tele_man_result)
+                        return False
 
-                self.num_retries += 1
-                self.current_state = State.SEARCH 
+                    self.num_retries += 1
+                    self.current_state = State.SEARCH 
 
-        # Stop ArUco detector
-        print("Stopping Alignment to User")
-        self.yolo_status_control_pub.publish(False)
-        self.human_detector.objectId = None
-        self.tele_man_result.success = True
-        self.tele_man_server.set_succeeded(self.tele_man_result)
-        print("Successfully completed Telepresence!")
-        return True
+            # Stop ArUco detector
+            print("Stopping Alignment to User")
+            self.yolo_status_control_pub.publish(False)
+            self.human_detector.objectId = None
+            self.tele_man_result.success = True
+            self.tele_man_server.set_succeeded(self.tele_man_result)
+            return True
+
 
 
 if __name__ == "__main__":

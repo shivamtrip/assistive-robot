@@ -113,27 +113,27 @@
         "status": {
             "battery_percent": 0,
             "current_task": {
-                "object_type": "",
+                "object_type": "BOTTLE",
                 "relative_name": "",
                 "resident_name": "Mary",
                 "room_number": "202",
-                "task_type": "VIDEOCALL"
+                "task_type": "DELIVERY"
             },
-            "global_state": "ALIGN_TO_USER",
+            "global_state": "NAVIGATION_TO_PICK",
             "hri_params": {
                 "emotion": "HAPPY",
                 "music": ""
             },
-            "last_update": 1701152820.3677995,
+            "last_update": 1701246143.5026329,
             "operation_mode": "AUTONOMOUS"
         },
         "teleop_commands": {
-            "last_command_stamp": 0,
+            "last_command_stamp": 1701201954.9,
             "manipulator": {
                 "gripper_open": false,
                 "vel_extend": 0,
                 "vel_lift": 0,
-                "yaw_position": 0
+                "yaw_position": -35
             },
             "mobile_base": {
                 "veltheta": 0,

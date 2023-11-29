@@ -9,11 +9,11 @@ from manipulation.msg import TriggerAction, TriggerFeedback, TriggerResult, Trig
 import rospkg
 import os
 import json
-# from visual_servoing import AlignToObject
+from std_msgs.msg import Bool
+
 
 
 class TaskExecutor:
-
 
     def __init__(self):
 
@@ -51,6 +51,8 @@ class TaskExecutor:
         self.telepresence_client.wait_for_server()
 
         self.heightOfObject = 0.84 # change this to a local variable later on 
+
+        self.teleop_status_control_pub = rospy.Publisher('teleop_status_control', Bool, queue_size=10)
 
 
         self.stow_robot_service()
@@ -97,20 +99,19 @@ class TaskExecutor:
 
     
 
-    def manipulate_object(self, object, isPick = True):
+    def manipulate_object(self, object, aruco_id, isPick = True):
 
         self.startManipService()
 
         rospy.loginfo("Task Executor starting manipulation, going to perform object" + (" picking" if isPick else " placing"))
         rospy.loginfo("Manipulating {}".format(object.name))
         # send goal
-        goalObject = object.value
-        if not isPick:
-            goalObject = 60 #table
 
         goal = TriggerGoal()
         goal.isPick = isPick
-        goal.objectId = goalObject
+        goal.objectId = aruco_id
+        if not isPick:
+            goal.objectId = 1           # Aruco ID for all placing arucos is 1
         self.manipulation_client.send_goal(goal, feedback_cb = self.dummy_cb)
         print("Task Executor has sent goal to Manipulation Manager")
         self.manipulation_client.wait_for_result()
@@ -127,7 +128,6 @@ class TaskExecutor:
 
 
 
-
     def align_to_user(self, user_id):
         
         self.startManipService()
@@ -140,12 +140,18 @@ class TaskExecutor:
         print("Task Executor received result from Telepresence Manager")
         result: TriggerResult = self.telepresence_client.get_result()
 
-        if(result.success):
-            rospy.loginfo("Manipulation complete")
+        return result.success
 
 
+    def start_teleop(self):
+            self.startManipService()
+            self.teleop_status_control_pub.publish(True)
 
 
+    def stop_teleop(self):
+        self.teleop_status_control_pub.publish(False)
+
+    
     def dummy_cb(self, msg):
         
         return

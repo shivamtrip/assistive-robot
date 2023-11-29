@@ -17,6 +17,7 @@ from task_executor import TaskExecutor
 from state_manager import BotState, TaskType, Emotions, LocationOfInterest, GlobalStates, ObjectOfInterest, VerbalResponseStates, OperationModes
 import time
 from sensor_msgs.msg import BatteryState
+from std_msgs.msg import String
 
 
 class Mission_Planner():
@@ -28,26 +29,30 @@ class Mission_Planner():
         self.task_queue = deque()
 
         self.count = 0
+        self.initial_num_of_bottles = 2
+        self.num_bottles_delivered = 0
+        self.cur_bottle_id = 0
         
         self.TaskExecutor = TaskExecutor()
         self.bot_state = BotState()
 
         self.task_listener = rospy.Subscriber('deployment_task_info', DeploymentTask, self.allocate_task)       
         self.battery_sub = rospy.Subscriber('/battery', BatteryState, self.health_manager)
+        self.state_listener = rospy.Subscriber('deployment_state_info', String, self.get_operation_mode) 
 
         self.status_publisher = rospy.Publisher('system_status_info', StatusMessage, queue_size=10)
-
+        self.video_call_enabled = False
 
         self.current_task_type = ""
         self.current_task_room = ""
         self.current_task_resident = ""
         self.current_task_object = ""
         self.current_task_relative = ""
+        self.current_operation_mode = OperationModes.AUTONOMOUS.name
 
 
         rospy.sleep(0.5)
         self.update_mission_status(GlobalStates.IDLE)
-        
 
         print("Mission Planner initialized..")
     
@@ -91,7 +96,24 @@ class Mission_Planner():
         self.status_update_to_interface_manager()
 
 
-    
+    def get_operation_mode(self, msg):
+        
+        if self.current_operation_mode == OperationModes.TELEOPERATION.name:
+            if msg.data == OperationModes.AUTONOMOUS.name:
+                print("State changed from TELEOP to AUTONOMOUS mode!")
+                self.video_call_enabled = False
+                self.current_operation_mode == OperationModes.AUTONOMOUS.name
+            else:
+                print("Still in TELEOP mode")
+
+                
+
+    def log_delivery(self):
+        
+        self.num_bottles_delivered += 1
+        if self.num_bottles_delivered == self.initial_num_of_bottles:
+            self.num_bottles_delivered = 0
+
             
     def update_next_task(self):
         
@@ -107,6 +129,9 @@ class Mission_Planner():
 
             self.current_task_location_1 = ObjectOfInterest.BOTTLE.name # object pickup location / Enum name (string)
             self.current_task_location_2 = self.current_task_room  # / Enum of room_number name (string)
+
+            self.cur_bottle_id = self.num_bottles_delivered
+
 
         elif self.current_task_type == TaskType.VIDEOCALL.name:
             self.current_task_location_1 = self.current_task_room 
@@ -135,7 +160,7 @@ class Mission_Planner():
 
             # Search for and pick-up object
             self.update_mission_status(GlobalStates.MANIPULATION_TO_PICK)
-            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], isPick = True)
+            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], self.cur_bottle_id, isPick = True)
             if not manipulationSuccess:
                 rospy.loginfo("Manipulation failed. Cannot PICK object, returning to user")
                 return
@@ -152,13 +177,14 @@ class Mission_Planner():
 
             # Place object at delivery location
             self.update_mission_status(GlobalStates.MANIPULATION_TO_PLACE)
-            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], isPick = False)
+            manipulationSuccess = self.TaskExecutor.manipulate_object(ObjectOfInterest[self.current_task_object], self.cur_bottle_id, isPick = False)
             if not manipulationSuccess:
                 rospy.loginfo("Manipulation failed. Cannot PLACE object, returning to user")
                 return
 
             print("Placed object")
             
+            # self.log_delivery()
             
             # Return to robot home location 
             self.update_mission_status(GlobalStates.RETURN_TO_HOME)
@@ -172,24 +198,36 @@ class Mission_Planner():
 
         elif self.current_task_type == TaskType.VIDEOCALL.name:
 
-            # # Navigate to Outside Room Location (in front of door, same as delivery location)            
-            # self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
-            # navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
-            # if not navSuccess:
-            #     return
+            # Navigate to Outside Room Location (in front of door, same as delivery location)            
+            self.update_mission_status(GlobalStates.NAVIGATION_TO_PICK)
+            navSuccess = self.TaskExecutor.navigate_to_location(self.current_task_location_1)
+            if not navSuccess:
+                return
 
             print("Reached User location")
 
             self.update_mission_status(GlobalStates.ALIGN_TO_USER)
             align_success = self.TaskExecutor.align_to_user(ObjectOfInterest.USER.value)
             if not align_success:
+                rospy.loginfo("Alignment to user failed")
                 return
 
             print("Aligned to User")
     
             self.update_mission_status(GlobalStates.VIDEOCALL, mode = OperationModes.TELEOPERATION)
-
-
+            self.current_operation_mode = OperationModes.TELEOPERATION.name
+            self.video_call_enabled = True
+            # self.TaskExecutor.start_teleop()
+            rospy.sleep(3)
+            
+            print("STARTING a video call")
+            while self.video_call_enabled:                
+                continue
+            
+            # self.TaskExecutor.stop_teleop()
+            
+            print("ENDING the video call")
+            
             # navigate_to_location()      # In front of door
             # wait_for_door_open()
             # navigate_to_location()      # At videocall spot in room 

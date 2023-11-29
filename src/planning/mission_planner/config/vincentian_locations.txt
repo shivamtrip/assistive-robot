@@ -1,0 +1,16 @@
+This file contains multiple locations at Vincentian. When testing the system, just replace the json text in
+'vincentian_2nd_floor.json' with stuff here. 
+
+
+Room 233: {"x" : -1.7, "y" : 15, "theta" : 180}
+Room Chris: {"x" : -2.62, "y" : 49.3, "theta" : 270}
+
+Table opposite monitor in 2nd floor common area: 
+"201" : {"x" : 3, "y" : -2.3, "theta" : 270},
+
+Sofa: {"x" : 6.92, "y" : 1.01, "theta" : 270}
+BOTTLE TV RIGHT SIDE: {"x" : 8.8, "y":-2.1, "theta":0},
+
+Room 229: {"x" : -1.6, "y" : 3.03, "theta" : 180}
+
+JEFF - {"x" : -1.6, "y" : 10.7, "theta" : 180}

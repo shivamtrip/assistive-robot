@@ -25,7 +25,7 @@ class AlignToObject:
         self.prevxerr = 0    
         self.isDetected = False 
         
-        self.vs_range = [(-np.deg2rad(60), np.deg2rad(60)), np.deg2rad(15)] # [(left angle, right angle), stepsize]
+        self.vs_range = [(-np.deg2rad(45), np.deg2rad(45)), np.deg2rad(15)] # [(left angle, right angle), stepsize]
 
         self.x, self.y, self.z = 0, 0, 0
         self.obtainedInitialImages = False
@@ -44,7 +44,7 @@ class AlignToObject:
         self.objectLocArr = []
         self.isDepthMatters = False
         
-        self.horizontal_alignment_offset = 0.055 #0.05  #0.055
+        self.horizontal_alignment_offset = 0.02 #0.055 #0.05  #0.055
  
 
 
@@ -63,10 +63,12 @@ class AlignToObject:
                     'head_pan;to' : angle,
                     # 'head_pan;to' : 0,
                 })
-                rospy.sleep(1) # wait for the head to move
+                rospy.sleep(2) # wait for the head to move
+                
                 result = self.aruco_detector.getArucoLocation()
                 if result is not None:
                     poses.append(result.copy())
+                    
 
             # This part of the code stitches detections together.
             if len(poses) != 0:

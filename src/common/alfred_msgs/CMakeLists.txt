@@ -66,6 +66,7 @@ add_message_files(
   SpeechTrigger.msg
   DeploymentTask.msg
   StatusMessage.msg
+  TeleopCommands.msg
 )
 
 ## Generate services in the 'srv' folder

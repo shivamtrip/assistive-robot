@@ -1,6 +1,7 @@
 #input  
 int64 objectId
 bool isPick
+bool isTeleop
 float64 heightOfObject
 ---
 #output

@@ -11,8 +11,9 @@ import json
 import pyrebase
 import time
 from collections import defaultdict
-from alfred_msgs.msg import DeploymentTask, StatusMessage
+from alfred_msgs.msg import DeploymentTask, StatusMessage, TeleopCommands
 from update_server import ServerUpdater
+from std_msgs.msg import String
 
 
 class InterfaceManager:
@@ -28,6 +29,8 @@ class InterfaceManager:
         self.firebase_schema_path = os.path.expanduser("~/ws/src/interface/interface_manager/config/firebase_schema.json")
         
         self.task_publisher = rospy.Publisher('deployment_task_info', DeploymentTask, queue_size=10)
+        self.state_publisher = rospy.Publisher('deployment_state_info', String, queue_size=10)
+        self.teleop_command_publisher = rospy.Publisher('teleop_command_info', TeleopCommands, queue_size=10)
 
         self.status_subscriber = rospy.Subscriber('system_status_info', StatusMessage, self.server_updater.update_system_status)
          
@@ -71,14 +74,21 @@ class InterfaceManager:
 
                         if self.current_cloud_status[system]['id'] == self.system_id:
 
+                            # Read Remote Status to get Task Information
                             for remote in self.remote_list:
                                 for button in self.button_list:
-                                    
                                     if self.current_cloud_status[system]['remote'][remote]['button'][button]['state'] == "1":
-                                        
                                         print(f"{button} -- {remote} -- {system} is ON")
-                                        
-                                        self.inform_mission_planner(button, remote, system)
+                                        self.send_task_information(button, remote, system)
+
+                            # Read System Status to get Operation Mode Information
+                            operation_mode = self.current_cloud_status[system]['status']['operation_mode']
+                            self.send_state_information(operation_mode)
+                            
+                            # if operation_mode == "TELEOPERATION":
+                            #     # Read Teleop Commands to get Teleop Command Information
+                            #     teleop_commands = self.current_cloud_status[system]['teleop_commands']
+                            #     self.send_teleop_commands(teleop_commands)
                         
                         self.server_updater.system_number = system
 
@@ -90,7 +100,7 @@ class InterfaceManager:
             rospy.sleep(self.update_delay)
                             
                             
-    def inform_mission_planner(self, button, remote, system):
+    def send_task_information(self, button, remote, system):
         
         task_message = DeploymentTask()
         
@@ -109,8 +119,23 @@ class InterfaceManager:
         self.server_updater.reset_button_state(button, remote, system)
 
         
+    def send_state_information(self, operation_mode):
 
+        self.state_publisher.publish(operation_mode)
+        
 
+    def send_teleop_commands(self, teleop_commands):
+        
+        teleop_command_message = TeleopCommands()
+        
+        teleop_command_message.manip_gripper_open = teleop_commands['manipulator']['gripper_open']
+        teleop_commands.manip_vel_extend = teleop_commands['manipulator']['vel_extend']
+        teleop_commands.manip_vel_lift = teleop_commands['manipulator']['vel_lift']
+        teleop_commands.manip_yaw_position = teleop_commands['manipulator']['yaw_position']
+        teleop_commands.base_vel_theta = teleop_commands['mobile_base']['veltheta']
+        teleop_commands.base_vel_x = teleop_commands['mobile_base']['velx']
+        
+        self.teleop_command_publisher.publish(teleop_command_message)
 
 
 if __name__ == "__main__":

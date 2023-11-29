@@ -418,7 +418,7 @@ class AlfredBodyNode:
         rospy.loginfo("Battery is fine!")
         if not self.robot.is_calibrated():
             rospy.loginfo("Homing the robot. Please wait :)")
-            self.robot.home()
+            # self.robot.home()
 
         self.stow(None)
 

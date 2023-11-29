@@ -84,7 +84,7 @@ class AlignToObject:
 
 
                 # If robot isn't rotating more than 3 degrees between iterations, break (to avoid being stuck in loop)
-                if prev_angle_to_go and abs(angle_to_go) - abs(prev_angle_to_go) <= 3:
+                if prev_angle_to_go and abs(angleToGo) - abs(prev_angle_to_go) <= 3:
                         print("Robot alignment is still the same since the previous iteration. Exiting loop.")
                         break
 
@@ -173,7 +173,7 @@ class AlignToObject:
         })
 
  
-        maxGraspableDistance = 1.2
+        maxGraspableDistance = 1.4  #1.2
 
         distanceToMove = self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)[4] - maxGraspableDistance
         rospy.loginfo("Object distance for YOLO = {}".format(self.human_detector.computeObjectLocation(self.human_detector.objectLocArr)[4]))

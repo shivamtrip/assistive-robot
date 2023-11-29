@@ -102,9 +102,9 @@ class ObjectDetectionNode:
 
 
 
-    def yolo_status_control(self, msg):
+    def yolo_status_control(self, msg : Bool):
 
-        if msg == True:
+        if msg.data == True:
             print("ACTIVATING Yolo Object Detector")
             self.yolo_detection_enabled = True
         else:

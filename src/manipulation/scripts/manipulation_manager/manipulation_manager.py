@@ -98,6 +98,8 @@ class ManipulationManager:
         # Start ArUco detector
         print("Starting Aruco Detections")
         self.aruco_detector.detect_aruco = True
+        
+        # self.aruco_detector.aruco_id = goal.objectId
         # self.aruco_detector.first_print = False
         # self.aruco_status_message.status = True
         # self.aruco_status_service(self.aruco_status_message)
