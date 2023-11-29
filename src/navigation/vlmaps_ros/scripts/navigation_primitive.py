@@ -736,7 +736,7 @@ def get_default_location(data_config_dir:str, label:str):
         pos = locations_dict[label]
         roll, pitch, yaw = pos['roll'], pos['pitch'], pos['yaw']
         x, y, z = pos['x'], pos['y'], pos['z']
-        goal2D = (x,y,yaw)
+        goal2D = (x,y,math.radians(yaw))
         return goal2D
     else:
         rospy.logerr(f"[{rospy.get_name()}]:" +"Label {} not found in locations dict".format(label))
