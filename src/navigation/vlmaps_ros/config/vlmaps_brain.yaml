@@ -28,7 +28,6 @@ area_threshold_to_match: 2000
 inference: True
 save_video: False
 show_vis: True
-cuda_device: 'cuda:0'
-
 
 objects_list: ["table","chair","refrigerator","potted plant","floor","sofa","bed","sink","other"]
+cuda_device: 'cuda:3'
