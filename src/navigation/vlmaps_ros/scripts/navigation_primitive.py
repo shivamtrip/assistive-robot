@@ -167,7 +167,14 @@ class TestTaskPlanner:
 
     def go_to_object(self, obj1, obj2):
         """ Inferences over vlmaps and navigates to object location """
-
+        
+        if(obj1=='user'):
+            homeGoal2d = (self.home_pos[0],self.home_pos[1],0)
+            home_navman_goal = convertToNavManGoals(homeGoal2d)
+            rospy.loginfo(f"[{rospy.get_name()}]:" +"Sending goal to navman {}".format(home_navman_goal))
+            status = self.navigate_to_location(home_navman_goal)
+            return status
+        
         assert obj1 in self.labels, "Object not in vlmaps labels"
 
         # Call vlmaps
@@ -191,6 +198,7 @@ class TestTaskPlanner:
         status = self.navigate_to_location(safe_navman_goal)
         
         if (self.show_vis):
+     
             publish_markers(goals_vis)
             # labels of interest
             USEFUL_LABELS = [obj1]
