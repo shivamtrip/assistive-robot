@@ -1,96 +1,38 @@
-<h1 align="center">
-  <br>
-  <img src="images/Auxilio_Logo.jpg" alt="Auxilio" width="197">
-  <br>
-  <p>Alfred</p>
-</h1>
+# End-to-end autonomy (HRI, Perception, Planning, Navigation, Manipulation, Controls) on a Stretch RE1 robot
 
-# Repository organisation
+- This was my Master's capstone project at CMU Robotics. It involved developing and integrating an end-to-end autonomy stack for an indoor assistive robot.
+- At the end of our project (Dec-2023), we successfully [deployed our robot at an Assisted Living Facility](https://www.youtube.com/watch?v=epFzxcuik8c&ab_channel=AuxilioRobotics) in Pittsburgh and Carnegie Mellon University [featured our work](https://www.cs.cmu.edu/news/2023/care-home-robot).
 
-The code is organised in several top level packages/directories. The top level should adhere to the following subdivision of functionality (a more detailed description can be found in the folders themselves):
+<img src = "https://github.com/shivamtrip/home-robot/assets/66013750/f39b4dbb-7791-4d4f-96a6-782c452834fd" width="450"> <br/>
 
-**common/** - top-level launchfiles, msgs, and other files used by many packages
+**Important Links:** [Project YouTube](https://www.youtube.com/@AuxilioRobotics), [Project Website](https://mrsdprojects.ri.cmu.edu/2023teamf), [Project Github](https://github.com/Auxilio-Robotics/alfred-deployed) 
 
-**perception/** - folder for perception packages
+## Implementation
+The user provides a voice command to Alfred (Stretch RE1 robot) for fetching an object. Alfred understands this command, plans and navigates to the object's approximate location in the environment, scans for the object, detects the object, identifies grasp points, picks up the object and finally returns back to the user with the desired object. 
 
-**navigation/** - folder for navigation packages
+- For HRI, we are using Google Cloud Speech-to-Text API and the ChatGPT API. 
+- For Navigation, we are using ROS Movebase, STVL for 3D Obstacle Avoidance, GMapping for 2D Lidar SLAM, AMCL for 2D Localization, A* for global planning and DWA for local planning.
+- For Perception and Manipulation, we are using Yolo v8, Graspnet and have implemented multiple finite state machines.
+- For overall system integration, we have a system-level finite state machine.
+- For low-level joint control, we are leveraging the Stretch RE1's open-source APIs.
 
-**manipulation/** - folder for manipulation packages
+**My primary role in this project:** 
+- Use ROS / C++ / Python to set up and optimize the navigation stack (localization, planning & 3D obstacle avoidance)
+- Design & implement a robust software architecture which integrates a cloud-server, HRI interfaces, navigation / manipulation stacks and a high-level task planner.
+- Through the course of the project, I also contributed to various perception, manipulation and system-integration aspects of the project.
 
-**control/** - folder for control packages
 
-**interface/** - folder for interface packages
+## Videos
+Navigation             |  Manipulation
+:-------------------------:|:-------------------------:
+<img src="https://github.com/shivamtrip/home-robot/assets/66013750/1e100290-46ea-495f-a957-8b471560a2af" width="300"> &nbsp; | &nbsp; <img src = "https://github.com/shivamtrip/home-robot/assets/66013750/7ba8de89-31f0-4fcf-9dc2-8be52344d24c" width="250"> <br />
+<img src = "https://github.com/shivamtrip/home-robot/assets/66013750/91732fd1-f02f-461a-99ab-a01f0a7eb123" width="300"> &nbsp;| &nbsp; <img src="https://github.com/shivamtrip/home-robot/assets/66013750/dd773590-5f12-440e-ad63-26ebbec67c77" width="250" > <br />
 
-**simulation/** - folder for simulation packages
+## Software Architectures
+<img src="https://github.com/shivamtrip/home-robot/assets/66013750/1de1b99d-f994-45a1-859a-482e0953d265" width="600"> <br/>
+<img src="https://github.com/shivamtrip/home-robot/assets/66013750/8a995bd9-c8f4-46ad-833a-9793f6b44d7d" width="600"> <br/>
 
-# Placement of ROS packages
-ROS Packages should be added in one of the top level work-package folders. The top level work-package folders themselves should not be used to store ros package information. 
 
-The directory tree should look like:
 
-```
-~/ws
-  |__ src
-      |__ common
-      |   |__ alfred_msgs
-      |   |__ ...
-      |
-      |__ perception
-      |   |__ ...
-      |
-      |__ control
-      |   |__ ...
-      |
-      |__ manipulation
-      |   |__ ...
-      |
-      |__ navigation
-      |   |__ ...
-      |
-      |__ interface
-      |   |__ speech_recognition
-      |   |__ ...
-      |
-      |__ simulation
-          |__ ...
-```
 
-# Setting up the workspace
 
-```
-cd ~
-git clone --recursive git@github.com:Auxilio-Robotics/alfred.git ws
-```
-
-# Install dependencies
-
-```
-cd ws
-source /opt/ros/noetic/setup.bash
-sudo apt install python3-rosdep
-rosdep install --from-paths src --ignore-src -r -y
-```
-
-# Building the workspace
-
-```
-cd ~/ws
-source /opt/ros/noetic/setup.bash # if not done already
-catkin init # to check if config is valid
-catkin build
-```
-
-# Testing the workspace
-```
-cd ~/ws
-catkin build
-catkin test
-```
-
-# Run Nursing Home Simulation
-
-```
-cd ~/ws
-source devel/setup.bash
-roslaunch alfred_gazebo simulation.launch
-```
