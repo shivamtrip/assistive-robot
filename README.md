@@ -29,7 +29,7 @@ Navigation             |  Manipulation
 <img src = "https://github.com/shivamtrip/home-robot/assets/66013750/91732fd1-f02f-461a-99ab-a01f0a7eb123" width="300"> &nbsp;| &nbsp; <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/dd773590-5f12-440e-ad63-26ebbec67c77" width="250" > <br />
 
 ## System Architectures
-<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/2aacf45b-84fe-484a-8fc1-a8d398d21774" width="600"> <br/>
+<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/1073baaf-a9ab-43d1-9273-dcb43b4903da" width="600"> <br/>
 <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/eb1b2101-ca88-47b5-a550-7b64e1747261" width="600"> <br/>
 
 ## Software Architectures
