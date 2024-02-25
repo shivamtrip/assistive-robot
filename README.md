@@ -12,7 +12,7 @@ The user provides a voice command to Alfred (Stretch RE1 robot) for fetching an 
 
 - For HRI, we are using Google Cloud Speech-to-Text API and the ChatGPT API. 
 - For Navigation, we are using ROS Movebase, STVL for 3D Obstacle Avoidance, GMapping for 2D Lidar SLAM, AMCL for 2D Localization, A* for global planning and DWA for local planning.
-- For Perception and Manipulation, we are using Yolo v8, Graspnet and have implemented multiple finite state machines.
+- For Perception and Manipulation, we are using Yolo v8 for object detection, Graspnet for grasp point detection and have implemented multiple finite state machines for different stages of our pipeline.
 - For overall system integration, we have a system-level finite state machine.
 - For low-level joint control, we are leveraging the Stretch RE1's open-source APIs.
 
