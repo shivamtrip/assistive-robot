@@ -40,6 +40,6 @@ Navigation             |  Manipulation
 <img src="https://github.com/shivamtrip/home-robot/assets/66013750/1de1b99d-f994-45a1-859a-482e0953d265" width="600"> <br/>
 <img src="https://github.com/shivamtrip/home-robot/assets/66013750/8a995bd9-c8f4-46ad-833a-9793f6b44d7d" width="600"> <br/>
 
-
-
+## Project Poster 
+<img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/e754fc4b-5b5d-4be2-9317-6ea9829ebad7" width="600">
 
