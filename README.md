@@ -3,12 +3,15 @@
 - This was my Master's capstone project at CMU Robotics. It involved developing and integrating an end-to-end autonomy stack for an indoor assistive robot.
 - At the end of our project (Dec-2023), we successfully [deployed our robot at an Assisted Living Facility](https://www.youtube.com/watch?v=epFzxcuik8c&ab_channel=AuxilioRobotics) in Pittsburgh and Carnegie Mellon University [featured our work](https://www.cs.cmu.edu/news/2023/care-home-robot).
 
-Demo @ CMU Robotics Institute |  Demo @ Vincentian Senior Living, Pittsburgh
-:-------------------------:|:-------------------------:
-<br /> <img src="https://github.com/shivamtrip/home-robot/assets/66013750/f39b4dbb-7791-4d4f-96a6-782c452834fd" width="450"> &nbsp; | &nbsp; <img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/8b7fc190-bc96-4c4f-8c32-a48c7bb1a066" width="450"> <br />
-
+**Demo @ CMU Robotics Institute**
+:-------------------------:|
+<br /> <img src="https://github.com/shivamtrip/home-robot/assets/66013750/f39b4dbb-7791-4d4f-96a6-782c452834fd" width="450"> &nbsp; |
 
 [<img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/42b94cf7-d9d8-4c68-a32f-f60633ff56ca" width = "400">](https://www.cs.cmu.edu/news/2023/care-home-robot) <br/> 
+
+**Demo @ Vincentian Senior Living, Pittsburgh**
+:-------------------------:|
+&nbsp; <br />  <img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/8b7fc190-bc96-4c4f-8c32-a48c7bb1a066" width="450"> <br />
 
 
 **Important Links:** [Project YouTube](https://www.youtube.com/@AuxilioRobotics), [Project Website](https://mrsdprojects.ri.cmu.edu/2023teamf), [Project Github](https://github.com/Auxilio-Robotics/alfred-deployed) 
