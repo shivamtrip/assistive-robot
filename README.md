@@ -16,6 +16,14 @@
 
 **Important Links:** [Project YouTube](https://www.youtube.com/@AuxilioRobotics), [Project Website](https://mrsdprojects.ri.cmu.edu/2023teamf), [Project Github](https://github.com/Auxilio-Robotics/alfred-deployed) 
 
+Jump to section: 
+- [Use Case](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#use-case)
+- [Subsystem Videos](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#subsystem-videos)
+- [System Architectures](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#system-architectures)
+- [Software Architectures](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#software-architectures)
+- [Tech Stack](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#tech-stack)
+- [Project Poster](https://github.com/shivamtrip/assistive-robot?tab=readme-ov-file#project-poster)
+
 ## Use-Case: 
 1. A user provides a voice command to Alfred (Stretch RE1 robot) for fetching an object.
 2. Alfred understands this command and sets out to fetch the object.
@@ -27,7 +35,7 @@
 3. The user is happy! :) 
 
 
-## More Videos
+## Subsystem Videos
 Navigation             |  Manipulation
 :-------------------------:|:-------------------------:
 <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/1e100290-46ea-495f-a957-8b471560a2af" width="300"> &nbsp; | &nbsp; <img src = "https://github.com/shivamtrip/home-robot/assets/66013750/7ba8de89-31f0-4fcf-9dc2-8be52344d24c" width="250"> <br />
