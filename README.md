@@ -50,11 +50,6 @@ Navigation             |  Manipulation
 Overall Structure |
 :-------------------------:|
 <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="500"> &nbsp;
-
-Our robot operated in an assisted living facility and had a scalable database structure. Features:
-- Enabled horizontal scaling of number of robots and remotes in the facility (each resident had a remote to call the robot)
-- Enabled capturing of real-time status of each robot such as current operation mode, battery percentage, joint angles, etc.
-- Enabled remote-based teleoperation of robot (for patient's family or nurse). 
   
 
 ## Tech Stack
