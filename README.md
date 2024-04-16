@@ -47,11 +47,10 @@ Navigation             |  Manipulation
 <img src="https://github.com/shivamtrip/home-robot/assets/66013750/8a995bd9-c8f4-46ad-833a-9793f6b44d7d" width="600"> <br/>
 
 #### Database Structure
-For our deployment system that operated in an assisted living facility, we created a scalable database structure. Primary features included:
-- Allowed for horizontal scaling of number of robots in the facility
-- Allowed for horizontal scaling of number of remotes in the facility (each resident would have a remote in their room to call Alfred)
-- Captured real-time status of each robot, including global states such as current operation mode, battery percentage, etc. as well as local states such as joint angles.
-- Enabled remote-based teleoperation of robot (this feature would enable a family member the resident or nurse to operate the robot and assist the resident).
+Our robot operated in an assisted living facility and had a scalable database structure. Features:
+- Enabled horizontal scaling of number of robots and remotes in the facility (each resident also had a remote to request the robot's assistance)
+- Enabled capturing of real-time status of each robot such as current operation mode, battery percentage, joint angles, etc.
+- Enabled remote-based teleoperation of robot (for patient's family or nurse). 
     
 Overall Structure |
 :-------------------------:|
@@ -59,8 +58,7 @@ Overall Structure |
 
 Joint Status |Remote Status | System Status | Teleoperation Commands   
 :-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:
-<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> &nbsp;| <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> &nbsp; | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300">
-
+<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/5173a884-2eb7-44c8-a3ef-d51efed00671" width="300"> &nbsp;| <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/ded57a6d-1462-4a47-b205-56394d2c751b" width="300"> &nbsp; | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/dd8ea419-9a8b-4cf1-8e98-d504755311ec" width="300"> | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/366e06d9-a498-48e3-86ab-618299c2b9e8" width="300">
 
 ## Tech Stack
 - For HRI, we are using Google Cloud Speech-to-Text API and the ChatGPT API. 
