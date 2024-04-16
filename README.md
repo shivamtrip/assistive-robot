@@ -46,6 +46,21 @@ Navigation             |  Manipulation
 #### Mission Planner Node
 <img src="https://github.com/shivamtrip/home-robot/assets/66013750/8a995bd9-c8f4-46ad-833a-9793f6b44d7d" width="600"> <br/>
 
+#### Database Structure
+For our deployment system that operated in an assisted living facility, we created a scalable database structure. Primary features included:
+- Allowed for horizontal scaling of number of robots in the facility
+- Allowed for horizontal scaling of number of remotes in the facility (each resident would have a remote in their room to call Alfred)
+- Captured real-time status of each robot, including global states such as current operation mode, battery percentage, etc. as well as local states such as joint angles.
+- Enabled remote-based teleoperation of robot (this feature would enable a family member the resident or nurse to operate the robot and assist the resident).
+    
+Overall Structure |
+:-------------------------:|
+<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="400"> &nbsp;| 
+
+Joint Status |Remote Status | System Status | Teleoperation Commands   
+:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:
+<img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> &nbsp;| <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> &nbsp; | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300"> | <img src="https://github.com/shivamtrip/assistive-robot/assets/66013750/f6991590-dfb7-49a9-999c-26b2972f46e2" width="300">
+
 
 ## Tech Stack
 - For HRI, we are using Google Cloud Speech-to-Text API and the ChatGPT API. 
@@ -63,4 +78,5 @@ Navigation             |  Manipulation
 
 ## Project Poster 
 <img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/e754fc4b-5b5d-4be2-9317-6ea9829ebad7" width="600">
+
 
