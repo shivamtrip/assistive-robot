@@ -5,7 +5,7 @@
 
 **Demo @ CMU Robotics Institute**
 :-------------------------:|
-<br /> <img src="https://github.com/shivamtrip/home-robot/assets/66013750/f39b4dbb-7791-4d4f-96a6-782c452834fd" width="450"> &nbsp; |
+<br /> <img src="https://github.com/user-attachments/assets/1d79f821-a7d5-4499-b6fb-a55f256d5f1a" width="450"> &nbsp; |
 
 [<img src = "https://github.com/shivamtrip/assistive-robot/assets/66013750/42b94cf7-d9d8-4c68-a32f-f60633ff56ca" width = "400">](https://www.cs.cmu.edu/news/2023/care-home-robot) <br/> 
 
